@@ -1,0 +1,11 @@
+{
+  "requirements": 90,
+  "active_requirements": 84,
+  "acceptance_scenarios": 26,
+  "deferred_scenarios": [
+    "AC-014"
+  ],
+  "stable_ids_preserved": true,
+  "undefined_or_unmapped_ids": 0,
+  "home_copy_unchanged": true
+}

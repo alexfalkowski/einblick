@@ -9,6 +9,8 @@ FEATURES.md
 PROJECTS.md
 RELIABILITY.md
 vendor/
+!/prototype/vendor/
+!/prototype/vendor/**
 test/reports/*
 !test/reports/.keep
 *.prof

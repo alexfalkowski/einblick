@@ -1,0 +1,12 @@
+# Proposed presentation catalog only; the executable config schema does not exist yet.
+# Confirm each deployed service's monitored incoming protocols before rollout.
+# id selects the native OTel service.name; server_protocols selects standard panels.
+services:
+  - id: abgleich
+    server_protocols: [http]
+  - id: bezeichner
+    server_protocols: [http, grpc]
+  - id: standort
+    server_protocols: [http, grpc]
+  - id: web
+    server_protocols: [http]

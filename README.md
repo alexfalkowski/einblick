@@ -17,7 +17,16 @@ owner input. Link to InfraOps for deployment details; do not invent infrastructu
 dependencies, or rationale. Remove this comment once the service docs are complete.
 -->
 
+## Requirements
 
+The [current requirements](docs/requirements.md) own the product decisions,
+acceptance scenarios, and open questions. The repository currently contains a
+service scaffold; the planned telemetry behavior remains to be implemented.
+
+See the [planning handoff](docs/planning.md) for the implementation plan,
+historical requirements, supporting evidence, and interactive prototype. Read
+the [planning guidance](docs/planning-guidance.md) before refining requirements
+or starting a planned implementation packet.
 
 ## Development
 
