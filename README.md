@@ -35,6 +35,9 @@ Use the Go and Ruby toolchain provided by the
 development workflow also uses betteralign, golangci-lint, and RuboCop. See
 `make help` for supported commands and their prerequisites.
 
+Local builds require CGO and a C/C++ compiler for the planned DuckDB
+integration.
+
 Initialize the shared tooling before using Make, then install dependencies and
 build the server:
 
@@ -86,8 +89,18 @@ health:
 
 ## Deployment
 
+Releases publish notes on GitHub and Docker images for deployment.
+
 Container builds use the shared
-[Go service Dockerfile](bin/build/docker/go/Dockerfile). The `.cd` marker enables
+[Go service Dockerfile](bin/build/docker/go/Dockerfile). The service Makefile
+sets `static=0`, enabling CGO and selecting the Debian 13 C/C++ runtime image
+for Docker build, test, and release targets (DEP-001). Build a local image with:
+
+```sh
+make build-docker platform=arm64
+```
+
+The `.cd` marker enables
 automated deployment updates: the release image's `deploy` command opens a
 version-bump PR in [InfraOps](https://github.com/alexfalkowski/infraops).
 Deployment configuration is managed in
