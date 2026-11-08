@@ -1,13 +1,11 @@
-[![CircleCI](https://circleci.com/gh/alexfalkowski/go-service-template.svg?style=svg)](https://circleci.com/gh/alexfalkowski/go-service-template)
-[![codecov](https://codecov.io/gh/alexfalkowski/go-service-template/graph/badge.svg)](https://codecov.io/gh/alexfalkowski/go-service-template)
-[![Go Reference](https://pkg.go.dev/badge/github.com/alexfalkowski/go-service-template.svg)](https://pkg.go.dev/github.com/alexfalkowski/go-service-template)
+[![CircleCI](https://circleci.com/gh/alexfalkowski/einblick.svg?style=svg)](https://circleci.com/gh/alexfalkowski/einblick)
+[![codecov](https://codecov.io/gh/alexfalkowski/einblick/graph/badge.svg)](https://codecov.io/gh/alexfalkowski/einblick)
+[![Go Reference](https://pkg.go.dev/badge/github.com/alexfalkowski/einblick.svg)](https://pkg.go.dev/github.com/alexfalkowski/einblick)
 [![Stability: Active](https://masterminds.github.io/stability/active.svg)](https://masterminds.github.io/stability/active.html)
 
-# go-service-template
+# einblick
 
-<!-- repository:description -->
-A template for Go services with HTTP and gRPC transports.
-<!-- /repository:description -->
+Einblick collects logs, metrics, and traces for go-service services with DuckDB queries and Parquet archives in Cloudflare R2.
 
 <!--
 Service owners and documentation tools: expand the introduction with the intended
@@ -19,29 +17,7 @@ owner input. Link to InfraOps for deployment details; do not invent infrastructu
 dependencies, or rationale. Remove this comment once the service docs are complete.
 -->
 
-<!-- template:setup -->
-## Create a service
 
-Create the repository through InfraOps using this template, with its final name
-and description. Clone it into a directory matching the repository name, then run
-from the clone's root:
-
-```sh
-gh auth login
-tools/init
-```
-
-Initialization requires Bash 4+, GNU sed, Git, the GitHub CLI, and the development
-tools below. It reads the name, owner, and description from the GitHub repository
-at `origin`, then updates the module path, service names, README, and badges.
-An empty description or a checkout directory that differs from the repository
-name stops initialization before any files are changed.
-
-The script installs dependencies, regenerates API code, formats the project, and
-removes `tools/` and this section. It then creates an initialization branch and
-runs `make ready`, which commits, pushes, opens a pull request, and enables
-auto-merge.
-<!-- /template:setup -->
 
 ## Development
 
@@ -64,7 +40,7 @@ make build
 Start the server with the local development configuration:
 
 ```sh
-./go-service-template server -config file:test/.config/server.yaml
+./einblick server -config file:test/.config/server.yaml
 ```
 
 The local configuration listens for HTTP on port `11000` and gRPC on port
@@ -72,8 +48,8 @@ The local configuration listens for HTTP on port `11000` and gRPC on port
 See [the configuration](test/.config/server.yaml) for transport timeouts, rate
 limits, logging, and telemetry settings.
 
-The initial [gRPC contract](api/example/v1/service.proto) defines
-`example.v1.Service/Hello`, with a message field in the request and response.
+The initial [gRPC contract](api/einblick/v1/service.proto) defines
+`einblick.v1.Service/Hello`, with a message field in the request and response.
 Implement the service's domain behavior and document a working request here.
 Regenerate Go and Ruby bindings with `make proto-generate` after changing the
 contract.
@@ -83,13 +59,13 @@ contract.
 The server exposes service health, liveness, and readiness over HTTP:
 
 ```sh
-curl --fail http://localhost:11000/go-service-template/healthz
-curl --fail http://localhost:11000/go-service-template/livez
-curl --fail http://localhost:11000/go-service-template/readyz
+curl --fail http://localhost:11000/einblick/healthz
+curl --fail http://localhost:11000/einblick/livez
+curl --fail http://localhost:11000/einblick/readyz
 ```
 
 The initial checks use a no-op check for liveness and readiness, and an online
-check for service health. The gRPC health service checks `example.v1.Service`.
+check for service health. The gRPC health service checks `einblick.v1.Service`.
 See [the health wiring](internal/health/health.go) and
 [health scenarios](test/features/health/) when adding dependency checks.
 
@@ -108,7 +84,7 @@ service's configuration there once it is provisioned.
 
 ## References
 
-- [API contract](api/example/v1/service.proto)
-- [Go package documentation](https://pkg.go.dev/github.com/alexfalkowski/go-service-template)
-- [Releases](https://github.com/alexfalkowski/go-service-template/releases)
+- [API contract](api/einblick/v1/service.proto)
+- [Go package documentation](https://pkg.go.dev/github.com/alexfalkowski/einblick)
+- [Releases](https://github.com/alexfalkowski/einblick/releases)
 - [Shared tooling](bin/README.md)

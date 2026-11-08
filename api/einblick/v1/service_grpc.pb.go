@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.2
 // - protoc             (unknown)
-// source: example/v1/service.proto
+// source: einblick/v1/service.proto
 
 package v1
 
@@ -19,7 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Service_Hello_FullMethodName = "/example.v1.Service/Hello"
+	Service_Hello_FullMethodName = "/einblick.v1.Service/Hello"
 )
 
 // ServiceClient is the client API for Service service.
@@ -114,7 +114,7 @@ func _Service_Hello_Handler(srv interface{}, ctx context.Context, dec func(inter
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Service_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "example.v1.Service",
+	ServiceName: "einblick.v1.Service",
 	HandlerType: (*ServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -123,5 +123,5 @@ var Service_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "example/v1/service.proto",
+	Metadata: "einblick/v1/service.proto",
 }

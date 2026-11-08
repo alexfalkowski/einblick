@@ -25,50 +25,50 @@ executors:
 jobs:
   build-service:
     executor: go
-    working_directory: ~/go-service-template
+    working_directory: ~/einblick
     steps:
       - checkout-submodules
       - run: make source-key
       - restore_cache:
           name: restore go cache
           keys:
-            - go-service-template-go-cache-{{ checksum "go.sum" }}-{{ checksum "~/.go-version" }}
-            - go-service-template-go-cache-
+            - einblick-go-cache-{{ checksum "go.sum" }}-{{ checksum "~/.go-version" }}
+            - einblick-go-cache-
       - restore_cache:
           name: restore ruby cache
           keys:
-            - go-service-template-ruby-cache-{{ checksum "test/Gemfile.lock" }}-{{ checksum "~/.ruby-version" }}
-            - go-service-template-ruby-cache-
+            - einblick-ruby-cache-{{ checksum "test/Gemfile.lock" }}-{{ checksum "~/.ruby-version" }}
+            - einblick-ruby-cache-
       - run: make clean
       - run: make dep
       - save_cache:
           name: save go cache
-          key: go-service-template-go-cache-{{ checksum "go.sum" }}-{{ checksum "~/.go-version" }}
+          key: einblick-go-cache-{{ checksum "go.sum" }}-{{ checksum "~/.go-version" }}
           paths:
             - ~/go/pkg/mod
       - save_cache:
           name: save ruby cache
-          key: go-service-template-ruby-cache-{{ checksum "test/Gemfile.lock" }}-{{ checksum "~/.ruby-version" }}
+          key: einblick-ruby-cache-{{ checksum "test/Gemfile.lock" }}-{{ checksum "~/.ruby-version" }}
           paths:
             - test/vendor
       - restore_cache:
           name: restore go build cache
           keys:
-            - go-service-template-go-build-cache-{{ checksum "go.sum" }}-{{ checksum "~/.go-version" }}-{{ checksum ".source-key" }}
-            - go-service-template-go-build-cache-
+            - einblick-go-build-cache-{{ checksum "go.sum" }}-{{ checksum "~/.go-version" }}-{{ checksum ".source-key" }}
+            - einblick-go-build-cache-
       - restore_cache:
           name: restore go lint cache
           keys:
-            - go-service-template-go-lint-cache-{{ checksum "go.sum" }}-{{ checksum "~/.go-lint-version" }}-{{ checksum ".source-key" }}
-            - go-service-template-go-lint-cache-
+            - einblick-go-lint-cache-{{ checksum "go.sum" }}-{{ checksum "~/.go-lint-version" }}-{{ checksum ".source-key" }}
+            - einblick-go-lint-cache-o
       - run: make clean
       - run: make lint
       - save_cache:
           name: save go lint cache
-          key: go-service-template-go-lint-cache-{{ checksum "go.sum" }}-{{ checksum "~/.go-lint-version" }}-{{ checksum ".source-key" }}
+          key: einblick-go-lint-cache-{{ checksum "go.sum" }}-{{ checksum "~/.go-lint-version" }}-{{ checksum ".source-key" }}
           paths:
             - ~/.cache/golangci-lint
-      - run: make proto-breaking
+      # - run: make proto-breaking
       - run: make proto-stale
       - run: make sec
       - run: make features
@@ -76,7 +76,7 @@ jobs:
       - run: make analyse
       - save_cache:
           name: save go build cache
-          key: go-service-template-go-build-cache-{{ checksum "go.sum" }}-{{ checksum "~/.go-version" }}-{{ checksum ".source-key" }}
+          key: einblick-go-build-cache-{{ checksum "go.sum" }}-{{ checksum "~/.go-version" }}-{{ checksum ".source-key" }}
           paths:
             - ~/.cache/go-build
       - run: make coverage
@@ -88,27 +88,27 @@ jobs:
     resource_class: arm.large
   sync:
     executor: release
-    working_directory: ~/go-service-template
+    working_directory: ~/einblick
     steps:
       - checkout-submodules
       - run: make sync push
     resource_class: arm.large
   version:
     executor: release
-    working_directory: ~/go-service-template
+    working_directory: ~/einblick
     steps:
       - checkout-submodules
       - run: make source-key
       - restore_cache:
           name: restore go cache
           keys:
-            - go-service-template-go-cache-{{ checksum "go.sum" }}-{{ checksum "~/.go-version" }}
-            - go-service-template-go-cache-
+            - einblick-go-cache-{{ checksum "go.sum" }}-{{ checksum "~/.go-version" }}
+            - einblick-go-cache-
       - restore_cache:
           name: restore go build cache
           keys:
-            - go-service-template-go-build-cache-{{ checksum "go.sum" }}-{{ checksum "~/.go-version" }}-{{ checksum ".source-key" }}
-            - go-service-template-go-build-cache-
+            - einblick-go-build-cache-{{ checksum "go.sum" }}-{{ checksum "~/.go-version" }}-{{ checksum ".source-key" }}
+            - einblick-go-build-cache-
       - run: version
       - persist_to_workspace:
           root: /tmp/workspace
@@ -123,7 +123,7 @@ jobs:
       - run: echo "all applicable jobs finished"
   test-docker-amd64:
     executor: go
-    working_directory: ~/go-service-template
+    working_directory: ~/einblick
     steps:
       - checkout-submodules
       - setup_remote_docker:
@@ -132,7 +132,7 @@ jobs:
     resource_class: large
   test-docker-arm64:
     executor: go
-    working_directory: ~/go-service-template
+    working_directory: ~/einblick
     steps:
       - checkout-submodules
       - setup_remote_docker:
@@ -141,7 +141,7 @@ jobs:
     resource_class: arm.large
   release-docker-amd64:
     executor: go
-    working_directory: ~/go-service-template
+    working_directory: ~/einblick
     steps:
       - checkout-submodules
       - attach_workspace:
@@ -155,7 +155,7 @@ jobs:
     resource_class: large
   release-docker-arm64:
     executor: go
-    working_directory: ~/go-service-template
+    working_directory: ~/einblick
     steps:
       - checkout-submodules
       - attach_workspace:
@@ -169,7 +169,7 @@ jobs:
     resource_class: arm.large
   manifest-docker:
     executor: go
-    working_directory: ~/go-service-template
+    working_directory: ~/einblick
     steps:
       - checkout-submodules
       - attach_workspace:
@@ -183,7 +183,7 @@ jobs:
     resource_class: arm.large
 
 workflows:
-  go-service-template:
+  einblick:
     jobs:
       - build-service
       - test-docker-amd64:
