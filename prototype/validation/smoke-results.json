@@ -1,0 +1,25 @@
+{
+  "checks": [
+    "Overview renders eight built-in charts",
+    "Synthetic trace IDs are distinct",
+    "Logs show bounded page",
+    "Logs advance to the second page",
+    "Instance changes reset log pagination",
+    "Time range changes reset log pagination",
+    "Surrounding logs reset log pagination",
+    "Log drawer opens",
+    "Log links to trace waterfall",
+    "Span inspection changes selection",
+    "Trace links to filtered related logs",
+    "Log search filters rows",
+    "Trace error filter works",
+    "HTTP-only services omit gRPC panels",
+    "Chart range selection appears",
+    "Chart selection carries into log filtering",
+    "Empty state remains distinct from zero",
+    "Empty overview uses dashes",
+    "Mobile layout fits viewport",
+    "No browser runtime error"
+  ],
+  "passed": 20
+}
