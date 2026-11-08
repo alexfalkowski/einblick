@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.12
 // 	protoc        (unknown)
-// source: example/v1/service.proto
+// source: einblick/v1/service.proto
 
 package v1
 
@@ -31,7 +31,7 @@ type HelloRequest struct {
 
 func (x *HelloRequest) Reset() {
 	*x = HelloRequest{}
-	mi := &file_example_v1_service_proto_msgTypes[0]
+	mi := &file_einblick_v1_service_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +43,7 @@ func (x *HelloRequest) String() string {
 func (*HelloRequest) ProtoMessage() {}
 
 func (x *HelloRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_example_v1_service_proto_msgTypes[0]
+	mi := &file_einblick_v1_service_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -56,7 +56,7 @@ func (x *HelloRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HelloRequest.ProtoReflect.Descriptor instead.
 func (*HelloRequest) Descriptor() ([]byte, []int) {
-	return file_example_v1_service_proto_rawDescGZIP(), []int{0}
+	return file_einblick_v1_service_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *HelloRequest) GetMessage() string {
@@ -76,7 +76,7 @@ type HelloResponse struct {
 
 func (x *HelloResponse) Reset() {
 	*x = HelloResponse{}
-	mi := &file_example_v1_service_proto_msgTypes[1]
+	mi := &file_einblick_v1_service_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -88,7 +88,7 @@ func (x *HelloResponse) String() string {
 func (*HelloResponse) ProtoMessage() {}
 
 func (x *HelloResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_example_v1_service_proto_msgTypes[1]
+	mi := &file_einblick_v1_service_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -101,7 +101,7 @@ func (x *HelloResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HelloResponse.ProtoReflect.Descriptor instead.
 func (*HelloResponse) Descriptor() ([]byte, []int) {
-	return file_example_v1_service_proto_rawDescGZIP(), []int{1}
+	return file_einblick_v1_service_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *HelloResponse) GetMessage() string {
@@ -111,39 +111,38 @@ func (x *HelloResponse) GetMessage() string {
 	return ""
 }
 
-var File_example_v1_service_proto protoreflect.FileDescriptor
+var File_einblick_v1_service_proto protoreflect.FileDescriptor
 
-const file_example_v1_service_proto_rawDesc = "" +
+const file_einblick_v1_service_proto_rawDesc = "" +
 	"\n" +
-	"\x18example/v1/service.proto\x12\n" +
-	"example.v1\"(\n" +
+	"\x19einblick/v1/service.proto\x12\veinblick.v1\"(\n" +
 	"\fHelloRequest\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\")\n" +
 	"\rHelloResponse\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage2G\n" +
-	"\aService\x12<\n" +
-	"\x05Hello\x12\x18.example.v1.HelloRequest\x1a\x19.example.v1.HelloResponseBKZ;github.com/alexfalkowski/go-service-template/api/example/v1\xea\x02\vExample::V1b\x06proto3"
+	"\amessage\x18\x01 \x01(\tR\amessage2I\n" +
+	"\aService\x12>\n" +
+	"\x05Hello\x12\x19.einblick.v1.HelloRequest\x1a\x1a.einblick.v1.HelloResponseBAZ1github.com/alexfalkowski/einblick/api/einblick/v1\xea\x02\vExample::V1b\x06proto3"
 
 var (
-	file_example_v1_service_proto_rawDescOnce sync.Once
-	file_example_v1_service_proto_rawDescData []byte
+	file_einblick_v1_service_proto_rawDescOnce sync.Once
+	file_einblick_v1_service_proto_rawDescData []byte
 )
 
-func file_example_v1_service_proto_rawDescGZIP() []byte {
-	file_example_v1_service_proto_rawDescOnce.Do(func() {
-		file_example_v1_service_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_example_v1_service_proto_rawDesc), len(file_example_v1_service_proto_rawDesc)))
+func file_einblick_v1_service_proto_rawDescGZIP() []byte {
+	file_einblick_v1_service_proto_rawDescOnce.Do(func() {
+		file_einblick_v1_service_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_einblick_v1_service_proto_rawDesc), len(file_einblick_v1_service_proto_rawDesc)))
 	})
-	return file_example_v1_service_proto_rawDescData
+	return file_einblick_v1_service_proto_rawDescData
 }
 
-var file_example_v1_service_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
-var file_example_v1_service_proto_goTypes = []any{
-	(*HelloRequest)(nil),  // 0: example.v1.HelloRequest
-	(*HelloResponse)(nil), // 1: example.v1.HelloResponse
+var file_einblick_v1_service_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_einblick_v1_service_proto_goTypes = []any{
+	(*HelloRequest)(nil),  // 0: einblick.v1.HelloRequest
+	(*HelloResponse)(nil), // 1: einblick.v1.HelloResponse
 }
-var file_example_v1_service_proto_depIdxs = []int32{
-	0, // 0: example.v1.Service.Hello:input_type -> example.v1.HelloRequest
-	1, // 1: example.v1.Service.Hello:output_type -> example.v1.HelloResponse
+var file_einblick_v1_service_proto_depIdxs = []int32{
+	0, // 0: einblick.v1.Service.Hello:input_type -> einblick.v1.HelloRequest
+	1, // 1: einblick.v1.Service.Hello:output_type -> einblick.v1.HelloResponse
 	1, // [1:2] is the sub-list for method output_type
 	0, // [0:1] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
@@ -151,26 +150,26 @@ var file_example_v1_service_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_example_v1_service_proto_init() }
-func file_example_v1_service_proto_init() {
-	if File_example_v1_service_proto != nil {
+func init() { file_einblick_v1_service_proto_init() }
+func file_einblick_v1_service_proto_init() {
+	if File_einblick_v1_service_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_example_v1_service_proto_rawDesc), len(file_example_v1_service_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_einblick_v1_service_proto_rawDesc), len(file_einblick_v1_service_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_example_v1_service_proto_goTypes,
-		DependencyIndexes: file_example_v1_service_proto_depIdxs,
-		MessageInfos:      file_example_v1_service_proto_msgTypes,
+		GoTypes:           file_einblick_v1_service_proto_goTypes,
+		DependencyIndexes: file_einblick_v1_service_proto_depIdxs,
+		MessageInfos:      file_einblick_v1_service_proto_msgTypes,
 	}.Build()
-	File_example_v1_service_proto = out.File
-	file_example_v1_service_proto_goTypes = nil
-	file_example_v1_service_proto_depIdxs = nil
+	File_einblick_v1_service_proto = out.File
+	file_einblick_v1_service_proto_goTypes = nil
+	file_einblick_v1_service_proto_depIdxs = nil
 }

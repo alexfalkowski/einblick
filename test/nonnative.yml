@@ -1,12 +1,12 @@
 version: "1.0"
-name: go-service-template
+name: einblick
 url: http://localhost:11000
 log: reports/nonnative.log
 processes:
   - name: server
     go:
       output: reports
-      executable: ../go-service-template
+      executable: ../einblick
       command: server
       parameters: ["-config file:.config/server.yaml"]
     timeout: 5
@@ -18,7 +18,7 @@ processes:
     readiness:
       - kind: http
         port: 11000
-        path: /go-service-template/readyz
+        path: /einblick/readyz
       - kind: grpc
         port: 12000
-        service: example.v1.Service
+        service: einblick.v1.Service

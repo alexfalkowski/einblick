@@ -15,5 +15,5 @@ test/reports/*
 *.cov
 *.out
 *.test
-/go-service-template
+/einblick
 dist/
