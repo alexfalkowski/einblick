@@ -87,9 +87,14 @@ health:
 ## Deployment
 
 Container builds use the shared
-[Go service Dockerfile](bin/build/docker/go/Dockerfile). Deployment configuration
-is managed in [InfraOps](https://github.com/alexfalkowski/infraops); link to the
-service's configuration there once it is provisioned.
+[Go service Dockerfile](bin/build/docker/go/Dockerfile). The `.cd` marker enables
+automated deployment updates: the release image's `deploy` command opens a
+version-bump PR in [InfraOps](https://github.com/alexfalkowski/infraops).
+Deployment configuration is managed in
+[the InfraOps application definitions](https://github.com/alexfalkowski/infraops/blob/master/area/apps/apps.hjson)
+and [Einblick configuration](https://github.com/alexfalkowski/infraops/blob/master/area/apps/lean/einblick.yaml).
+See [the CircleCI configuration](.circleci/config.yml) for the release and
+deployment workflow.
 
 ## References
 
