@@ -11,14 +11,11 @@ module Einblick
     end
 
     def health_grpc
-      @health_grpc ||= Nonnative.grpc_health(host: 'localhost', port: 12_000, service: 'einblick.v1.Service')
+      @health_grpc ||= Nonnative.grpc_health(host: 'localhost', port: 12_000, service: 'einblick')
     end
 
     def user_agent
       @user_agent ||= Nonnative::Header.grpc_user_agent('Einblick-ruby-client/1.0 gRPC/1.0')
     end
-  end
-
-  module V1
   end
 end

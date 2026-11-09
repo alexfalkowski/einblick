@@ -1,13 +1,16 @@
 # Telemetry service: first-version requirements
 
-**Status:** Working draft for refinement; no service implementation is claimed.  
-**Revision:** 0.13  
-**Created / last updated:** 2026-11-02 / 2026-11-04  
-**Working name:** einblick — proposed, not finalized.  
-**Audience:** Product owner, implementing agents, reviewers, and service operators.  
-**Document owner:** docs/requirements.md in this service handoff folder; retain this owner when moving the folder.
+**Status:** Implementation specification; telemetry backend and deployment remain to be built.
 
-This document captures the design discussion as a self-contained specification. It distinguishes agreed direction, proposed defaults, implementation requirements, and unresolved decisions. It is part of the einblick planning and prototype folder, not a change to go-service or infraops.
+**Revision:** 0.14
+
+**Last updated:** 2026-11-09
+
+**Audience:** Implementing agents, reviewers, product owner, and operators.
+
+This document owns the v1 product contract. [The implementation plan](review-and-plan.md)
+owns the remaining work packets and their entry conditions. The Go service scaffold
+and per-service CGO opt-in already exist.
 
 ## 1. How to read and refine this document
 
@@ -18,7 +21,7 @@ This document captures the design discussion as a self-contained specification. 
 - **MUST** describes required behavior for the proposed first version. It does not mean that behavior exists today.
 - Requirement IDs are stable. Acceptance scenarios and implementation reports should refer to these IDs.
 
-The product owner can refine any draft requirement. Record material changes in the revision history and update affected acceptance scenarios. Preserve IDs; mark superseded requirements rather than silently reusing their IDs.
+The product owner can refine any draft requirement. Update affected acceptance scenarios and implementation packets when decisions change. Preserve IDs; mark superseded requirements rather than silently reusing their IDs.
 
 Routine implementation details should follow the owning repository's conventions. Agents should not repeatedly request confirmation for details already settled here. An unresolved decision should block only work that genuinely depends on it.
 
@@ -68,15 +71,15 @@ The service should remain understandable to a small engineering team. Prefer an 
 | D-009 | Frontend | Use go-service MVC and embedded assets; the web service is the reference implementation. | Agreed direction |
 | D-010 | Frontend libraries | Follow the web MVC/htmx/Pico pattern and render built-in charts with a small embedded plotting library. uPlot is the proposed chart library; Grafana is not a runtime dependency. | Built-in charts agreed; library proposed |
 | D-011 | Retention | Configurable; seven days is acceptable for normal operation. Use a shorter value while testing. | Agreed direction |
-| D-012 | UI authentication | Defer site authentication entirely for v1. A reusable go-service solution will be designed separately; no credential-file or session implementation is required here. | Revised by owner in 0.2; previous design superseded |
+| D-012 | UI authentication | Defer site authentication entirely for v1. A reusable go-service solution will be designed separately; no credential-file or session implementation is required here. | Agreed direction |
 | D-013 | Local persistence | A persistent volume holds DuckDB, its WAL, and pending exports. | Working design |
 | D-014 | Acknowledgement | Acknowledge accepted telemetry after a successful local DuckDB commit; R2 upload is asynchronous. | Working design; durability consequence documented below |
 | D-015 | Rollout | Enable one existing application first, measure the real workload, then expand. | Agreed direction |
 | D-016 | Service dashboards | A small service catalog selects ready-made HTTP and/or gRPC panels plus Logs and Traces views, using our shared go-service instrumentation. | Agreed direction |
 | D-017 | R2 transfer library | Use a lean existing Go S3 library. Do not use either AWS Go SDK directly or through a runtime wrapper; evaluate actual runtime dependencies and binary cost. | Agreed constraint; client selection open |
-| D-018 | Upgrade strategy | Reuse the existing rolling-update behavior. Remove I-01b's proposed Recreate capability and strategy selector from scope; retain graceful DuckDB shutdown, one active writer and bounded startup/recovery validation. | Agreed by owner in 0.13 |
+| D-018 | Upgrade strategy | Use existing rolling updates with graceful DuckDB shutdown, one active writer and bounded startup/recovery. Do not add Recreate or a strategy selector. | Agreed direction |
 
-The decision to evaluate DuckDB supersedes earlier suggestions to start with compressed OTLP archive files or choose FrostDB for the first implementation. Revisit the engine only if the feasibility work supplies a concrete reason.
+Revisit DuckDB only if feasibility work supplies a concrete blocker.
 
 ## 4. Scope
 
@@ -89,7 +92,7 @@ The decision to evaluate DuckDB supersedes earlier suggestions to start with com
 - UTC daily archive partitioning, initially containing multiple applications.
 - Recent and historical queries through an embedded MVC frontend.
 - Built-in chart dashboards, log exploration, and trace waterfalls for our go-service services.
-- A small service catalog declaring each service and its server protocols.
+- A small service catalog declaring each service and its server transports.
 - Configurable retention, including a shorter test setting.
 - Basic operational status, resource visibility, and recovery scenarios.
 - A one-application pilot and measured capacity notes.
@@ -125,38 +128,38 @@ These exclusions limit initial implementation scope; they do not require specula
 | Application | A logical service identified principally through OpenTelemetry service resource attributes. |
 | Instance | A particular service instance; distinguish it from the service name when interpreting metrics. |
 | Service catalog | Configuration that selects the service navigation and standard panel groups. It is not an ingestion allowlist. |
-| Server protocol | An incoming HTTP or gRPC request surface. A service can expose both; this is separate from its outbound clients and telemetry signals. |
+| Transport | An incoming HTTP or gRPC server surface. A service can expose both; this is separate from its outbound clients and telemetry signals. |
 | Built-in metric profile | Server-owned mappings from the actual instruments emitted by supported go-service versions to standard chart queries and units. |
 
-## 6. Existing ecosystem: observations, not capacity guarantees
+## 6. Existing integration surfaces
 
-Inspected on 2026-11-02:
+Use these capabilities when implementing the service:
 
-- The repositories with .cd markers are abgleich, bezeichner, standort, and web.
-- The checked-in infraops application definition configures 1, 2, 2, and 2 replicas respectively: seven replicas in total.
-- Their inspected runtime configurations use info-level text logging and omit metrics/tracing configuration. Introducing the backend therefore also requires enabling the desired OTLP exporters in clients.
-- go-service installs OpenTelemetry runtime and host instrumentation when metrics are enabled. Its vendored versions contribute approximately 20–21 scalar series per instance before transport metrics.
-- HTTP/gRPC instrumentation supplies additional spans and histograms. HTTP client phase tracing can create several spans for one outbound request.
-- Redis and SQL instrumentation contribute data only when those dependencies are configured.
-- At this inspection, the shared Go container build used CGO_ENABLED=0 and a distroless/static runtime image; see the 2026-11-04 update below.
-- The app model uses a read-only root filesystem and ephemeral-storage budgets; optional persistent-data support is recorded in the 2026-11-04 update below.
-- infraops contains R2 provisioning support, but its inspected production Cloudflare configuration does not declare a bucket. This does not establish whether a bucket exists outside that configuration.
-- web already demonstrates embedded templates, MVC full/partial views, htmx, and Pico CSS.
+- The repository already has the `einblick` Go module, server/config/health
+  composition, CI, and shared `bin` tooling. The root Makefile sets `static=0`.
+  E-02 validates the final DuckDB image and integrates dependencies into this scaffold.
+- The Makefile uses `http.mak` for shared service tooling without local protobuf
+  generation. Keep the gRPC transport configured for OTLP ingestion and consume
+  upstream OpenTelemetry service definitions; no custom service API is needed.
+- Infraops provides `storage.capacity`, `storage.path`, and optional
+  `storage.profile` for a protected `<app>-data` filesystem PVC and writable mount.
+  Omitted profile uses the cluster default; empty requests no StorageClass; a named
+  profile selects an existing class. Protection does not establish backups, backing
+  PV reclaim policy, or exclusive-writer enforcement. I-03 owns installation values
+  and actual volume/rolling-update validation.
+- Infraops provides private R2 buckets and optional object-age `expiration`.
+  LIF-002 owns the lifecycle change/removal constraints; I-02 selects the bucket
+  and policy configuration.
+- Storage-aware release tooling is available. DEP-006 requires verification of
+  actual configuration-writing pipelines and storage preservation before activation.
+- `web` supplies the embedded MVC/htmx/Pico reference. The golden-signal dashboard
+  in `docker/grafana/services.json` supplies panel vocabulary; verify native OTLP
+  names and units against the supported go-service version.
 
-Additional inspection on 2026-11-03:
-
-- docker/grafana/services.json contains the Service Golden Signals dashboard: HTTP and gRPC latency, traffic, errors, and p99/p50 latency spread; host/runtime context; and Redis/SQL groups. This is the starting panel vocabulary, not a requirement to run Grafana.
-- Its Prometheus job labels, suffixes, and queries are not raw OTLP names. Map the current go-service instruments and units explicitly; do not copy its PromQL into DuckDB or assume every older SQL metric name still applies.
-- The lightweight S3 candidates differ materially in streaming, cancellation, and dependencies. The evaluation in section 8.8 is source-based, not an R2 compatibility or linked-binary benchmark.
-
-Additional inspection on 2026-11-04:
-
-- `bin` PR #660, commit `e8ad603613179460aea3096a58cf85e09b9b0992`, provides `static=0` through the shared service Docker build/test/release targets. It enables CGO, removes forced static linking, and selects `gcr.io/distroless/cc-debian13`; omitted or `static=1` builds retain the ordinary static defaults. The owner confirms that `duckdb-go` was built and successfully run in an ARM image on an M5 Mac while developing the feature. B-01 is retired from future implementation, including that completed capability trial. E-02 still owns einblick's consuming pin, final driver/engine/extension packaging and any required-platform coverage not established by that run. See the [verification record](evidence/bin-cgo-verification.md) for evidence provenance and remaining checks.
-- Infraops storage support is delivered in PR #3763, commit `a2c6f88f081e761fbef71aef05cf3215b73e90d6`. It supplies optional `storage` with required `capacity` and `path`, plus optional `profile`, creating a protected `<app>-data` filesystem PVC and writable mount. I-01a is retired from future implementation. The existing rolling-update behavior remains the integration baseline; I-01b's proposed strategy change is superseded by D-018. The [earlier storage record](evidence/infraops-storage-verification.md) preserves the original inspection; the [dependency refresh](evidence/r2-release-verification.md) records the merged source and release-tooling status. No live PVC or successful CSI/recovery run is inferred.
-- Infraops PR #3764, commit `ded49c5c48800ec121b400a9f3490ae795c450a6` (tag `v2.617.0`), delivers optional R2 `expiration` using positive whole-second Go durations, such as `168h` or `24h`. It manages all-object age expiration and retains seven-day incomplete multipart cleanup. This retires I-02's lifecycle-capability implementation, not its bucket/reference, policy or activation work. The inspected `area/cf/cf.hjson` still declares no buckets. Infraops documents complete lifecycle-rule ownership and a pinned-provider limitation: omitting a previously applied expiration does not disable its remote rules. O-003 remains open; capability delivery does not select einblick's retention clock.
-- Docker PR #1818, commit `cd711259ac9b72634adb91a758e1e9a11d2d0dd5`, delivers release image source version `8.48` with `cmd/bump` pinned to `2.617.0`. The inspected abgleich, bezeichner, standort and web deployment pipelines all pin `alexfalkowski/release:8.48`; the tag's schema includes storage and its version updater rewrites the complete application configuration. These source updates are delivered; the owner reports rollout in progress. Confirm actual pipeline/image execution and storage-preserving releases before storage activation. Do not schedule the completed image/pin changes again. See the [dependency refresh](evidence/r2-release-verification.md) for exact revisions and evidence limits.
-
-These are source observations, not observations of live cluster state. They must be rechecked when implementation begins. Replica counts and instrumentation definitions do not establish actual log rates, span rates, attribute cardinality, or retained record sizes.
+Existing clients need explicit logger, metrics, and tracer exporter configuration.
+Verify their current instrumentation and runtime configuration when enabling the
+pilot. Replica counts and source definitions do not establish telemetry rates,
+cardinality, retained sizes, or production capacity.
 
 ## 7. Working architecture
 
@@ -272,12 +275,12 @@ Initial archive compaction and a remote manifest service are unnecessary for an 
 - **WEB-001 — Existing MVC pattern.** Use go-service MVC, embedded Go templates/assets, and the web service's full-page/partial-view conventions.
 - **WEB-002 — Small frontend.** Use a lightweight browser stack with built-in charts. htmx/Pico CSS and uPlot are the proposed baseline. Embed pinned assets and licenses; no frontend runtime server, CDN, or Grafana installation is required.
 - **WEB-003 — Connected investigation.** Provide navigation from a log's trace ID to the trace and from a trace to related logs. Preserve useful investigation context in shareable URLs and return navigation.
-- **WEB-004 — File-based credentials.** Deferred in revision 0.2; the previous v1 credential-file requirement is superseded by D-012 and WEB-012.
-- **WEB-005 — Password verification.** Deferred in revision 0.2; no v1 site-password implementation is required.
-- **WEB-006 — Session memory.** Deferred in revision 0.2; no v1 browser-session implementation is required.
-- **WEB-007 — Session boundaries.** Deferred in revision 0.2; expiry/logout/restart semantics belong to the future shared solution.
-- **WEB-008 — Cookie properties.** Deferred in revision 0.2 with the site-session design.
-- **WEB-009 — Full authentication coverage.** Deferred in revision 0.2 with the site-authentication design.
+- **WEB-004 — File-based credentials.** Reserved; site authentication is outside v1 under WEB-012.
+- **WEB-005 — Password verification.** Reserved; site authentication is outside v1 under WEB-012.
+- **WEB-006 — Session memory.** Reserved; site authentication is outside v1 under WEB-012.
+- **WEB-007 — Session boundaries.** Reserved; site authentication is outside v1 under WEB-012.
+- **WEB-008 — Cookie properties.** Reserved; site authentication is outside v1 under WEB-012.
+- **WEB-009 — Full authentication coverage.** Reserved; site authentication is outside v1 under WEB-012.
 - **WEB-010 — Safe rendering.** Render telemetry through escaping templates. Treat log bodies, attributes, errors, and span names as content, not trusted HTML.
 - **WEB-011 — Useful status.** Make incomplete query coverage, query cancellation, and ingestion/archive delay visible when they affect interpretation.
 - **WEB-012 — Auth deferred.** V1 must run its site without a login page, mounted UI credential file, or browser-session subsystem. Future site authentication is separate shared go-service work. This does not remove R2 credentials or decide internal ingestion TLS/authentication.
@@ -288,26 +291,26 @@ Initial archive compaction and a remote manifest service are unnecessary for an 
 
 ### 8.7 Service catalog and standard UX
 
-The catalog is a small presentation configuration, not a second database of telemetry. A proposed minimal configuration is:
+The catalog belongs in the existing service configuration, using go-service decoding/validation and service-local configuration projections. The `transports` list selects the incoming HTTP/gRPC server groups to display. A minimal catalog example is:
 
 ```yaml
 services:
   - id: abgleich
-    server_protocols: [http]
+    transports: [http]
   - id: bezeichner
-    server_protocols: [http, grpc]
+    transports: [http, grpc]
   - id: standort
-    server_protocols: [http, grpc]
+    transports: [http, grpc]
   - id: web
-    server_protocols: [http]
+    transports: [http]
 ```
 
-These protocol entries illustrate the intended shape; confirm each deployed service's relevant server surfaces before committing production configuration. An optional display_name changes only the label. Optional resource_attributes can narrow a service to an existing environment/namespace resource attribute, with exact equality matching. The initial installation does not require these options. A selector uses service.name equal to id by default; resource_attributes must not silently override that identity. A future need for multiple differently named catalog entries selecting the same service is a separate schema decision.
+These transport entries illustrate the intended shape; confirm each deployed service's relevant server surfaces before committing production configuration. An optional display_name changes only the label. Optional resource_attributes can narrow a service to an existing environment/namespace resource attribute, with exact equality matching. The initial installation does not require these options. A selector uses service.name equal to id by default; resource_attributes must not silently override that identity. A future need for multiple differently named catalog entries selecting the same service is a separate schema decision.
 
-- **CAT-001 — Minimal declaration.** Require a unique nonempty id and explicit server_protocols list containing http and/or grpc; an empty list is valid for a worker without monitored incoming request traffic. Missing configuration must not silently mean both protocols. Prefer the list over a special both enum.
+- **CAT-001 — Minimal declaration.** Require a unique nonempty id and explicit transports list containing http and/or grpc; an empty list is valid for a worker without monitored incoming request traffic. Missing configuration must not silently mean both protocols. Prefer the list over a special both enum.
 - **CAT-002 — Selection meaning.** Match native OTel service.name by default, with optional documented exact resource filters. Do not assume a Prometheus job label or the presence of service.namespace/Kubernetes attributes that clients do not emit.
-- **CAT-003 — Startup validation.** Reject duplicate IDs, duplicate or unknown protocol entries, conflicting identity filters, and malformed selectors with actionable configuration errors. Use existing go-service config conventions rather than introducing a config engine.
-- **CAT-004 — Protocol-driven overview.** Show HTTP and gRPC server groups only when configured. Each group contains latency p50/p95/p99, traffic, non-success requests, and latency spread. A worker with an empty protocol list still has runtime context, Logs, and Traces. Missing samples display no data, not zero or an inferred healthy state.
+- **CAT-003 — Startup validation.** Reject duplicate IDs, duplicate or unknown transport entries, conflicting identity filters, and malformed selectors with actionable configuration errors. Use existing go-service config conventions rather than introducing a config engine.
+- **CAT-004 — Transport-driven overview.** Show HTTP and gRPC server groups only when configured. Each group contains latency p50/p95/p99, traffic, non-success requests, and latency spread. A worker with an empty transports list still has runtime context, Logs, and Traces. Missing samples display no data, not zero or an inferred healthy state.
 - **CAT-005 — Shared standard profile.** Ship one server-owned go-service metric profile; adding a service with the same instrumentation needs no custom queries. Verify current histogram names/units and status attributes during feasibility. Optional Redis/SQL groups can follow when their current instruments and useful queries are verified; they are not required for the initial service pane.
 - **CAT-006 — Presentation scope.** Catalog membership determines navigation and standard panel groups, not ingestion acceptance. Retain otherwise supported telemetry from unconfigured services; it remains queryable through supported service/time query operations. The catalog is not an authorization boundary.
 
@@ -341,21 +344,35 @@ web
 
 Service, protocol, and instance selectors are server-side query inputs. The protocol catalog controls which metric groups exist; it does not mean every log has a protocol attribute. Unclassified logs must remain visible in the all-protocol view. Do not invent an HTTP/gRPC assignment for unrelated worker logs.
 
-**Review artifact:** [interactive service-pane prototype](../prototype/index.html), with [screenshots](../prototype/screenshots/) and [build/check instructions](../README.md). It is a self-contained static concept with synthetic telemetry and embedded uPlot 1.6.32, not an implementation of the ingestion/query backend or the final MVC structure. Its mock service versions, rates, operations, and dependencies are illustrative. The product requirements above, rather than incidental mock data or styling, define the handoff contract.
+**Initial design:** Use the [interactive prototype](../prototype/index.html) as
+the visual starting point. These screenshots allow inspection without launching
+a browser:
+
+- [Overview](../prototype/screenshots/overview.png): service navigation, summary cards and chart groups.
+- [Logs](../prototype/screenshots/logs.png): search/filter controls and bounded results.
+- [Trace details](../prototype/screenshots/trace-detail.png): span waterfall, selected-span details and related logs.
+
+Preserve the service sidebar, Overview/Logs/Traces structure, shared controls,
+compact chart/table layout and detail drawers. Iterate on this design in the
+working MVC version once real data is available. The frozen HTML opens directly
+without a server or build and embeds uPlot 1.6.32 and its license; agents can also
+inspect its source. Its telemetry and operational status are synthetic. Implement
+behavior from the requirements rather than copying mock data or interaction
+limitations.
 
 The interaction draws inspiration from the existing golden-signal dashboard, Grafana's log-detail/correlation workflow, and Jaeger's trace timeline. There is no dashboard editor or requirement for users to configure Grafana.
 
-### 8.8 Lean R2 client evaluation
+### 8.8 R2 client selection
 
-The proposed first client to validate is **github.com/termermc/go-micro-s3/client**. Its inspected client module declares no external dependencies and provides context-aware upload/download/HEAD/list/delete operations, custom endpoints, and tunable multipart uploads. File uploads can use ReaderAt sections instead of whole-file buffering. Its own README reports Garage testing, not R2 testing, and uploads use unsigned payloads. Validate the actual R2/S3 policy and integrity behavior before selecting a pinned version; library size alone does not establish correctness or compatibility.
+Start feasibility with **github.com/termermc/go-micro-s3/client**, a candidate
+rather than an approved production dependency. Verify the selected revision's
+streaming, cancellation, multipart controls, R2 signing/integrity behavior, and
+operations required by STO-014/STO-015. Its size or compatibility with another
+S3 server does not establish suitability for R2.
 
-| Candidate | Source observations | Consequence |
-| --- | --- | --- |
-| go-micro-s3/client | No external requires in the inspected client module; standard-library HTTP; contexts; file/stream operations; configurable multipart. R2 and linked-binary cost not measured. | Leading feasibility candidate, not an approved production dependency yet. |
-| rhnvrm/simples3 | Very small dependency surface, but inspected FilePut and multipart paths buffer whole input and public operations do not take a context. | Does not meet the bounded-transfer/cancellation requirement unchanged. |
-| kelindar/s3 | Offers streaming and contexts, but inspected go.mod includes fasthttp and other dependencies. | Alternative to measure if needed; do not infer zero runtime cost from a tagline or count test-only dependencies as linked code. |
-
-Pin an immutable version/commit, record its license and maintenance/support tradeoffs, measure the linked service binary with/without the transfer package, and run the required R2 scenarios. Do not write our own S3 client to avoid choosing a library. DuckDB's remote-Parquet extensions have a separate packaging/dependency cost; selecting a small Go client does not remove it.
+Pin an immutable version/commit, review license and maintenance, inspect runtime
+dependencies, and measure the linked binary delta. DuckDB remote-Parquet support
+has a separate packaging/dependency cost and needs independent validation.
 
 ## 9. Durability and recovery contract
 
@@ -401,7 +418,7 @@ This is a logical configuration inventory, not a finalized YAML schema or comman
 
 | Setting | Initial value or requirement | Status |
 | --- | --- | --- |
-| Service name and domain | einblick is the working name; final identity to be chosen. | Open |
+| Service name and ingress domain | Service/module name is einblick; choose the installation ingress domain. | Domain open |
 | gRPC ingestion listener | Internal cluster endpoint, using standard OTLP/gRPC services. | Agreed |
 | UI HTTP listener | Existing go-service HTTP/MVC conventions behind HTTPS ingress. | Working design |
 | Ingestion authentication and TLS | Reuse go-service capabilities; exact auth mode/certificate provisioning to select. | Open |
@@ -416,15 +433,15 @@ This is a logical configuration inventory, not a finalized YAML schema or comman
 | Archive retention | Seven days normally. | Agreed direction |
 | Testing retention | 24 hours initially, or another explicitly configured shorter value. | Proposed |
 | Retention clock | Object age versus event age must be explicit. | Open |
-| R2 lifecycle configuration | If object-age expiration is selected, reuse infraops `expiration`, for example `168h` normally or `24h` for testing; `7d` is not valid Go duration syntax. | Capability delivered; installation policy/activation open |
+| R2 lifecycle configuration | If object-age expiration is selected, reuse infraops `expiration`, for example `168h` normally or `24h` for testing; `7d` is not valid Go duration syntax. | Installation policy/activation open |
 | DuckDB memory / threads | Tunable, with Go/native headroom; initial values from feasibility/pilot. | Open tuning |
 | Historical-query concurrency | One initially. | Proposed |
 | Query timeout | 30 seconds, configurable. | Proposed |
 | Result and search-range limits | Bounded; concrete initial limits chosen with the initial query workflows. | Open tuning |
 | Pending-ingestion disk budget | Sized for a chosen R2 outage window plus recovery/export workspace. | Open tuning |
-| Service catalog | Service ID plus server_protocols list; optional display label/resource narrowing. | Proposed schema; behavior agreed |
+| Service catalog | Service ID plus transports list; optional display label/resource narrowing. | `transports` name agreed; optional selectors proposed |
 | Chart profile | Built-in go-service panel/query profile; no user-authored dashboards. | Agreed direction |
-| Site authentication | Deferred; no v1 site credential/session settings. | Agreed in 0.2 |
+| Site authentication | Deferred; no v1 site credential/session settings. | Agreed |
 | R2 Go client | Lean existing client, excluding both AWS Go SDKs; go-micro-s3/client first to validate. | Selection open |
 | Multipart part size / concurrency | Tunable bounded values, measured with export sizes and process memory. | Open tuning |
 | Late arrival / future skew | Define explicitly; no silently invented cutoff. | Open |
@@ -434,12 +451,12 @@ R2 credential values must not be embedded in checked-in examples. Use configured
 
 ## 12. Deployment and build requirements
 
-- **DEP-001 — Per-service CGO opt-in.** Use the existing shared `static=0` option for this service's Docker build/test/release paths to enable CGO. Consume an immutable `bin` revision containing PR #660 and validate the resulting service image during E-02. Other existing services retain their current default.
+- **DEP-001 — Per-service CGO opt-in.** Keep the root Makefile's existing `static=0` setting for Docker build/test/release paths. Validate the resulting native service image during E-02 and record the consumed `bin` revision. Preserve the shared default for other services.
 - **DEP-002 — Actual native packaging.** Pin a compatible DuckDB Go driver and bundled engine. Demonstrate the target runtime image has the required native runtime support; a statically linked DuckDB library alone does not establish a fully static executable.
 - **DEP-003 — Extensions available at startup.** Package the required remote-Parquet/R2 extension support with the release image or otherwise make it available without a runtime internet download. Verify paths under the read-only root filesystem.
 - **DEP-004 — Persistent volume.** Use infraops' delivered optional `storage` capability to provision and mount persistent application storage explicitly. Set capacity and a dedicated data path; select the provisioning profile for the installation. Preserve claim identity across pod replacement and document protection, migration and deletion behavior. An ephemeral-storage request/limit is not a substitute.
-- **DEP-005 — One writer.** Reuse the existing one-replica rolling-update configuration and ensure only one process holds the DuckDB database for writing. Replacement processes may overlap during shutdown/startup; handle temporary database-lock unavailability within bounded startup and keep intake unready until database access and recovery succeed. Validate this handoff with the actual persistent volume. D-018 removes the proposed infrastructure strategy change from scope.
-- **DEP-006 — Standard runtime integration.** Use the existing go-service server/config/DI/lifecycle patterns and the owning repositories' supported build and validation workflows. Consume the delivered storage-aware release tooling; the inspected source baseline is release image `8.48` with `cmd/bump` `2.617.0`, also pinned by the four existing deployment pipelines. Before enabling storage, confirm the actual tool/image revisions used after rollout and verify that version updates for any application preserve every application's storage settings. Source pins alone do not establish successful execution.
+- **DEP-005 — One writer.** Reuse the existing one-replica rolling-update configuration and ensure only one process holds the DuckDB database for writing. Replacement processes may overlap during shutdown/startup; handle temporary database-lock unavailability within bounded startup and keep intake unready until database access and recovery succeed. Validate this handoff with the actual persistent volume.
+- **DEP-006 — Standard runtime integration.** Use the existing go-service server/config/DI/lifecycle patterns and the owning repositories' supported build and validation workflows. Before enabling storage, verify storage-aware release tooling in every configuration-writing pipeline and record actual tool/image revisions. The known source baseline is release image `8.48` with `cmd/bump` `2.617.0`. Demonstrate that version updates for this or another application preserve every application's storage settings, including optional-profile presence. Source pins alone do not establish successful execution.
 - **DEP-007 — Separate network surfaces.** Provide internal gRPC ingestion and browser access through their appropriate services/ingress, with site authentication deferred under D-012. Align the app's actual listeners with configured probes.
 - **DEP-008 — Secret and file access.** Mount R2 and any selected ingestion secrets read-only, keep writable files under the data/workspace mounts, and verify non-root volume permissions.
 - **DEP-009 — Deployment platforms.** Establish whether the service must retain the current Linux amd64/arm64 image matrix. Validate each required platform with the CGO-enabled packaging.
@@ -449,7 +466,7 @@ Current go-service constraint: OTLP/gRPC exporters with configured headers requi
 
 ## 13. Acceptance scenarios
 
-These are service-boundary scenarios for future implementation, not claims that tests have run. Follow the new repository's established test harness; use the existing sibling services as references. Exercise behavior through standard OTLP and browser/query workflows where practical, rather than inspecting private call order. Architectural constraints are also checked through the explicitly identified design/code review; do not add source-inspection tests merely to enforce them.
+These are service-boundary scenarios for future implementation, not claims that tests have run. Follow the repository's established test harness; use the existing sibling services as references. Exercise behavior through standard OTLP and browser/query workflows where practical, rather than inspecting private call order. Architectural constraints are also checked through the explicitly identified design/code review; do not add source-inspection tests merely to enforce them.
 
 | ID | Observable scenario and expected result | Requirements |
 | --- | --- | --- |
@@ -466,7 +483,7 @@ These are service-boundary scenarios for future implementation, not claims that 
 | AC-011 | A fresh-volume instance discovers and queries an existing R2 archive without downloading all history; optional warming does not enqueue archived records for upload. | QRY-012, STO-009 |
 | AC-012 | Retention expiration, policy changes/removal, late events, future timestamps, missing timestamps, and client retries follow the explicitly chosen policies. If R2 lifecycle expiration is selected, document and verify its asynchronous object-age behavior and remote-rule disabling; removing configuration alone must not be reported as disabling expiration. | DAT-004, LIF-001, LIF-002, LIF-003, LIF-004, LIF-005 |
 | AC-013 | Long-running or abandoned queries are cancelled or time out within their documented policy; results are bounded and concurrent query work respects its limit. | QRY-009, QRY-010, QRY-011, OPS-001, OPS-002, OPS-003 |
-| AC-014 | Deferred in 0.2 with site authentication. The former credential/session acceptance scenario is retained for ID history and is not a v1 readiness gate; see AC-022 for the current boundary. | WEB-004, WEB-005, WEB-006, WEB-007, WEB-008, WEB-009 |
+| AC-014 | Reserved; site authentication is outside v1. AC-022 verifies the current boundary. | WEB-004, WEB-005, WEB-006, WEB-007, WEB-008, WEB-009 |
 | AC-015 | Telemetry containing HTML/script-like text is displayed as content, and log-to-trace navigation preserves useful investigation context. | WEB-001, WEB-002, WEB-003, WEB-010 |
 | AC-016 | Storage unavailability or intentionally partial results are visibly distinct from no matches; archive delay and recovery/resource status are observable independently of intake. Backend diagnostics do not recursively generate incoming telemetry. | WEB-011, QRY-010, OPS-005, OPS-006, OPS-007 |
 | AC-017 | Existing archives remain readable across the supported schema/runtime upgrade path, and local migration/rollback behavior is documented and exercised. | DAT-007, DEP-002 |
@@ -482,125 +499,43 @@ These are service-boundary scenarios for future implementation, not claims that 
 
 The acceptance matrix should be updated when a requirement changes. Tests should assert user-visible data, errors, recovery, ordering, and resource behavior rather than internal method sequences.
 
-## 14. Incremental delivery and agent handoff
+## 14. Delivery phases
 
-Each phase should produce a reviewable result with focused verification. These phases describe future work; creating this document does not authorize deployment, credential changes, publishing, or unrelated repository edits.
+Select one review packet at a time from [the implementation plan](review-and-plan.md).
+Resolve only the material choices needed by that packet; detailed schema, queries,
+and configuration can accompany the implementation. Keep partial acceptance
+coverage distinct from a fully passed scenario.
 
-Treat P0–P4 as milestones, not single implementation tasks or PRs. The [design review and staged implementation plan](review-and-plan.md) documents the review units, task entry conditions, scope boundaries, decision deadlines, repository interfaces, evidence, and acceptance coverage. Shared CGO (B-01), infraops storage (I-01a), I-02's lifecycle capability, and the release-image/consumer pin updates were delivered independently; do not repeat their implementation. I-01b is superseded without implementation under D-018; do not add a rollout-strategy capability or selector for this project. E-02 validates the native release path during P0. Remaining infrastructure work comprises I-02's bucket/reference and policy activation, confirmation of the in-progress release-tooling rollout, and I-03's installation integration during P4, including validation of the existing rolling-update path. The [rollout scope record](evidence/rollout-scope-update.md) preserves the owner's correction. This requirements refresh does not start einblick implementation or deployment; its implementation packets remain unstarted.
+| Phase | Remaining outcome | Exit evidence |
+| --- | --- | --- |
+| P0 | Verify supported source contracts, platforms, typed/nanosecond storage, final native/extension packaging, real R2 operations and dependency/resource cost. Use the existing scaffold and build opt-in. | E-01/E-02 feasibility results for all three signals; usable private test-R2 access. |
+| P1 | Build bounded log, trace and metric intake, local transactions/recovery and fixed recent queries. Record signal-specific time/support/duplicate policies. | AC-001/AC-002/AC-004/AC-006; local portions of AC-003/AC-005/AC-008 and backend bounds/cancellation in AC-013. |
+| P2 | Implement immutable export jobs, Parquet/R2 publication, historical reads, safe eviction, retention and outage recovery. | AC-007–AC-012/AC-019; archived portions of AC-003/AC-005 and historical bounds/failures in AC-013/AC-016. |
+| P3 | Complete catalog-driven MVC Overview, Logs and Traces, linked investigation, escaped rendering, bounded charts and visible query states. | AC-013/AC-015/AC-016/AC-022–AC-025 and operator docs. |
+| P4 | Verify storage-preserving releases, prepare installation, validate deployment/recovery, and enable one client with explicit exporters, sampling and TLS/authentication. | AC-017/AC-018/AC-020, prior active acceptance, AC-021 architectural review, AC-026 R2 evidence and recovery runbook. |
 
-The plan's section 11 tracks remaining decisions/evidence and their relevant gates. Inherit the standards under section 1.1 and derive routine repository details during the selected task. Document backend-specific invariants and material policies before the code that depends on them; detailed schema, queries and config can be reviewed with their scoped patch. These are phase-local requirements, not a requirement to finish every later-phase design before P0. Actual feasibility and pilot evidence remain future execution work.
-
-**Owner-agreed delivery process:** Execute phases one by one, with one selected review packet at a time, including independent repository changes. Preserve the first requirements version generated by an agent for each packet and the final reviewed PR with immutable revisions, rationale and validation. At each phase boundary, compare those artifacts to identify supported improvements to the shared skills in `bin`. Review skill changes independently from product/build/infrastructure changes, record their adoption or explicit no-change/deferred disposition, and carry accepted revisions into the next selected phase. The [phase feedback process](phase-feedback.md) owns the procedure and evidence templates. Dependency delivery records do not imply a phase or skill-feedback review is complete; einblick implementation phases have not started.
-
-**Owner-agreed agent/human handoff:** For each selected packet, the agent writes the change and generates an original complete patch; the human drives it through refinement and the PR stage. Preserve the original patch/base, requirements first draft and revision used, and actual agent session ID(s). Feed **patch + final PR/revisions + requirements + session ID**, with accessible session content and review rationale when available, into later inspection of what drove the accepted result. Remind the human at patch handoff to retain these inputs and at final-PR/phase close to return the bundle for feedback. The reminders are part of the documented workflow and agent guidance; no scheduled notification or automatic PR/skill work is implied.
-
-### P0 — Establish feasibility and the repository baseline
-
-- Finalize the service/repository identity or explicitly retain the working name.
-- Move this document into the new repository as its requirements owner.
-- Establish go-service module/config composition and the supported repository command surface.
-- Pin a `bin` revision containing PR #660 and opt this service into `static=0`; no new shared CGO implementation packet is needed.
-- Identify a usable private test R2 bucket/reference and credential sources for E-02. Reuse delivered infraops bucket support if provisioning is needed; production retention policy and lifecycle activation are not prerequisites for test access.
-- Verify a pinned DuckDB driver/engine builds and runs on the required platforms.
-- Verify packaged extension loading, low-memory operation, a local persistent path, nanosecond preservation, and representative typed telemetry mappings.
-- Validate a lean S3 client against R2 and measure its runtime dependency/binary cost before selecting it.
-- Capture native go-service metric names, units, temporality, and status/resource attributes for the built-in dashboard profile; treat docker/grafana/services.json as a semantic reference.
-- Record measured constraints and any requirement that cannot be satisfied.
-- Do not build two storage engines for comparison without a concrete unresolved need.
-
-**Exit evidence:** The selected stack runs in the intended container, and representative data for all three signals can be stored and queried with the required precision.
-
-### P1 — Build ingestion and the recent-query path
-
-- Implement standard gRPC ingestion, local transactions, backpressure, and the selected support boundary.
-- Define the storage schema and the initial fixed query operations.
-- Demonstrate log ordering/pagination, multi-service trace lookup, and basic metric semantics.
-- Record the chosen late/skew/duplicate policies before they become implicit behavior.
-
-**Exit evidence:** AC-001, AC-002, AC-004, AC-006, the local-storage portions of AC-003 and AC-005, and locally committed-record recovery from AC-008, through the supported service boundaries. Enforce the backend bounds/cancellation portions of AC-013 as queries are introduced. The full archival portions of AC-003/AC-005 and pending-export recovery follow in P2; a partial scenario is not a full acceptance pass.
-
-### P2 — Add archival and recovery
-
-- Implement durable batch/export state, Parquet exports, stable object IDs, R2 transfer, and safe local eviction.
-- Implement selected day-prefix archive discovery and historical reads.
-- Exercise recovery, ambiguous upload outcomes, R2 outage behavior, and fresh-volume rebuilding.
-- Select and document retention semantics.
-
-**Exit evidence:** AC-007 through AC-012 and AC-019, plus the archive round-trip/historical portions of AC-003 and AC-005 and historical-query bounds/failures from AC-013/AC-016, with the acknowledged-data recovery boundary explicit.
-
-### P3 — Deliver the built-in service UX
-
-- Implement the catalog-driven Overview, Logs, and Traces views through MVC with embedded chart/htmx/CSS assets.
-- Render the fixed go-service panel groups without Grafana or dashboard authoring.
-- Add linked chart/log/trace workflows, span details, and clear query/status outcomes.
-- Keep telemetry rendering escaped and browser query work bounded.
-- Leave site login, UI credential files, and sessions deferred.
-
-**Exit evidence:** AC-013, AC-015, AC-016, and AC-022 through AC-025, plus initial operator documentation. AC-014 is deferred.
-
-### P4 — Integrate deployment and run the pilot
-
-- Use the pinned `static=0` native image path validated during P0; no new shared CGO build-tooling change is planned.
-- Consume the delivered infraops storage and optional R2 expiration capabilities, confirm release-tooling rollout and actual revisions in every configuration-writing pipeline, and demonstrate storage-preserving releases before enabling storage. I-01b is superseded; the release-image and existing consumer pin changes are delivered dependencies, not new implementation packets.
-- Integrate installation configuration for storage capacity/profile/path, one replica using the existing rolling-update behavior, internal gRPC service, private R2 bucket or verified existing bucket reference, secrets, and probes. Validate graceful DuckDB close, bounded lock handoff during overlapping startup, actual non-root writes, volume recovery and the release/configuration round-trip.
-- Configure one client with all three exporters, the chosen authentication/TLS, and an explicit export interval/sampling policy.
-- Run the pilot, record capacity observations, and choose initial resource budgets.
-- Expand only after the acceptance behavior and available capacity are demonstrated.
-
-**Exit evidence:** AC-017, AC-018, and AC-020, plus results from the earlier phases, the applicable architectural review in AC-021, R2 client evidence in AC-026, and a documented recovery procedure.
-
-### Suggested implementation task template
-
-```text
-Carry out unit <ID> from docs/review-and-plan.md when explicitly selected
-in a future task. P0–P4 are milestones, not single implementation tasks.
-
-Allowed repositories and changes:
-- <one writable repository and explicit scope>
-- Read-only sibling references: <scope>
-
-Prerequisite evidence and dependency revisions:
-- <the selected unit's entry conditions>
-
-Requirements in scope:
-- <requirement IDs>
-
-Acceptance scenarios:
-- <AC IDs>
-
-Read the applicable AGENTS.md and skills in each repository.
-Follow existing module/config/MVC/test/build conventions.
-Use the agreed database and scope unless evidence establishes a blocker.
-Resolve routine implementation details locally; surface material unresolved choices.
-Report implemented requirement IDs, actual validation, and remaining limitations.
-Preserve the requirements document as decisions are refined.
-Retain the first requirements and revision used, original complete patch
-with base revision, and actual session ID(s). Hand the patch to the human
-for refinement/PR work. Include the reminder to return requirements +
-original patch + final PR/revisions + session ID for later inspection under
-docs/phase-feedback.md, with session access, rationale and skills context.
-Stop at the selected unit's review boundary; do not start the next unit.
-Do not deploy or publish unless the current task authorizes it.
-```
-
-The document does not grant sub-agent or external-message authorization. Applicable runtime and repository instructions determine those permissions.
+The agent hands the scoped change and original patch to the human for refinement
+and PR work. [Phase feedback](phase-feedback.md) owns capture and review of
+requirements + original patch + final PR + session ID. Finish the current phase
+and feedback review before the owner selects the next. Deployment, publication,
+client enablement and sibling edits require their own task scope.
 
 ## 15. Open-decision register
 
 | ID | Decision | Suggested starting point / consequence | Needed by |
 | --- | --- | --- | --- |
-| O-001 | Final name, repository, and ingress identity | einblick is the leading proposal; avoid baking an unapproved identity into multiple repositories prematurely. | P0 |
+| O-001 | Installation ingress identity | Service and module are einblick. Choose the ingress domain and deployment references. | I-03 / P4 |
 | O-002 | Internal ingestion authentication, TLS, certificate provisioning, and client trust | Reuse go-service mechanisms. Header-bearing remote OTLP/gRPC requires TLS under the current exporter contract. | Before a deployed client connects |
-| O-003 | Public meaning of archive retention | Object-age expiration through R2 remains the simplest proposal; infraops now provides it through optional `expiration`. Document asynchronous deletion, complete-rule ownership, and explicit remote-rule removal when disabling it. Strict event-age retention requires a different documented enforcement policy. Delivery of the capability does not settle this choice. | P2 |
+| O-003 | Public meaning of archive retention | Object-age expiration through R2 remains the simplest proposal; infraops provides it through optional `expiration`. Document asynchronous deletion, complete-rule ownership, and explicit remote-rule removal when disabling it. Strict event-age retention requires a different documented enforcement policy. The capability does not settle this choice. | P2 |
 | O-004 | Backend event-day selection, accepted lateness, missing timestamps, and future clock skew | Inherit OTel timestamp meanings and its log Timestamp/ObservedTimestamp preference. Choose archive-day selection and only the remaining backend fallback/lateness/skew policy; do not redefine span/metric timestamp semantics. Exact backend policy is not yet agreed. | P1 |
 | O-005 | Duplicate policy per signal | Candidate: identify duplicate spans by trace/span IDs, identify metric points by complete stream identity and point timestamps, and tolerate duplicate logs rather than collapsing legitimate identical messages. Validate counter/histogram semantics before adoption. | P1 |
 | O-006 | Supported OTLP subset and its database mapping | Inherit protobuf/data-model definitions; derive the physical schema during feasibility/implementation. Verify representative go-service payloads, preserve typed values/nanoseconds, and document unsupported shapes/omissions explicitly. A handwritten copy of the OTel schema is unnecessary. | P0/P1 |
-| O-007 | R2 bucket and persistent-volume ownership/configuration | Reuse infraops' delivered protected-PVC and optional R2 expiration capabilities; choose capacity, path, provisioning profile, backing-volume reclaim policy and operational ownership. Verify the private bucket/reference. Confirm the release-tooling rollout and storage-preserving execution before activating storage; do not infer live provisioning from source support. | Test R2 access in P0; installation in P4 |
+| O-007 | R2 bucket and persistent-volume ownership/configuration | Reuse infraops' delivered protected-PVC and optional R2 expiration capabilities; choose capacity, path, provisioning profile, backing-volume reclaim policy and operational ownership. Verify the private bucket/reference. Verify actual release-tooling execution and storage preservation before activating storage; do not infer live provisioning from source support. | Test R2 access in P0; installation in P4 |
 | O-008 | Concrete resource and query bounds | Measure one-application ingestion and representative historical queries. Set memory/native headroom, workspace limits, export thresholds, and disk outage capacity from evidence. | P0 baseline; refine in P4 |
-| O-009 | Site authentication | Deferred by owner in 0.2. Reusable go-service site authentication is separate future work; this is not a v1 blocker. | Deferred |
-| O-010 | Required platform matrix and native runtime image | Confirm Linux amd64/arm64 requirements and package the actual driver/engine/extensions accordingly. The owner verified the shared native capability with a successful ARM duckdb-go image run on an M5 Mac; amd64 coverage is not recorded. | P0 |
+| O-009 | Reserved: site authentication | Outside v1 under D-012/WEB-012. | No v1 work |
+| O-010 | Required platform matrix and native runtime image | Confirm Linux amd64/arm64 requirements and package the actual driver/engine/extensions accordingly. Validate the final service image on every required platform; the generic ARM capability trial is already complete. | P0 |
 | O-011 | Lean S3 client version | Start feasibility with go-micro-s3/client; pin only after R2 behavior, bounded-memory transfer, license, runtime dependencies, and linked binary cost are checked. | P0/P2 |
-| O-012 | Final catalog field names and supported go-service metric profile | Begin with id plus server_protocols; confirm actual server surfaces and native instruments/units. Optional resource filters must use attributes clients actually emit. | P0/P3 |
+| O-012 | Catalog selectors and supported go-service metric profile | Use the transports field; begin with id for service identity; confirm actual server surfaces and native instruments/units. Optional resource filters must use attributes clients actually emit. | P0/P3 |
 | O-013 | Frontend library versions and visual refinement | MVC with embedded lightweight assets; uPlot is demonstrated by the static concept. Confirm htmx/Pico versions from the owning web pattern at implementation time. | P3 |
 
 Open tuning values do not require new infrastructure or repeated approval requests. Material changes to durability, authentication boundaries, supported data, or deployment scope should be raised with their concrete consequences.
@@ -625,7 +560,7 @@ Broader rollout follows the measured pilot. Pilot readiness and full-fleet readi
 
 ## 17. References and source owners
 
-Repository references are pointers to the owning code/documentation, not guarantees that current main/master contents remain identical to the 2026-11-02 inspection.
+Repository references are pointers to the owning code/documentation, not guarantees that current main/master contents remain unchanged. Verify the versions relevant to the selected packet.
 
 ### Existing repositories
 
@@ -659,29 +594,9 @@ Repository references are pointers to the owning code/documentation, not guarant
 - [go-micro-s3 client source and API](https://github.com/termermc/go-micro-s3/tree/master/client)
 - [go-micro-s3 client module dependencies](https://github.com/termermc/go-micro-s3/blob/master/client/go.mod)
 - [go-micro-s3 streaming/multipart upload implementation](https://github.com/termermc/go-micro-s3/blob/master/client/upload.go)
-- [simples3 object upload implementation](https://github.com/rhnvrm/simples3/blob/master/object.go)
-- [kelindar/s3 module dependencies](https://github.com/kelindar/s3/blob/main/go.mod)
 - [uPlot chart library and license](https://github.com/leeoniya/uPlot)
 - [Grafana log details and correlation workflow](https://grafana.com/docs/grafana/latest/visualizations/explore/logs-integration/)
 - [Jaeger trace timeline design](https://github.com/jaegertracing/jaeger-ui/blob/main/docs/adr/0009-service-filter-trace-timeline.md)
 - [DigitalOcean Kubernetes persistent volumes](https://docs.digitalocean.com/products/kubernetes/how-to/add-volumes/)
 
 Use documentation matching the driver/engine version actually selected. A newer documentation page does not establish that its features exist in the pinned Go driver's bundled engine.
-
-## 18. Revision history
-
-| Revision | Date | Change |
-| --- | --- | --- |
-| 0.1 | 2026-11-02 | Captured the design discussion, agreed directions, working storage/recovery design, proposed defaults, stable requirements, acceptance scenarios, delivery phases, and remaining decisions. |
-| 0.2 | 2026-11-03 | Deferred site authentication and retained superseded IDs; narrowed product to our go-service services; specified built-in charts, service catalog, Overview/Logs/Traces UX and static review prototype; excluded the AWS Go SDKs and added lean-client R2/footprint feasibility gates. |
-| 0.3 | 2026-11-03 | Packaged requirements, history, portable prototype/assets, screenshots, checks, README, and agent guidance in the einblick handoff folder; no product-scope decisions changed. |
-| 0.4 | 2026-11-03 | Added a design review and proposed smaller implementation units, with owner-requested independent bin/infraops tracks; clarified local versus archive acceptance sequencing and early query/recovery evidence. No product-scope decisions changed. |
-| 0.5 | 2026-11-03 | Made the planning-only owner direction explicit; completed future task scopes, dependencies, decision deadlines, repository interfaces, acceptance coverage and review-record guidance. All execution units remain unstarted; no implementation or product-scope decision is claimed. |
-| 0.6 | 2026-11-03 | Distinguished the documented work breakdown from unfinished design content; recorded seven remaining planning gaps, including concrete contracts, archive ownership, validation protocols and smaller review packets. No product-scope decision or execution is claimed. |
-| 0.7 | 2026-11-03 | Recorded owner-agreed serial phases and a first-requirements/final-PR feedback loop for improving bin skills; added immutable evidence, correction classification, independent skill review and next-phase adoption guidance. All execution remains unstarted; no product-scope decision changed. |
-| 0.8 | 2026-11-03 | Clarified the agent-patch/human-PR handoff, requirements/patch/PR/session inspection bundle, immutable original patch and session-access evidence, and reminders at patch handoff and phase close. No implementation, skill change or scheduled reminder was started. |
-| 0.9 | 2026-11-03 | Referenced inherited OTLP/data-model/convention contracts; allowed source-derived routine details with scoped patches; narrowed planning gaps to backend policies and phase-local evidence. Preserved support boundaries and distinguished inferred defaults from agreed decisions. No implementation started. |
-| 0.10 | 2026-11-04 | Verified the shared CGO opt-in delivered independently by bin PR #660 and retired B-01 from future implementation, recording the owner's successful ARM duckdb-go image run on an M5 Mac. DEP-001 now reuses `static=0`; E-02 retains einblick's consuming pin, final native/extension packaging and remaining platform coverage. Updated phase/dependency/acceptance wording, retained revision 0.9 and a verification/handoff record. No einblick implementation or complete service feasibility is claimed. |
-| 0.11 | 2026-11-04 | Recorded infraops storage delivery at inspected commit 342ca738ac0d618341389bfc9644c0e3b4831b66; retired I-01a's implementation and replaced obsolete no-storage statements with the capacity/path/profile, protected-claim and mount contract. Retained I-01b, archive/installation work and actual storage validation; added the evidenced release-tooling adoption prerequisite to DEP-006/AC-018 and P4. Preserved revision 0.10 and original handoff evidence; no remaining phase or deployment started. |
-| 0.12 | 2026-11-04 | Verified delivered infraops R2 expiration at PR #3764/v2.617.0, merged storage at PR #3763, docker PR #1818's release 8.48/bump 2.617.0, and all four deployment-pipeline pins. Removed obsolete lifecycle/image/pin implementation work; recorded owner-reported rollout in progress and retained actual execution/storage-preservation gates. Updated LIF-002/AC-012 for the delivered lifecycle change/removal contract without settling O-003. Preserved revision 0.11 and original documentation patch evidence. No einblick implementation or live validation started. |
-| 0.13 | 2026-11-04 | Recorded owner decision D-018 to keep the existing rollout behavior and remove the proposed Recreate capability/selector. Marked I-01b superseded without implementation and removed it from tasks, dependencies and phase order. Updated DEP-005/DEP-010/AC-018 to retain one active writer, graceful close, bounded startup/lock handling and actual rolling-update recovery evidence. Preserved revision 0.12 and the original documentation patch. No service or infrastructure implementation started. |

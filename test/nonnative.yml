@@ -21,4 +21,4 @@ processes:
         path: /einblick/readyz
       - kind: grpc
         port: 12000
-        service: einblick.v1.Service
+        service: einblick
