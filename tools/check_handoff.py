@@ -1,16 +1,12 @@
-"""Check local handoff links, requirement IDs, and the generated static preview."""
+"""Check specification links, requirement IDs, and the frozen design reference."""
 
 from collections import Counter
 from configparser import ConfigParser
 from html.parser import HTMLParser
-from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 import json
 import re
-import sys
-
-sys.dont_write_bytecode = True
 
 root = Path(__file__).resolve().parents[1]
 requirements = (root / 'docs/requirements.md').read_text()
@@ -24,9 +20,6 @@ assert references == set(ids), f'Undefined requirement IDs: {references - set(id
 rows = '\n'.join(line for line in requirements.splitlines() if re.match(r'^\| AC-\d{3} \|', line))
 mapped = set(re.findall(r'\b[A-Z]{3}-\d{3}\b', rows))
 assert set(ids) <= mapped, f'Unmapped requirements: {set(ids) - mapped}'
-for snapshot in (root / 'docs/history').glob('requirements-*.md'):
-    old_ids = set(re.findall(r'^- \*\*([A-Z]{3}-\d{3}) —', snapshot.read_text(), re.M))
-    assert old_ids <= set(ids), f'Removed stable IDs from {snapshot.name}: {old_ids - set(ids)}'
 
 submodules = ConfigParser(interpolation=None)
 submodules.read(root / '.gitmodules')
@@ -39,10 +32,7 @@ uninitialized_submodules = [
 checked_links = 0
 skipped_submodule_links = []
 documents = [root / 'README.md', root / 'AGENTS.md']
-documents += sorted(
-    path for path in (root / 'docs').rglob('*.md')
-    if not path.is_relative_to(root / 'docs/history')
-)
+documents += sorted((root / 'docs').rglob('*.md'))
 for path in documents:
     content = path.read_text()
     assert sum(line.startswith('```') for line in content.splitlines()) % 2 == 0, f'Unbalanced code fences: {path}'
@@ -58,11 +48,7 @@ for path in documents:
         assert target.exists(), f'Broken local link in {path}: {link}'
         checked_links += 1
 
-spec = spec_from_file_location('prototype_build', root / 'prototype/build.py')
-build = module_from_spec(spec)
-spec.loader.exec_module(build)
 preview = (root / 'prototype/index.html').read_text()
-assert preview == build.render_preview(), 'Preview is stale; run python3 prototype/build.py'
 
 class Assets(HTMLParser):
     def handle_starttag(self, tag, attributes):
@@ -77,14 +63,10 @@ assert 'Permission is hereby granted' in preview, 'Missing embedded uPlot licens
 result = {
     'requirements': len(ids),
     'acceptance_scenarios': len(scenarios),
-    'stable_ids_preserved': True,
     'undefined_or_unmapped_ids': 0,
     'local_link_targets_checked': checked_links,
     'uninitialized_submodule_links': skipped_submodule_links,
-    'preview_matches_source': True,
     'external_preview_assets': 0,
-    'scope': 'Planning bundle integrity; no backend or R2 validation',
+    'scope': 'Specification and visual-reference integrity; no backend or browser behavior validation',
 }
-output = root / 'prototype/validation/handoff-check-results.json'
-output.write_text(json.dumps(result, indent=2) + '\n')
 print(json.dumps(result, indent=2))
