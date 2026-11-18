@@ -14,8 +14,10 @@ The [v1 specification](docs/requirements.md) defines the product behavior and
 acceptance scenarios. The service scaffold and CGO opt-in exist; telemetry
 implementation and installation remain outstanding.
 
-Start with [the implementation plan](docs/review-and-plan.md) to select a packet
-and find validation/handoff instructions. For UI work, use the
+To work one step at a time, say `Continue docs/review-and-plan.md`.
+[That file](docs/review-and-plan.md) records the current step and remaining work;
+each continuation works on one step, removes it when complete and stops.
+The specification remains reference material. For UI work, use the
 [initial design reference](docs/requirements.md#87-service-catalog-and-standard-ux).
 
 ## Development

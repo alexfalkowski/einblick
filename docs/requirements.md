@@ -2,15 +2,16 @@
 
 **Status:** Implementation specification; telemetry backend and deployment remain to be built.
 
-**Revision:** 0.14
+**Revision:** 0.16
 
-**Last updated:** 2026-11-09
+**Last updated:** 2026-11-18
 
 **Audience:** Implementing agents, reviewers, product owner, and operators.
 
 This document owns the v1 product contract. [The implementation plan](review-and-plan.md)
-owns the remaining work packets and their entry conditions. The Go service scaffold
-and per-service CGO opt-in already exist.
+owns the ordered work queue, saved progress, entry conditions and handoff process.
+Say `Continue docs/review-and-plan.md` to work on its current step. The Go service
+scaffold and per-service CGO opt-in already exist.
 
 ## 1. How to read and refine this document
 
@@ -137,7 +138,8 @@ Use these capabilities when implementing the service:
 
 - The repository already has the `einblick` Go module, server/config/health
   composition, CI, and shared `bin` tooling. The root Makefile sets `static=0`.
-  E-02 validates the final DuckDB image and integrates dependencies into this scaffold.
+  E-02 validates and integrates local DuckDB; Parquet and remote dependencies
+  follow in E-06/E-07a, with final-image validation before installation.
 - The Makefile uses `http.mak` for shared service tooling without local protobuf
   generation. Keep the gRPC transport configured for OTLP ingestion and consume
   upstream OpenTelemetry service definitions; no custom service API is needed.
@@ -501,42 +503,65 @@ The acceptance matrix should be updated when a requirement changes. Tests should
 
 ## 14. Delivery phases
 
-Select one review packet at a time from [the implementation plan](review-and-plan.md).
+Use [the implementation plan](review-and-plan.md) as the single continuation file.
+It records the current step, removes completed steps from its queue and owns
+validation/handoff instructions. The phase table below summarizes scope; it is
+not a second progress tracker.
+
+Select one review packet at a time from that queue.
 Resolve only the material choices needed by that packet; detailed schema, queries,
 and configuration can accompany the implementation. Keep partial acceptance
 coverage distinct from a fully passed scenario.
 
+Start with logs and add one capability at a time. DuckDB, Parquet, R2, traces,
+metrics and the full frontend are separate review steps. Inspect source contracts
+and gather feasibility evidence when the selected step needs them; R2 access and
+all-signal fixtures do not block receiving logs or implementing local persistence.
+
+P0 is a development-only receiver that prints incoming log records through the
+server's logger, with its own OTLP log exporter disabled to prevent a feedback
+loop. Its responses demonstrate receipt only, and records are discarded after
+printing. It does not satisfy ING-002 or AC-001 and must not be enabled for a
+deployed client. From P1 onward, successful ingestion requires a local DuckDB
+commit under ING-002; remove the print-only path when persistence replaces it.
+
 | Phase | Remaining outcome | Exit evidence |
 | --- | --- | --- |
-| P0 | Verify supported source contracts, platforms, typed/nanosecond storage, final native/extension packaging, real R2 operations and dependency/resource cost. Use the existing scaffold and build opt-in. | E-01/E-02 feasibility results for all three signals; usable private test-R2 access. |
-| P1 | Build bounded log, trace and metric intake, local transactions/recovery and fixed recent queries. Record signal-specific time/support/duplicate policies. | AC-001/AC-002/AC-004/AC-006; local portions of AC-003/AC-005/AC-008 and backend bounds/cancellation in AC-013. |
-| P2 | Implement immutable export jobs, Parquet/R2 publication, historical reads, safe eviction, retention and outage recovery. | AC-007–AC-012/AC-019; archived portions of AC-003/AC-005 and historical bounds/failures in AC-013/AC-016. |
-| P3 | Complete catalog-driven MVC Overview, Logs and Traces, linked investigation, escaped rendering, bounded charts and visible query states. | AC-013/AC-015/AC-016/AC-022–AC-025 and operator docs. |
-| P4 | Verify storage-preserving releases, prepare installation, validate deployment/recovery, and enable one client with explicit exporters, sampling and TLS/authentication. | AC-017/AC-018/AC-020, prior active acceptance, AC-021 architectural review, AC-026 R2 evidence and recovery runbook. |
+| P0 | Receive and print logs using standard OTLP/gRPC in the existing server. | E-01: a representative local client sends logs and their content appears in server output; no database, archive or durability claim. |
+| P1 | Add DuckDB log persistence, commit acknowledgement and restart recovery. | E-02 then E-03a: native/platform and typed/nanosecond evidence; log response/support portions of AC-002/AC-003 and committed-record AC-008. Queries and R2 remain later work. |
+| P2 | Query recent logs, then add a thin MVC Logs page. | E-03b then E-03c: log AC-001/AC-004, local query bounds in AC-013 and log rendering in AC-015. |
+| P3 | Export immutable log batches to local Parquet files. | E-06: log archive-format AC-003, interrupted local export in AC-009, pending-job AC-008 and derivative cleanup in AC-019. No R2 dependency. |
+| P4 | Verify the lean R2 client, then upload completed log batches asynchronously. | E-07a then E-07b: actual-R2/dependency/resource AC-026 and remote publication/recovery in AC-008/AC-009. Keep local source rows. |
+| P5 | Read archived logs with DuckDB and safely evict published local batches. | E-08: log AC-007/AC-011/AC-019 and historical query bounds/failures in AC-013/AC-016. |
+| P6 | Add log retention and verify R2 outage, capacity and backlog recovery. | E-09: log AC-010/AC-012 and repeated disk/workspace cycles in AC-019. |
+| P7 | Add traces through separate durable-intake, query/view and archive packets. | E-04a/E-04b/E-04c: trace portions of AC-001–AC-003/AC-005 and the existing recovery/archive scenarios. |
+| P8 | Add metrics through separate durable-intake, numerical-query and archive packets. | E-05a/E-05b/E-05c: metric portions of AC-001–AC-003/AC-006/AC-024 and recovery/archive scenarios. All-signal backend evidence closes here. |
+| P9 | Complete catalog-driven Overview panels and linked investigation across the MVC views. | E-10 then E-11: full AC-013/AC-015/AC-016/AC-022–AC-025 and operator docs. |
+| P10 | Verify storage-preserving releases, prepare installation, validate deployment/recovery, and enable one client with explicit exporters, sampling and TLS/authentication. | AC-017/AC-018/AC-020, prior active acceptance, AC-021 architectural review, AC-026 final evidence and recovery runbook. |
 
-The agent hands the scoped change and original patch to the human for refinement
-and PR work. [Phase feedback](phase-feedback.md) owns capture and review of
-requirements + original patch + final PR + session ID. Finish the current phase
-and feedback review before the owner selects the next. Deployment, publication,
-client enablement and sibling edits require their own task scope.
+The implementation plan also owns capture and review of requirements + original
+patch + final PR + session ID. A continuation request selects its next ready step
+after the previous handoff; phase transitions retain the product and feedback
+checks recorded there. Deployment, publication, client enablement and sibling
+edits require their own task scope.
 
 ## 15. Open-decision register
 
 | ID | Decision | Suggested starting point / consequence | Needed by |
 | --- | --- | --- | --- |
-| O-001 | Installation ingress identity | Service and module are einblick. Choose the ingress domain and deployment references. | I-03 / P4 |
+| O-001 | Installation ingress identity | Service and module are einblick. Choose the ingress domain and deployment references. | I-03 / P10 |
 | O-002 | Internal ingestion authentication, TLS, certificate provisioning, and client trust | Reuse go-service mechanisms. Header-bearing remote OTLP/gRPC requires TLS under the current exporter contract. | Before a deployed client connects |
-| O-003 | Public meaning of archive retention | Object-age expiration through R2 remains the simplest proposal; infraops provides it through optional `expiration`. Document asynchronous deletion, complete-rule ownership, and explicit remote-rule removal when disabling it. Strict event-age retention requires a different documented enforcement policy. The capability does not settle this choice. | P2 |
-| O-004 | Backend event-day selection, accepted lateness, missing timestamps, and future clock skew | Inherit OTel timestamp meanings and its log Timestamp/ObservedTimestamp preference. Choose archive-day selection and only the remaining backend fallback/lateness/skew policy; do not redefine span/metric timestamp semantics. Exact backend policy is not yet agreed. | P1 |
-| O-005 | Duplicate policy per signal | Candidate: identify duplicate spans by trace/span IDs, identify metric points by complete stream identity and point timestamps, and tolerate duplicate logs rather than collapsing legitimate identical messages. Validate counter/histogram semantics before adoption. | P1 |
-| O-006 | Supported OTLP subset and its database mapping | Inherit protobuf/data-model definitions; derive the physical schema during feasibility/implementation. Verify representative go-service payloads, preserve typed values/nanoseconds, and document unsupported shapes/omissions explicitly. A handwritten copy of the OTel schema is unnecessary. | P0/P1 |
-| O-007 | R2 bucket and persistent-volume ownership/configuration | Reuse infraops' delivered protected-PVC and optional R2 expiration capabilities; choose capacity, path, provisioning profile, backing-volume reclaim policy and operational ownership. Verify the private bucket/reference. Verify actual release-tooling execution and storage preservation before activating storage; do not infer live provisioning from source support. | Test R2 access in P0; installation in P4 |
-| O-008 | Concrete resource and query bounds | Measure one-application ingestion and representative historical queries. Set memory/native headroom, workspace limits, export thresholds, and disk outage capacity from evidence. | P0 baseline; refine in P4 |
+| O-003 | Public meaning of archive retention | Object-age expiration through R2 remains the simplest proposal; infraops provides it through optional `expiration`. Document asynchronous deletion, complete-rule ownership, and explicit remote-rule removal when disabling it. Strict event-age retention requires a different documented enforcement policy. The capability does not settle this choice. | P6 |
+| O-004 | Backend event-day selection, accepted lateness, missing timestamps, and future clock skew | Inherit OTel timestamp meanings and its log Timestamp/ObservedTimestamp preference. Choose archive-day selection and only the remaining backend fallback/lateness/skew policy; do not redefine span/metric timestamp semantics. Exact backend policy is not yet agreed. | Log time policy in P1/P2; archive day in P3; traces in P7; metrics in P8 |
+| O-005 | Duplicate policy per signal | Candidate: identify duplicate spans by trace/span IDs, identify metric points by complete stream identity and point timestamps, and tolerate duplicate logs rather than collapsing legitimate identical messages. Validate counter/histogram semantics before adoption. | Logs in P1; traces in P7; metrics in P8 |
+| O-006 | Supported OTLP subset and its database mapping | Inherit protobuf/data-model definitions; derive the physical schema during feasibility/implementation. Verify representative go-service payloads, preserve typed values/nanoseconds, and document unsupported shapes/omissions explicitly. A handwritten copy of the OTel schema is unnecessary. | Log transport in P0 and storage in P1; traces in P7; metrics in P8 |
+| O-007 | R2 bucket and persistent-volume ownership/configuration | Reuse infraops' delivered protected-PVC and optional R2 expiration capabilities; choose capacity, path, provisioning profile, backing-volume reclaim policy and operational ownership. Verify the private bucket/reference. Verify actual release-tooling execution and storage preservation before activating storage; do not infer live provisioning from source support. | Local storage path in P1; test R2 access in P4; installation in P10 |
+| O-008 | Concrete resource and query bounds | Measure one-application ingestion and representative historical queries. Set memory/native headroom, workspace limits, export thresholds, and disk outage capacity from evidence. | Bound each capability as introduced in P0–P8; pilot refinement in P10 |
 | O-009 | Reserved: site authentication | Outside v1 under D-012/WEB-012. | No v1 work |
-| O-010 | Required platform matrix and native runtime image | Confirm Linux amd64/arm64 requirements and package the actual driver/engine/extensions accordingly. Validate the final service image on every required platform; the generic ARM capability trial is already complete. | P0 |
-| O-011 | Lean S3 client version | Start feasibility with go-micro-s3/client; pin only after R2 behavior, bounded-memory transfer, license, runtime dependencies, and linked binary cost are checked. | P0/P2 |
-| O-012 | Catalog selectors and supported go-service metric profile | Use the transports field; begin with id for service identity; confirm actual server surfaces and native instruments/units. Optional resource filters must use attributes clients actually emit. | P0/P3 |
-| O-013 | Frontend library versions and visual refinement | MVC with embedded lightweight assets; uPlot is demonstrated by the static concept. Confirm htmx/Pico versions from the owning web pattern at implementation time. | P3 |
+| O-010 | Required platform matrix and native runtime image | Confirm Linux amd64/arm64 requirements and package the actual driver/engine/extensions accordingly. Validate the final service image on every required platform; the generic ARM capability trial is already complete. | DuckDB in P1; Parquet in P3; remote-read extensions in P4/P5; final image in P10 |
+| O-011 | Lean S3 client version | Start feasibility with go-micro-s3/client; pin only after R2 behavior, bounded-memory transfer, license, runtime dependencies, and linked binary cost are checked. | P4 |
+| O-012 | Catalog selectors and supported go-service metric profile | Use the transports field; begin with id for service identity; confirm actual server surfaces and native instruments/units. Optional resource filters must use attributes clients actually emit. | Metric profile in P8; catalog in P9 |
+| O-013 | Frontend library versions and visual refinement | MVC with embedded lightweight assets; uPlot is demonstrated by the static concept. Confirm htmx/Pico versions from the owning web pattern at implementation time. | Logs page in P2; full frontend in P9 |
 
 Open tuning values do not require new infrastructure or repeated approval requests. Material changes to durability, authentication boundaries, supported data, or deployment scope should be raised with their concrete consequences.
 
