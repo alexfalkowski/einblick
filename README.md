@@ -4,104 +4,57 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/alexfalkowski/einblick.svg)](https://pkg.go.dev/github.com/alexfalkowski/einblick)
 [![Stability: Active](https://masterminds.github.io/stability/active.svg)](https://masterminds.github.io/stability/active.html)
 
-# einblick
+# 🔭 Einblick
 
-Einblick collects logs, metrics, and traces for go-service services with DuckDB queries and Parquet archives in Cloudflare R2.
+Einblick is an OpenTelemetry service for applications built on go-service.
+It receives logs, metrics and traces over gRPC and prints them through the
+service logger. Received records are discarded after printing.
 
-## Requirements
+Searchable DuckDB storage and Parquet archives in Cloudflare R2 are planned.
+See the [product requirements](docs/requirements.md) and
+[implementation plan](docs/review-and-plan.md) for the remaining work.
 
-The [v1 specification](docs/requirements.md) defines the product behavior and
-acceptance scenarios. The service scaffold and CGO opt-in exist; telemetry
-implementation and installation remain outstanding.
+## 🚀 Quickstart
 
-To work one step at a time, say `Continue docs/review-and-plan.md`.
-[That file](docs/review-and-plan.md) records the current step and remaining work;
-each continuation works on one step, removes it when complete and stops.
-The specification remains reference material. For UI work, use the
-[initial design reference](docs/requirements.md#87-service-catalog-and-standard-ux).
-
-## Development
-
-Use the Go and Ruby toolchain provided by the
-[CI image](.circleci/config.yml). The development workflow uses betteralign,
-golangci-lint, and RuboCop. See
-`make help` for supported commands and their prerequisites.
-
-Local builds require CGO and a C/C++ compiler for the planned DuckDB
-integration.
-
-Initialize the shared tooling before using Make, then install dependencies and
-build the server:
+Use Go, Ruby with Bundler, Make and a C/C++ compiler. See
+[development](docs/development.md) for toolchain details.
+Run these commands from the repository root:
 
 ```sh
-git submodule sync && git submodule update --init
+git submodule sync
+git submodule update --init
 make dep
 make build
-```
-
-## Server
-
-Start the server with the local development configuration:
-
-```sh
 ./einblick server -config file:test/.config/server.yaml
 ```
 
-The local configuration listens for HTTP on port `11000` and gRPC on port
-`12000`. It exports traces to an OTLP collector at `http://localhost:4318`.
-See [the configuration](test/.config/server.yaml) for transport timeouts, rate
-limits, logging, and telemetry settings.
-
-The planned telemetry receiver uses the standard OpenTelemetry OTLP/gRPC
-services for logs, metrics, and traces. Its implementation will consume upstream
-definitions; this repository has no custom protobuf API or generation step.
-
-## Health
-
-The server exposes service health, liveness, and readiness over HTTP:
+In another terminal, check readiness:
 
 ```sh
-curl --fail http://localhost:11000/einblick/healthz
-curl --fail http://localhost:11000/einblick/livez
 curl --fail http://localhost:11000/einblick/readyz
 ```
 
-The initial checks use a no-op check for liveness and readiness, and an online
-check for service health. The gRPC health service checks `einblick`.
-See [the health wiring](internal/health/health.go) and
-[health scenarios](test/features/health/) when adding dependency checks.
+The development configuration listens on HTTP port `11000` and gRPC port `12000`.
 
-```yaml
-health:
-  duration: 1s # Interval between checks.
-  timeout: 1s # Timeout for the online check.
-```
+## 📥 Telemetry ingestion
 
-## Deployment
+Send standard OTLP/gRPC log, metric and trace exports to the gRPC listener, including with gzip.
+See [telemetry ingestion](docs/ingestion.md) for receipt behavior, responses and a local
+client example. Successful exports acknowledge receipt only; telemetry is not stored.
 
-Releases publish notes on GitHub and Docker images for deployment.
+## ⚙️ Configuration
 
-Container builds use the shared
-[Go service Dockerfile](bin/build/docker/go/Dockerfile). The service Makefile
-sets `static=0`, enabling CGO and selecting the Debian 13 C/C++ runtime image
-for Docker build, test, and release targets (DEP-001). Build a local image with:
+See [configuration](docs/configuration.md) for the development settings,
+telemetry exporters, request limits and timeouts.
 
-```sh
-make build-docker platform=arm64
-```
+## 🛠️ Operations
 
-The `.cd` marker enables
-automated deployment updates: the release image's `deploy` command opens a
-version-bump PR in [InfraOps](https://github.com/alexfalkowski/infraops).
-Deployment configuration is managed in
-[the InfraOps application definitions](https://github.com/alexfalkowski/infraops/blob/master/area/apps/apps.hjson)
-and [Einblick configuration](https://github.com/alexfalkowski/infraops/blob/master/area/apps/lean/einblick.yaml).
-See [the CircleCI configuration](.circleci/config.yml) for the release and
-deployment workflow.
+See [operations](docs/operations.md) for health endpoints, container builds,
+release and deployment. Storage and query capabilities remain planned.
 
-## References
+## 🧪 Development
 
-- [OTLP ingestion requirements](docs/requirements.md#81-ingestion)
-- [Go package documentation](https://pkg.go.dev/github.com/alexfalkowski/einblick)
-- [Releases](https://github.com/alexfalkowski/einblick/releases)
-- [Shared tooling](bin/README.md)
+See [development](docs/development.md) for the Cucumber harness, test output and
+validation. Go API documentation is available on
+[pkg.go.dev](https://pkg.go.dev/github.com/alexfalkowski/einblick), and release
+history is available in [GitHub releases](https://github.com/alexfalkowski/einblick/releases).

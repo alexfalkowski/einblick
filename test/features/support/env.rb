@@ -5,3 +5,5 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 require 'nonnative'
 require 'einblick'
+
+World(Einblick::OTLP::World)
