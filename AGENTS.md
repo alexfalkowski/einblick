@@ -75,6 +75,14 @@ saved state, and [docs/requirements.md](docs/requirements.md) as the product
 contract. Keep agent instructions and process in this file; the plan contains
 feature work, dependencies, acceptance evidence and progress.
 
+Keep the plan focused on unfinished work, the next action, unresolved decisions
+and missing acceptance evidence. Do not duplicate changes, commit/PR history or
+completed refinements that can be derived from Git. Keep necessary handoff
+context directly in the Markdown plan. Remove completed features and their notes,
+and identify the next pending step. Each step is one bounded feature increment.
+Once its agreed scope is complete, advance the step number. Further feature work
+belongs to the next increment; do not keep a completed ID open for later stages.
+
 Focus the implementation queue on product features and their repository
 validation. The owner handles deployment and service cutover; do not track
 those tasks or make them prerequisites for feature work.
@@ -82,7 +90,7 @@ those tasks or make them prerequisites for feature work.
 Number implementation steps consecutively: `E-01`, `E-02`, `E-03`, and so on.
 Use the next whole number for each step, including split or inserted work.
 Renumber pending steps in execution order and update their references together.
-Keep completed step IDs and their evidence unchanged; do not add letter suffixes.
+Never reuse completed step IDs or add letter suffixes.
 
 Each continuation handles exactly one step, then stops:
 
@@ -90,16 +98,15 @@ Each continuation handles exactly one step, then stops:
    step rather than skipping it. Verify its repository state and prerequisites.
 2. Set the status to `in progress`; implement only that step with its relevant
    requirements, validation and documentation.
-3. On interruption or validation failure, leave the step in the queue and save
-   actual commands/results, remaining work and blockers. Set `in progress` or
-   `blocked` as appropriate.
-4. When its feature gates pass, preserve the original patch/base and record a
-   concise completion entry: result, actual validation, acceptance portions,
-   dependency/instruction revisions, handoff references, feedback disposition
-   and remaining gates. Mark unavailable evidence explicitly.
-5. Remove the completed row, select the next first row, set it to `ready`, update
-   resume notes and the last completed step, then stop. Owner review remains the
-   next step's entry condition; do not implement it in the same request.
+3. On interruption or validation failure, leave the step in the queue. Record
+   remaining work, blockers and any actual commands/results needed to resume
+   directly in the Markdown plan. Set `in progress` or `blocked` as appropriate.
+4. When its feature gates pass, report the result and actual validation. Keep
+   only acceptance or recovery context still needed by remaining work directly
+   in the Markdown plan; do not add a completed-feature history.
+5. Remove the completed row and its notes, select the next first row, set it to
+   `ready`, update the next action and resume notes, then stop. Owner review
+   remains the next step's entry condition; do not implement it in the same request.
 6. Once the queue and readiness gates are complete, retain final acceptance and
    recovery evidence, delete the plan and update incoming links. Keep the product
    specification.
@@ -128,55 +135,27 @@ This checks local Markdown targets, requirement/acceptance references and
 embedded preview assets/license. It does not validate backend or browser
 behavior. Links into uninitialized submodules are reported as skipped.
 
-## Patch handoff and feedback
+## Handoff and feedback
 
-The agent produces the change and original patch; the human drives refinement
-and the PR stage. Capture this evidence within the selected step's handoff rather
-than creating another work queue.
+The Markdown implementation plan is the durable handoff. Put everything needed
+for continuation directly in that file: unresolved decisions, remaining work,
+acceptance gaps and validation observations still needed by pending features.
+Use exact commands and concise actual results when they matter to the next step.
+Mark unavailable evidence explicitly.
 
-### Capture at patch handoff
+Do not rely on ignored report files or separate handoff folders. `test/reports/`
+is disposable and may be deleted. Do not leave required context behind a link
+to those files. Use Git for changes, revisions and review history instead of
+copying them into the plan. Remove completed-feature notes once no remaining
+work depends on them.
 
-Retain immutable references to these inputs for each step:
+The human drives refinement and the PR stage. When feedback review is needed,
+compare requirements with the available changes and review evidence. Separate
+owner decisions from patch errors, missing instructions and environment limits.
+State missing evidence rather than inventing or reconstructing it.
 
-| Input | Required context |
-| --- | --- |
-| Task and requirements | Step/scope, exact first agent-generated requirements if any, and the requirements revision actually used. |
-| Original patch | Complete patch including new/binary files as needed, base commit and content hash or immutable reference. Preserve it before human refinement. |
-| Session | Actual session ID(s), roles/runtime and accessible record/export when available. An ID alone does not provide inspectable conversation content. |
-| Instructions | Starting repository/dependency revisions and actual bin/skill revision used. |
-| Final PR | Reviewed PR with exact base/head or merge revisions, final checks, owner/reviewer corrections and rationale. For docs without a PR, record the accepted document revision. |
-
-Keep references portable. Mark missing or inaccessible inputs explicitly; do not
-reconstruct an original patch from the final result or invent session IDs.
-Exclude secrets and unrelated source/configuration captures.
-
-At patch handoff, remind the human:
-
-> Retain the requirements revision, original patch/base and actual session ID
-> before refinement. Return requirements + original patch + final PR/revisions +
-> session ID for feedback review, with an accessible session record if available.
-
-At final-PR or phase close, remind the human to provide that bundle and record
-its review or missing-evidence limitations before advancing.
-
-### Review before the next phase
-
-Compare requirements → original patch → final PR using actual session/review
-evidence to explain material corrections. Separate new owner direction and
-product decisions from patch errors, missing instructions, environment limits
-and reusable skill gaps. Missing session content limits causal conclusions.
-
-Propose only the smallest supported change to the existing owning bin skill.
-If its rule was already adequate, inspect discovery/compliance before adding
-another rule. Keep service-specific policy in this repository.
-
-Review skill changes independently in bin under its current instructions and
-validation. Record accepted, deferred, rejected or no-change disposition; adoption
-requires a reviewed/versioned change and the next phase's actual consumed revision.
-Do not report a proposed change as adopted.
-
-At phase close, record product acceptance and remaining gates, step bundle
-references, material corrections, feedback disposition and instruction revision
-for the next phase. Missing feedback cannot conceal an unmet product gate.
-The owner's continuation request selects the next ready step; feedback review
-does not itself authorize skill edits, publishing, deployment or external messages.
+Propose only the smallest supported change to an existing owning bin skill;
+keep service-specific policy here. Skill changes require independent review and
+validation in bin. Adoption requires a reviewed/versioned change and the next
+feature's actual consumed revision. Feedback review does not authorize skill
+edits, publishing, deployment or external messages.

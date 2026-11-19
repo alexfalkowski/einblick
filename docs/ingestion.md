@@ -16,10 +16,10 @@ OpenTelemetry definitions, including gzip:
 The [development configuration](configuration.md) exposes all three on gRPC
 port `12000`.
 
-Each successful export prints one
-`OTLP <signal> received (development only; discarded)` entry through the service
-logger, where `<signal>` is `logs`, `metrics` or `traces`. The complete
-resource/scope/payload is printed as Protobuf JSON. Records are
+Each successful export prints one entry through the service logger. Its message
+is the complete request as Protobuf JSON, including resource and scope context;
+the `signal` field identifies `logs`, `metrics` or `traces`. The payload is not
+duplicated in a separate field. Empty requests print `{}`. Records are
 discarded after printing. Success acknowledges receipt only, with no stored
 history or queries.
 

@@ -36,7 +36,7 @@ Then('the server should print the complete {word} export') do |signal|
 end
 
 Then('the server should not print telemetry for this export') do
-  expect(File.read('reports/server.log', nil, @receipt_offset)).not_to include("OTLP #{@signal} received")
+  expect(File.read('reports/server.log', nil, @receipt_offset)).not_to have_otlp_export(@signal)
 end
 
 Then('the {word} export should fail with {string}') do |_signal, status|

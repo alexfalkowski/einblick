@@ -2,6 +2,7 @@
 
 require 'base64'
 require 'json'
+require 'open3'
 require 'securerandom'
 require 'yaml'
 
@@ -27,3 +28,4 @@ end
 
 require 'einblick/otlp'
 require 'einblick/otlp/world'
+require 'einblick/startup/world'

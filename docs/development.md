@@ -7,8 +7,10 @@
 Use Go matching [go.mod](../go.mod) and Ruby with Bundler. The
 [CI image](../.circleci/config.yml) provides the project's Go and Ruby toolchain.
 Git with GitHub SSH access is needed for the shared `bin` submodule. Make and
-a C/C++ compiler are needed for the build, with CGO enabled for the planned
-DuckDB integration.
+a C/C++ compiler are needed for the build, with CGO enabled for DuckDB.
+Native local development is checked on macOS arm64; Linux amd64/arm64 are the
+existing container build targets. Other native development platforms are not
+validated by this change.
 
 Follow the [quickstart](../README.md#-quickstart) to initialize the submodule,
 install dependencies and build the server. Use `make help` from the repository
@@ -24,6 +26,16 @@ Run the printing scenarios for all three signals from the repository root:
 ```sh
 make features tags=@printing
 ```
+
+Run the health scenarios with `make features feature=features/health`. They
+check HTTP and gRPC readiness with the configured local database open.
+They also verify that empty and in-memory database paths fail configuration
+validation, and that a path naming a directory stops startup with a database-open
+error. These cases use separate CLI invocations and checked-in configurations.
+The existing harness starts the service in `test/` and closes it after the run.
+These scenarios do not prove typed-value storage or crash recovery; the public
+intake still discards telemetry. Database round-trip acceptance remains open
+until storage validation is available.
 
 Server output and test results go to `test/reports/`. The synthetic OTLP fixtures follow the pinned
 go-service sources and include resource/scope identity, typed nested values,

@@ -1,8 +1,8 @@
 # Telemetry service: first-version requirements
 
-**Status:** Implementation specification; printing is implemented, with persistence, queries and archives still planned.
+**Status:** Implementation specification; printing and local DuckDB startup are implemented. Telemetry persistence, queries and archives remain planned.
 
-**Revision:** 0.18
+**Revision:** 0.20
 
 **Last updated:** 2026-11-19
 
@@ -139,7 +139,9 @@ Use these capabilities when implementing the service:
 
 - The repository already has the `einblick` Go module, server/config/health
   composition, CI, and shared `bin` tooling. The root Makefile sets `static=0`.
-  E-02 validates and integrates local DuckDB; Parquet and remote dependencies
+  Local DuckDB integration provides explicit file, memory and thread settings;
+  [configuration](configuration.md#-local-database) owns the implemented schema.
+  Data-fidelity acceptance remains open. Parquet and remote dependencies
   follow in E-06/E-07, with native-image validation as each is introduced.
 - The Makefile uses `http.mak` for shared service tooling without local protobuf
   generation. Keep the gRPC transport configured for OTLP ingestion and consume
@@ -427,7 +429,7 @@ This is a logical configuration inventory, not a finalized YAML schema or comman
 | gRPC ingestion listener | Internal cluster endpoint, using standard OTLP/gRPC services. | Agreed |
 | UI HTTP listener | Existing go-service HTTP/MVC conventions behind HTTPS ingress. | Working design |
 | Ingestion authentication and TLS | Reuse go-service capabilities; exact auth mode/certificate provisioning to select. | Open |
-| Persistent local path | /data | Proposed |
+| Persistent local path | Explicit database filename; `/data/recent.duckdb` on a persistent mount, `reports/recent.duckdb` from `test/` for development. | Interface implemented; installation values owned by the operator |
 | R2 bucket | Private installation-specific bucket; identify existing or provisioned owner. | Open wiring |
 | R2 endpoint and credentials | Explicit configuration and mounted secret/source references. | Required |
 | Archive format | Versioned Parquet | Agreed |
@@ -439,7 +441,7 @@ This is a logical configuration inventory, not a finalized YAML schema or comman
 | Testing retention | 24 hours initially, or another explicitly configured shorter value. | Proposed |
 | Retention clock | Object age versus event age must be explicit. | Open |
 | R2 lifecycle configuration | If object-age expiration is selected, reuse infraops `expiration`, for example `168h` normally or `24h` for testing; `7d` is not valid Go duration syntax. | Installation policy/activation open |
-| DuckDB memory / threads | Tunable, with Go/native headroom; initial values from feasibility/pilot. | Open tuning |
+| DuckDB memory / threads | Required explicit settings; development uses `64MiB` and one worker. Production values require measured Go/native headroom. | Interface implemented; production tuning open |
 | Historical-query concurrency | One initially. | Proposed |
 | Query timeout | 30 seconds, configurable. | Proposed |
 | Result and search-range limits | Bounded; concrete initial limits chosen with the initial query workflows. | Open tuning |
@@ -456,7 +458,7 @@ R2 credential values must not be embedded in checked-in examples. Use configured
 
 ## 12. Deployment and build requirements
 
-- **DEP-001 — Per-service CGO opt-in.** Keep the root Makefile's existing `static=0` setting for Docker build/test/release paths. Validate the resulting native service image during E-02 and record the consumed `bin` revision. Preserve the shared default for other services.
+- **DEP-001 — Per-service CGO opt-in.** Keep the root Makefile's existing `static=0` setting for Docker build/test/release paths. The owner validates the resulting native service image at deployment. Record the consumed `bin` revision in the handoff and preserve the shared default for other services.
 - **DEP-002 — Actual native packaging.** Pin a compatible DuckDB Go driver and bundled engine. Demonstrate the target runtime image has the required native runtime support; a statically linked DuckDB library alone does not establish a fully static executable.
 - **DEP-003 — Extensions available at startup.** Package the required remote-Parquet/R2 extension support with the release image or otherwise make it available without a runtime internet download. Verify paths under the read-only root filesystem.
 - **DEP-004 — Persistent volume.** Use infraops' delivered optional `storage` capability to provision and mount persistent application storage explicitly. Set capacity and a dedicated data path; select the provisioning profile for the installation. Preserve claim identity across pod replacement and document protection, migration and deletion behavior. An ephemeral-storage request/limit is not a substitute.
@@ -464,7 +466,7 @@ R2 credential values must not be embedded in checked-in examples. Use configured
 - **DEP-006 — Standard runtime integration.** Use the existing go-service server/config/DI/lifecycle patterns and the owning repositories' supported build and validation workflows. Before enabling storage, verify storage-aware release tooling in every configuration-writing pipeline and record actual tool/image revisions. The known source baseline is release image `8.48` with `cmd/bump` `2.617.0`. Demonstrate that version updates for this or another application preserve every application's storage settings, including optional-profile presence. Source pins alone do not establish successful execution.
 - **DEP-007 — Separate network surfaces.** Provide internal gRPC ingestion and browser access through their appropriate services/ingress, with site authentication deferred under D-012. Align the app's actual listeners with configured probes.
 - **DEP-008 — Secret and file access.** Mount R2 and any selected ingestion secrets read-only, keep writable files under the data/workspace mounts, and verify non-root volume permissions.
-- **DEP-009 — Deployment platforms.** Establish whether the service must retain the current Linux amd64/arm64 image matrix. Validate each required platform with the CGO-enabled packaging.
+- **DEP-009 — Deployment platforms.** Retain the current Linux amd64/arm64 image matrix. Local development also uses native macOS arm64. Validate each required runtime with the CGO-enabled packaging. The owner will validate the deployed platforms/runtime; deployment does not become a prerequisite for the repository feature queue.
 - **DEP-010 — Bounded shutdown and startup.** On graceful termination, stop accepting intake, finish or safely fail in-flight work, stop database users and close DuckDB before process exit within the configured termination grace. Align probes, bounded startup/lock handling and recovery with the existing rollout configuration. Exercise delayed shutdown and replacement startup; graceful-close expectations do not replace crash-recovery requirements or promise uninterrupted ingestion.
 
 Current go-service constraint: OTLP/gRPC exporters with configured headers require TLS for non-loopback endpoints. A cluster DNS address does not bypass that validation. If header-based ingestion authentication is selected, include certificate provisioning and client trust in the rollout.
@@ -522,10 +524,10 @@ continue printing until E-11 and E-14 replace their respective paths with
 commit-backed ingestion. Durable v1 requires all three signals to meet ING-002;
 no permanent discard mode or second backend is planned.
 
-| Phase | Remaining outcome | Exit evidence |
+| Phase | Outcome | Exit evidence |
 | --- | --- | --- |
 | P0 | Receive and print all three signals using standard OTLP/gRPC. | E-01: complete requests appear in the logger, with receipt-only responses; no database, archive or durability claim. |
-| P1 | Add DuckDB log persistence, commit acknowledgement and restart recovery. | E-02 then E-03: native/platform and typed/nanosecond evidence; log response/support portions of AC-002/AC-003 and committed-record AC-008. Queries and R2 remain later work. |
+| P1 | Add DuckDB log persistence, commit acknowledgement and restart recovery. | E-03: typed/nanosecond write/read round-trip, timestamp binding, committed-record reopen, log response/support portions of AC-002/AC-003 and committed-record AC-008. Deployed native/platform validation remains with the owner. Queries and R2 remain later work. |
 | P2 | Query recent logs, then add a thin MVC Logs page. | E-04 then E-05: log AC-001/AC-004, local query bounds in AC-013 and log rendering in AC-015. |
 | P3 | Export immutable log batches to local Parquet files. | E-06: log archive-format AC-003, interrupted local export in AC-009, pending-job AC-008 and derivative cleanup in AC-019. No R2 dependency. |
 | P4 | Verify the lean R2 client, then upload completed log batches asynchronously. | E-07 then E-08: actual-R2/dependency/resource AC-026 and remote publication/recovery in AC-008/AC-009. Keep local source rows. |
@@ -551,7 +553,7 @@ their storage/query policies and full recovery/archive evidence follow in P7/P8.
 | O-007 | R2 bucket and persistent-volume ownership/configuration | Reuse infraops' delivered protected-PVC and optional R2 expiration capabilities; choose capacity, path, provisioning profile, backing-volume reclaim policy and operational ownership. Verify the private bucket/reference. Verify actual release-tooling execution and storage preservation before activating storage; do not infer live provisioning from source support. | Local storage path in P1; test R2 access in P4; runtime settings before use |
 | O-008 | Concrete resource and query bounds | Measure one-application ingestion and representative historical queries. Set memory/native headroom, workspace limits, export thresholds, and disk outage capacity from evidence. | Bound each capability as introduced in P0–P8; refine with workload measurements |
 | O-009 | Reserved: site authentication | Outside v1 under D-012/WEB-012. | No v1 work |
-| O-010 | Required platform matrix and native runtime image | Confirm Linux amd64/arm64 requirements and package the actual driver/engine/extensions accordingly. Validate the final service image on every required platform; the generic ARM capability trial is already complete. | DuckDB in P1; Parquet in P3; remote-read extensions in P4/P5; images validated as dependencies are introduced |
+| O-010 | Required platform matrix and native runtime image | Retain Linux amd64/arm64 containers and native macOS arm64 development. Package the actual driver/engine/extensions accordingly. The owner will validate deployed platform/runtime behavior; it remains unavailable acceptance evidence until run. | Repository dependency checks as introduced; deployed runtime validation owned by the operator |
 | O-011 | Lean S3 client version | Start feasibility with go-micro-s3/client; pin only after R2 behavior, bounded-memory transfer, license, runtime dependencies, and linked binary cost are checked. | P4 |
 | O-012 | Catalog selectors and supported go-service metric profile | Use the transports field; begin with id for service identity; confirm actual server surfaces and native instruments/units. Optional resource filters must use attributes clients actually emit. | Metric profile in P8; catalog in P9 |
 | O-013 | Frontend library versions and visual refinement | MVC with embedded lightweight assets; uPlot is demonstrated by the static concept. Confirm htmx/Pico versions from the owning web pattern at implementation time. | Logs page in P2; full frontend in P9 |
