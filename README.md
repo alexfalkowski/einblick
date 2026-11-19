@@ -7,18 +7,20 @@
 # 🔭 Einblick
 
 Einblick is an OpenTelemetry service for applications built on go-service.
-It receives logs, metrics and traces over gRPC and prints them through the
-service logger. Received records are discarded after printing.
+It receives logs, metrics and traces over gRPC. Logs commit to local DuckDB
+storage before acknowledgement; metrics and traces print through the service
+logger and are discarded.
 
-The service opens a local DuckDB database and checks it for readiness.
-Telemetry persistence, queries and Parquet archives in Cloudflare R2 are planned.
+The service recovers its local log database before serving requests.
+Queries, trace/metric persistence and Parquet archives in Cloudflare R2 are planned.
 See the [product requirements](docs/requirements.md) and
 [implementation plan](docs/review-and-plan.md) for the remaining work.
 
 ## 🚀 Quickstart
 
-Use Go, Ruby with Bundler, Make and a C/C++ compiler. See
-[development](docs/development.md) for toolchain details.
+Use Go, Ruby with Bundler, Make, a C/C++ compiler and native DuckDB
+headers/library. macOS development uses Homebrew DuckDB; the configured CI image
+includes the native dependency. See [development](docs/development.md) for details.
 Run these commands from the repository root:
 
 ```sh
@@ -36,13 +38,15 @@ curl --fail http://localhost:11000/einblick/readyz
 ```
 
 The development configuration listens on HTTP port `11000` and gRPC port `12000`.
-Its local database is `test/reports/recent.duckdb`; telemetry is still discarded.
+Its local database is `test/reports/recent.duckdb`. This development location is
+disposable; use a persistent mount to retain accepted logs.
 
 ## 📥 Telemetry ingestion
 
 Send standard OTLP/gRPC log, metric and trace exports to the gRPC listener, including with gzip.
 See [telemetry ingestion](docs/ingestion.md) for receipt behavior, responses and a local
-client example. Successful exports acknowledge receipt only; telemetry is not stored.
+client example. Successful log exports acknowledge local commit. Successful
+metric and trace exports acknowledge receipt only.
 
 ## ⚙️ Configuration
 
@@ -51,8 +55,8 @@ telemetry exporters, request limits and timeouts.
 
 ## 🛠️ Operations
 
-See [operations](docs/operations.md) for health endpoints, container builds,
-release and deployment. Storage and query capabilities remain planned.
+See [operations](docs/operations.md) for health endpoints, persistent storage,
+deployment and log recovery. Query capabilities remain planned.
 
 ## 🧪 Development
 

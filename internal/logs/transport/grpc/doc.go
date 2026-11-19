@@ -1,4 +1,3 @@
-// Package grpc implements print-only OTLP log receipt for development.
-// It uses upstream protobuf services and the shared go-service gRPC lifecycle.
-// Success does not imply storage or durable acknowledgement.
+// Package grpc implements atomic, commit-backed OTLP log ingestion using
+// upstream protobuf services and the shared go-service gRPC lifecycle.
 package grpc

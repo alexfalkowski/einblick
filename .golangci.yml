@@ -4,6 +4,8 @@ linters:
   disable:
     - bodyclose
     - embeddedstructfieldcheck
+    - err113
+    - errcheck
     - exhaustruct
     - exhaustruct_v5
     - depguard

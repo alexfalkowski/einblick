@@ -43,6 +43,8 @@ GEM
     deep_merge (1.2.2)
     diff-lcs (1.6.2)
     domain_name (0.7.20261031)
+    duckdb (2.0.0.1)
+      bigdecimal (>= 3.1.4)
     ed25519 (1.4.0)
     ffi (1.17.4)
     ffi (1.17.4-aarch64-linux-gnu)
@@ -226,6 +228,7 @@ PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
+  duckdb
   nonnative
   opentelemetry-exporter-otlp-common
   rubocop

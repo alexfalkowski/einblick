@@ -1,8 +1,8 @@
 # Telemetry service: first-version requirements
 
-**Status:** Implementation specification; printing and local DuckDB startup are implemented. Telemetry persistence, queries and archives remain planned.
+**Status:** Implementation specification; local log persistence and recovery are implemented. Metrics/traces remain print-only; queries and archives are planned.
 
-**Revision:** 0.20
+**Revision:** 0.24
 
 **Last updated:** 2026-11-19
 
@@ -141,7 +141,11 @@ Use these capabilities when implementing the service:
   composition, CI, and shared `bin` tooling. The root Makefile sets `static=0`.
   Local DuckDB integration provides explicit file, memory and thread settings;
   [configuration](configuration.md#-local-database) owns the implemented schema.
-  Data-fidelity acceptance remains open. Parquet and remote dependencies
+  Log fidelity/recovery checks pass locally, and the configured CI image now
+  supplies the Ruby client's native library. Embedded Goose migrations version
+  the application schema at startup through a single Goose history;
+  [operations](operations.md#-log-storage-and-recovery) owns compatibility and
+  failure/rollback behavior. Parquet and remote dependencies
   follow in E-06/E-07, with native-image validation as each is introduced.
 - The Makefile uses `http.mak` for shared service tooling without local protobuf
   generation. Keep the gRPC transport configured for OTLP ingestion and consume
@@ -517,17 +521,18 @@ First receive and print logs, metrics and traces through the server's logger,
 then add DuckDB and the remaining service features. The receiver's own exporters
 must not feed itself.
 
-P0 responses demonstrate receipt only; records are discarded after printing,
-with no stored history or queries. This early release does not satisfy ING-002
-or AC-001. Log persistence replaces log printing in E-03; traces and metrics
-continue printing until E-11 and E-14 replace their respective paths with
+P0 responses demonstrated receipt only; records were discarded after printing,
+without stored history or queries. That release did not satisfy ING-002 or
+AC-001. E-03 replaces log printing with local commit acknowledgement.
+Traces and metrics continue printing
+until E-11 and E-14 replace their respective paths with
 commit-backed ingestion. Durable v1 requires all three signals to meet ING-002;
 no permanent discard mode or second backend is planned.
 
 | Phase | Outcome | Exit evidence |
 | --- | --- | --- |
 | P0 | Receive and print all three signals using standard OTLP/gRPC. | E-01: complete requests appear in the logger, with receipt-only responses; no database, archive or durability claim. |
-| P1 | Add DuckDB log persistence, commit acknowledgement and restart recovery. | E-03: typed/nanosecond write/read round-trip, timestamp binding, committed-record reopen, log response/support portions of AC-002/AC-003 and committed-record AC-008. Deployed native/platform validation remains with the owner. Queries and R2 remain later work. |
+| P1 | Add DuckDB log persistence, commit acknowledgement, restart recovery and versioned local migrations. | E-03: typed/nanosecond write/read round-trip, timestamp binding, committed-record reopen, log response/support portions of AC-002/AC-003 and committed-record AC-008; migration initialization, restart/failure recovery and newer-schema rejection for local AC-017. Deployed native/platform validation remains with the owner. Queries and R2 remain later work. |
 | P2 | Query recent logs, then add a thin MVC Logs page. | E-04 then E-05: log AC-001/AC-004, local query bounds in AC-013 and log rendering in AC-015. |
 | P3 | Export immutable log batches to local Parquet files. | E-06: log archive-format AC-003, interrupted local export in AC-009, pending-job AC-008 and derivative cleanup in AC-019. No R2 dependency. |
 | P4 | Verify the lean R2 client, then upload completed log batches asynchronously. | E-07 then E-08: actual-R2/dependency/resource AC-026 and remote publication/recovery in AC-008/AC-009. Keep local source rows. |
@@ -547,9 +552,9 @@ their storage/query policies and full recovery/archive evidence follow in P7/P8.
 | O-001 | Installation ingress identity | Service and module are einblick. Choose the ingress domain and deployment references. | Before configuring ingress |
 | O-002 | Internal ingestion authentication, TLS, certificate provisioning, and client trust | Reuse go-service mechanisms. Header-bearing remote OTLP/gRPC requires TLS under the current exporter contract. | Before a deployed client connects |
 | O-003 | Public meaning of archive retention | Object-age expiration through R2 remains the simplest proposal; infraops provides it through optional `expiration`. Document asynchronous deletion, complete-rule ownership, and explicit remote-rule removal when disabling it. Strict event-age retention requires a different documented enforcement policy. The capability does not settle this choice. | P6 |
-| O-004 | Backend event-day selection, accepted lateness, missing timestamps, and future clock skew | Inherit OTel timestamp meanings and its log Timestamp/ObservedTimestamp preference. Choose archive-day selection and only the remaining backend fallback/lateness/skew policy; do not redefine span/metric timestamp semantics. Exact backend policy is not yet agreed. | Log time policy in P1/P2; archive day in P3; traces in P7; metrics in P8 |
-| O-005 | Duplicate policy per signal | Candidate: identify duplicate spans by trace/span IDs, identify metric points by complete stream identity and point timestamps, and tolerate duplicate logs rather than collapsing legitimate identical messages. Validate counter/histogram semantics before adoption. | Logs in P1; traces in P7; metrics in P8 |
-| O-006 | Supported OTLP subset and its database mapping | Inherit protobuf/data-model definitions; derive the physical schema during feasibility/implementation. Verify representative go-service payloads, preserve typed values/nanoseconds, and document unsupported shapes/omissions explicitly. A handwritten copy of the OTel schema is unnecessary. | All-signal transport in P0; log storage in P1; trace storage in P7; metric storage in P8 |
+| O-004 | Backend event-day selection, accepted lateness, missing timestamps, and future clock skew | Logs: preserve both original nanosecond timestamps and separate receipt time; select Timestamp, then ObservedTimestamp, then server receipt time. Accept late and future timestamps without cutoffs. These log policies are agreed. Archive-day selection remains for P3; do not redefine span/metric timestamp semantics. | Archive day in P3; traces in P7; metrics in P8 |
+| O-005 | Duplicate policy per signal | Logs: retain repeated exports as additional records, including identical messages; no deduplication index or horizon. This log policy is agreed. Candidate for later signals: identify duplicate spans by trace/span IDs and metric points by complete stream identity and point timestamps. Validate counter/histogram semantics before adoption. | Traces in P7; metrics in P8 |
+| O-006 | Supported OTLP subset and its database mapping | Logs: preserve complete content from the pinned OTLP protobuf, including typed bodies/attributes, resource/scope context, correlation and original nanosecond timestamps; this support policy is agreed. Derive physical schema from these contracts and verify representative go-service payloads. Trace/metric support and mapping remain open; document unsupported shapes/omissions explicitly. A handwritten copy of the OTel schema is unnecessary. | Log verification in P1; trace storage in P7; metric storage in P8 |
 | O-007 | R2 bucket and persistent-volume ownership/configuration | Reuse infraops' delivered protected-PVC and optional R2 expiration capabilities; choose capacity, path, provisioning profile, backing-volume reclaim policy and operational ownership. Verify the private bucket/reference. Verify actual release-tooling execution and storage preservation before activating storage; do not infer live provisioning from source support. | Local storage path in P1; test R2 access in P4; runtime settings before use |
 | O-008 | Concrete resource and query bounds | Measure one-application ingestion and representative historical queries. Set memory/native headroom, workspace limits, export thresholds, and disk outage capacity from evidence. | Bound each capability as introduced in P0–P8; refine with workload measurements |
 | O-009 | Reserved: site authentication | Outside v1 under D-012/WEB-012. | No v1 work |
