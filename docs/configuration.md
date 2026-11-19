@@ -54,6 +54,13 @@ The development configuration uses text logging at debug level, exposes
 Prometheus metrics and exports the server's own traces to an OTLP collector at
 `http://localhost:4318/v1/traces`.
 
+DuckDB uses the shared go-service SQL instrumentation for operation traces,
+operation duration metrics and connection-pool statistics, labelled with
+`db.system.name=duckdb`. Raw SQL query text is excluded. With Prometheus enabled,
+the metrics endpoint includes `einblick_db_sql_connection_open` and
+`einblick_db_client_operation_duration_seconds_count` with `db_system_name="duckdb"`.
+Shutdown unregisters the pool statistics and closes the database.
+
 The receivers use the configured service logger directly. Keep the server's own
 OTLP log exporter disabled to avoid recursive export, and use `info` or `debug`
 level to see receipts. Keep its metric and trace exporters pointed away from

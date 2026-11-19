@@ -37,12 +37,30 @@ These scenarios do not prove typed-value storage or crash recovery; the public
 intake still discards telemetry. Database round-trip acceptance remains open
 until storage validation is available.
 
+The HTTP metrics scenario checks DuckDB connection-pool statistics and operation
+duration samples with the DuckDB database-system label. This verifies the SQL
+instrumentation through the service's metrics endpoint; remote trace delivery
+still depends on the configured collector.
+
 Server output and test results go to `test/reports/`. The synthetic OTLP fixtures follow the pinned
 go-service sources and include resource/scope identity, typed nested values,
 large integers and nanosecond timestamps. Metric fixtures cover gauges, sums
 and histograms with exemplars; trace fixtures include linked spans and events. See the [fixture notes](../test/fixtures/README.md)
 for source versions and provenance. The Ruby client uses upstream generated
 OTLP messages; no custom protobuf API or generation step is introduced.
+
+## 🦆 SQL instrumentation references
+
+DuckDB consumes go-service `v3.2.0`'s
+[`database/sql/telemetry/telemetry.go`](https://github.com/alexfalkowski/go-service/blob/v3.2.0/database/sql/telemetry/telemetry.go).
+The direct opener and metric cleanup follow Migrieren's
+[`internal/migrate/database/database.go`](https://github.com/alexfalkowski/migrieren/blob/0bc7d02426a1abf770d0c24cea25d648960bd67c/internal/migrate/database/database.go).
+The shared defaults also serve
+[`database/sql/pg/pg.go`](https://github.com/alexfalkowski/go-service/blob/v3.2.0/database/sql/pg/pg.go).
+The local go-service checkout at `04f25241e9fe5390d0d51e88faf70c99e592582e`
+was compared with the consumed version; these SQL reference files are unchanged.
+The existing `*sql.DB` constructor, health consumers and lifecycle own the
+connection; no writer/reader configuration or additional registration is needed.
 
 ## 📚 Product and design
 

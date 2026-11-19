@@ -17,3 +17,4 @@ Feature: Observability
   Scenario: Metrics
     When the system requests the "metrics" with HTTP
     Then the system should respond with metrics
+    And the system should respond with DuckDB metrics

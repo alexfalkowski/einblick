@@ -4,6 +4,19 @@ RSpec.configure do |config|
   config.wait_timeout = 3
 end
 
+RSpec::Matchers.define :have_duckdb_metric do |name|
+  match do |output|
+    output.lines.any? do |line|
+      sample = line.match(/\A#{Regexp.escape(name)}\{([^}]*)\}\s/)
+      sample && sample[1].split(',').include?('db_system_name="duckdb"')
+    end
+  end
+
+  failure_message do
+    "expected a #{name} sample with db_system_name=duckdb"
+  end
+end
+
 RSpec::Matchers.define :have_otlp_export do |signal, request|
   match do |output|
     receipts = output.lines.filter_map do |line|
