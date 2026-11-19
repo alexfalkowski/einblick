@@ -3,14 +3,16 @@ package health
 import (
 	"github.com/alexfalkowski/go-health/v2/checker"
 	"github.com/alexfalkowski/go-health/v2/server"
+	"github.com/alexfalkowski/go-service/v3/database/sql"
 	"github.com/alexfalkowski/go-service/v3/env"
 	"github.com/alexfalkowski/go-service/v3/health"
 )
 
-func register(name env.Name, srv *server.Server, cfg *Config) {
+func register(name env.Name, srv *server.Server, cfg *Config, db *sql.DB) {
 	regs := health.Registrations{
 		server.NewRegistration("noop", cfg.Duration.Duration(), checker.NewNoopChecker()),
 		server.NewOnlineRegistration(cfg.Timeout.Duration(), cfg.Duration.Duration()),
+		server.NewRegistration("duckdb", cfg.Duration.Duration(), checker.NewDBChecker(db, cfg.Timeout.Duration())),
 	}
 
 	srv.Register(name.String(), regs...)
@@ -25,9 +27,9 @@ func httpLivenessObserver(name env.Name, server *server.Server) error {
 }
 
 func httpReadinessObserver(name env.Name, server *server.Server) error {
-	return server.Observe(name.String(), "readyz", "noop")
+	return server.Observe(name.String(), "readyz", "duckdb")
 }
 
 func grpcObserver(name env.Name, server *server.Server) error {
-	return server.Observe(name.String(), "grpc", "noop")
+	return server.Observe(name.String(), "grpc", "duckdb")
 }

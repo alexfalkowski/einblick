@@ -17,7 +17,7 @@ func (s *Server) Export(ctx context.Context, req *v1.ExportMetricsServiceRequest
 	if err := proto.NewJSON().Encode(&payload, req); err != nil {
 		return nil, status.Error(codes.InvalidArgument, "metrics: invalid metric payload")
 	}
-	s.logger.Log(ctx, logger.NewText("OTLP metrics received (development only; discarded)"), logger.String("payload", payload.String()))
+	s.logger.Log(ctx, logger.NewText(payload.String()), logger.String("signal", "metrics"))
 
 	return &v1.ExportMetricsServiceResponse{}, nil
 }

@@ -10,7 +10,8 @@ Einblick is an OpenTelemetry service for applications built on go-service.
 It receives logs, metrics and traces over gRPC and prints them through the
 service logger. Received records are discarded after printing.
 
-Searchable DuckDB storage and Parquet archives in Cloudflare R2 are planned.
+The service opens a local DuckDB database and checks it for readiness.
+Telemetry persistence, queries and Parquet archives in Cloudflare R2 are planned.
 See the [product requirements](docs/requirements.md) and
 [implementation plan](docs/review-and-plan.md) for the remaining work.
 
@@ -25,7 +26,7 @@ git submodule sync
 git submodule update --init
 make dep
 make build
-./einblick server -config file:test/.config/server.yaml
+(cd test && ../einblick server -config file:.config/server.yaml)
 ```
 
 In another terminal, check readiness:
@@ -35,6 +36,7 @@ curl --fail http://localhost:11000/einblick/readyz
 ```
 
 The development configuration listens on HTTP port `11000` and gRPC port `12000`.
+Its local database is `test/reports/recent.duckdb`; telemetry is still discarded.
 
 ## 📥 Telemetry ingestion
 

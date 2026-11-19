@@ -7,3 +7,4 @@ require 'nonnative'
 require 'einblick'
 
 World(Einblick::OTLP::World)
+World(Einblick::Startup::World)

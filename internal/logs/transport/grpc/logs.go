@@ -17,7 +17,7 @@ func (s *Server) Export(ctx context.Context, req *v1.ExportLogsServiceRequest) (
 	if err := proto.NewJSON().Encode(&payload, req); err != nil {
 		return nil, status.Error(codes.InvalidArgument, "logs: invalid log payload")
 	}
-	s.logger.Log(ctx, logger.NewText("OTLP logs received (development only; discarded)"), logger.String("payload", payload.String()))
+	s.logger.Log(ctx, logger.NewText(payload.String()), logger.String("signal", "logs"))
 
 	return &v1.ExportLogsServiceResponse{}, nil
 }

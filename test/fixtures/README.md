@@ -29,6 +29,8 @@ The pinned `telemetry/logger/otlp.go` uses the otelslog bridge `v0.21.0` and log
 exporter `v0.23.0`. The bridge's scope name is the service name; go-service does
 not configure a scope version. Correlated and uncorrelated records share the
 request, with nested typed attributes and a large integer.
+The first log body includes quotes, a newline and text resembling logger fields
+to verify that the complete request remains intact inside the log message.
 
 ## 📊 Metrics
 

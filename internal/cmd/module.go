@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/alexfalkowski/einblick/internal/config"
+	"github.com/alexfalkowski/einblick/internal/duckdb"
 	"github.com/alexfalkowski/einblick/internal/health"
 	"github.com/alexfalkowski/einblick/internal/logs"
 	"github.com/alexfalkowski/einblick/internal/metrics"
@@ -10,10 +11,11 @@ import (
 	"github.com/alexfalkowski/go-signal/v2"
 )
 
-// Module composes the server, configuration, health, and telemetry receiver modules.
+// Module composes the server, configuration, database, health and telemetry receivers.
 var Module = signal.Module(
 	module.Server,
 	config.Module,
+	duckdb.Module,
 	health.Module,
 	logs.Module,
 	metrics.Module,

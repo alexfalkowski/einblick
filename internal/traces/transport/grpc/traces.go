@@ -17,7 +17,7 @@ func (s *Server) Export(ctx context.Context, req *v1.ExportTraceServiceRequest) 
 	if err := proto.NewJSON().Encode(&payload, req); err != nil {
 		return nil, status.Error(codes.InvalidArgument, "traces: invalid trace payload")
 	}
-	s.logger.Log(ctx, logger.NewText("OTLP traces received (development only; discarded)"), logger.String("payload", payload.String()))
+	s.logger.Log(ctx, logger.NewText(payload.String()), logger.String("signal", "traces"))
 
 	return &v1.ExportTraceServiceResponse{}, nil
 }
