@@ -18,3 +18,8 @@ Then('the system should respond with metrics') do
   expect(@response.code).to eq(200)
   expect(@response.body).to include('go_info')
 end
+
+Then('the system should respond with DuckDB metrics') do
+  expect(@response.body).to have_duckdb_metric('einblick_db_sql_connection_open')
+  expect(@response.body).to have_duckdb_metric('einblick_db_client_operation_duration_seconds_count')
+end
