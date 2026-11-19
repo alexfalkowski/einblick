@@ -1,15 +1,16 @@
 # Telemetry service: first-version requirements
 
-**Status:** Implementation specification; telemetry backend and deployment remain to be built.
+**Status:** Implementation specification; printing is implemented, with persistence, queries and archives still planned.
 
-**Revision:** 0.16
+**Revision:** 0.18
 
-**Last updated:** 2026-11-18
+**Last updated:** 2026-11-19
 
 **Audience:** Implementing agents, reviewers, product owner, and operators.
 
 This document owns the v1 product contract. [The implementation plan](review-and-plan.md)
-owns the ordered work queue, saved progress, entry conditions and handoff process.
+owns the ordered feature queue, saved progress and entry conditions.
+[AGENTS.md](../AGENTS.md) owns agent workflow and handoff instructions.
 Say `Continue docs/review-and-plan.md` to work on its current step. The Go service
 scaffold and per-service CGO opt-in already exist.
 
@@ -74,8 +75,8 @@ The service should remain understandable to a small engineering team. Prefer an 
 | D-011 | Retention | Configurable; seven days is acceptable for normal operation. Use a shorter value while testing. | Agreed direction |
 | D-012 | UI authentication | Defer site authentication entirely for v1. A reusable go-service solution will be designed separately; no credential-file or session implementation is required here. | Agreed direction |
 | D-013 | Local persistence | A persistent volume holds DuckDB, its WAL, and pending exports. | Working design |
-| D-014 | Acknowledgement | Acknowledge accepted telemetry after a successful local DuckDB commit; R2 upload is asynchronous. | Working design; durability consequence documented below |
-| D-015 | Rollout | Enable one existing application first, measure the real workload, then expand. | Agreed direction |
+| D-014 | Acknowledgement | Durable v1 acknowledges accepted telemetry after a successful local DuckDB commit; R2 upload is asynchronous. The early P0 printer acknowledges receipt only and discards records. | Working design; durability consequence documented below |
+| D-015 | Implementation order | Print all three signals first, then add persistence, queries, archival and the frontend through feature steps. | Agreed direction |
 | D-016 | Service dashboards | A small service catalog selects ready-made HTTP and/or gRPC panels plus Logs and Traces views, using our shared go-service instrumentation. | Agreed direction |
 | D-017 | R2 transfer library | Use a lean existing Go S3 library. Do not use either AWS Go SDK directly or through a runtime wrapper; evaluate actual runtime dependencies and binary cost. | Agreed constraint; client selection open |
 | D-018 | Upgrade strategy | Use existing rolling updates with graceful DuckDB shutdown, one active writer and bounded startup/recovery. Do not add Recreate or a strategy selector. | Agreed direction |
@@ -139,7 +140,7 @@ Use these capabilities when implementing the service:
 - The repository already has the `einblick` Go module, server/config/health
   composition, CI, and shared `bin` tooling. The root Makefile sets `static=0`.
   E-02 validates and integrates local DuckDB; Parquet and remote dependencies
-  follow in E-06/E-07a, with final-image validation before installation.
+  follow in E-06/E-07, with native-image validation as each is introduced.
 - The Makefile uses `http.mak` for shared service tooling without local protobuf
   generation. Keep the gRPC transport configured for OTLP ingestion and consume
   upstream OpenTelemetry service definitions; no custom service API is needed.
@@ -147,11 +148,11 @@ Use these capabilities when implementing the service:
   `storage.profile` for a protected `<app>-data` filesystem PVC and writable mount.
   Omitted profile uses the cluster default; empty requests no StorageClass; a named
   profile selects an existing class. Protection does not establish backups, backing
-  PV reclaim policy, or exclusive-writer enforcement. I-03 owns installation values
-  and actual volume/rolling-update validation.
+  PV reclaim policy, or exclusive-writer enforcement. DEP-004/DEP-005 define the
+  persistent-volume and single-writer contract.
 - Infraops provides private R2 buckets and optional object-age `expiration`.
-  LIF-002 owns the lifecycle change/removal constraints; I-02 selects the bucket
-  and policy configuration.
+  LIF-002 defines the lifecycle change/removal constraints. The archival feature
+  consumes the configured bucket and retention policy.
 - Storage-aware release tooling is available. DEP-006 requires verification of
   actual configuration-writing pipelines and storage preservation before activation.
 - `web` supplies the embedded MVC/htmx/Pico reference. The golden-signal dashboard
@@ -206,9 +207,9 @@ The bucket is scoped to this installation initially. Application identity is sto
 ### 8.1 Ingestion
 
 - **ING-001 — Standard transport.** Expose the standard OTLP/gRPC export services for logs, metrics, and traces. Existing go-service clients must not need custom exporters.
-- **ING-002 — Commit acknowledgement.** A successful response must mean the accepted records have committed to local persistent DuckDB storage. An in-memory queue alone is insufficient.
+- **ING-002 — Commit acknowledgement.** In durable v1, a successful response must mean the accepted records have committed to local persistent DuckDB storage. An in-memory queue alone is insufficient. The early receipt-only phase in section 14 does not satisfy this requirement.
 - **ING-003 — Protocol responses.** Report invalid, unsupported, partially accepted, and temporarily unavailable input using the appropriate OTLP responses. Valid empty requests must be handled according to OTLP.
-- **ING-004 — Bounded input.** Configure request-size and concurrent-ingestion bounds. Do not allow decoding or buffering to bypass the intended service memory budget.
+- **ING-004 — Bounded input.** Use go-service's request-size and rate limits, including the message-size limit after decompression. No custom record-count, output-size or concurrency caps are selected. Measure decoding and buffering against the intended service memory budget as load increases.
 - **ING-005 — Backpressure.** When local capacity cannot safely accept a request, return an appropriate retryable OTLP failure. Do not silently discard already accepted records to make room.
 - **ING-006 — Gzip.** Support the compression behavior needed by the standard OTLP/gRPC clients, including gzip.
 - **ING-007 — Internal exposure.** Expose ingestion through an internal cluster service. Public browser ingress must not implicitly expose the OTLP listener.
@@ -378,7 +379,9 @@ has a separate packaging/dependency cost and needs independent validation.
 
 ## 9. Durability and recovery contract
 
-The working acknowledgement boundary is a successful local DuckDB commit.
+The working durable-v1 acknowledgement boundary is a successful local DuckDB
+commit. This contract applies as each signal gains persistence. P0 prints and
+discards telemetry; its receipt responses provide no recovery guarantee.
 
 | Failure | Expected outcome |
 | --- | --- |
@@ -504,61 +507,51 @@ The acceptance matrix should be updated when a requirement changes. Tests should
 ## 14. Delivery phases
 
 Use [the implementation plan](review-and-plan.md) as the single continuation file.
-It records the current step, removes completed steps from its queue and owns
-validation/handoff instructions. The phase table below summarizes scope; it is
-not a second progress tracker.
+It records the current feature step and progress. Agent workflow, validation
+selection and patch handoff belong in [AGENTS.md](../AGENTS.md). The phase table
+below summarizes feature scope.
 
-Select one review packet at a time from that queue.
-Resolve only the material choices needed by that packet; detailed schema, queries,
-and configuration can accompany the implementation. Keep partial acceptance
-coverage distinct from a fully passed scenario.
+First receive and print logs, metrics and traces through the server's logger,
+then add DuckDB and the remaining service features. The receiver's own exporters
+must not feed itself.
 
-Start with logs and add one capability at a time. DuckDB, Parquet, R2, traces,
-metrics and the full frontend are separate review steps. Inspect source contracts
-and gather feasibility evidence when the selected step needs them; R2 access and
-all-signal fixtures do not block receiving logs or implementing local persistence.
-
-P0 is a development-only receiver that prints incoming log records through the
-server's logger, with its own OTLP log exporter disabled to prevent a feedback
-loop. Its responses demonstrate receipt only, and records are discarded after
-printing. It does not satisfy ING-002 or AC-001 and must not be enabled for a
-deployed client. From P1 onward, successful ingestion requires a local DuckDB
-commit under ING-002; remove the print-only path when persistence replaces it.
+P0 responses demonstrate receipt only; records are discarded after printing,
+with no stored history or queries. This early release does not satisfy ING-002
+or AC-001. Log persistence replaces log printing in E-03; traces and metrics
+continue printing until E-11 and E-14 replace their respective paths with
+commit-backed ingestion. Durable v1 requires all three signals to meet ING-002;
+no permanent discard mode or second backend is planned.
 
 | Phase | Remaining outcome | Exit evidence |
 | --- | --- | --- |
-| P0 | Receive and print logs using standard OTLP/gRPC in the existing server. | E-01: a representative local client sends logs and their content appears in server output; no database, archive or durability claim. |
-| P1 | Add DuckDB log persistence, commit acknowledgement and restart recovery. | E-02 then E-03a: native/platform and typed/nanosecond evidence; log response/support portions of AC-002/AC-003 and committed-record AC-008. Queries and R2 remain later work. |
-| P2 | Query recent logs, then add a thin MVC Logs page. | E-03b then E-03c: log AC-001/AC-004, local query bounds in AC-013 and log rendering in AC-015. |
+| P0 | Receive and print all three signals using standard OTLP/gRPC. | E-01: complete requests appear in the logger, with receipt-only responses; no database, archive or durability claim. |
+| P1 | Add DuckDB log persistence, commit acknowledgement and restart recovery. | E-02 then E-03: native/platform and typed/nanosecond evidence; log response/support portions of AC-002/AC-003 and committed-record AC-008. Queries and R2 remain later work. |
+| P2 | Query recent logs, then add a thin MVC Logs page. | E-04 then E-05: log AC-001/AC-004, local query bounds in AC-013 and log rendering in AC-015. |
 | P3 | Export immutable log batches to local Parquet files. | E-06: log archive-format AC-003, interrupted local export in AC-009, pending-job AC-008 and derivative cleanup in AC-019. No R2 dependency. |
-| P4 | Verify the lean R2 client, then upload completed log batches asynchronously. | E-07a then E-07b: actual-R2/dependency/resource AC-026 and remote publication/recovery in AC-008/AC-009. Keep local source rows. |
-| P5 | Read archived logs with DuckDB and safely evict published local batches. | E-08: log AC-007/AC-011/AC-019 and historical query bounds/failures in AC-013/AC-016. |
-| P6 | Add log retention and verify R2 outage, capacity and backlog recovery. | E-09: log AC-010/AC-012 and repeated disk/workspace cycles in AC-019. |
-| P7 | Add traces through separate durable-intake, query/view and archive packets. | E-04a/E-04b/E-04c: trace portions of AC-001–AC-003/AC-005 and the existing recovery/archive scenarios. |
-| P8 | Add metrics through separate durable-intake, numerical-query and archive packets. | E-05a/E-05b/E-05c: metric portions of AC-001–AC-003/AC-006/AC-024 and recovery/archive scenarios. All-signal backend evidence closes here. |
-| P9 | Complete catalog-driven Overview panels and linked investigation across the MVC views. | E-10 then E-11: full AC-013/AC-015/AC-016/AC-022–AC-025 and operator docs. |
-| P10 | Verify storage-preserving releases, prepare installation, validate deployment/recovery, and enable one client with explicit exporters, sampling and TLS/authentication. | AC-017/AC-018/AC-020, prior active acceptance, AC-021 architectural review, AC-026 final evidence and recovery runbook. |
+| P4 | Verify the lean R2 client, then upload completed log batches asynchronously. | E-07 then E-08: actual-R2/dependency/resource AC-026 and remote publication/recovery in AC-008/AC-009. Keep local source rows. |
+| P5 | Read archived logs with DuckDB and safely evict published local batches. | E-09: log AC-007/AC-011/AC-019 and historical query bounds/failures in AC-013/AC-016. |
+| P6 | Add log retention and verify R2 outage, capacity and backlog recovery. | E-10: log AC-010/AC-012 and repeated disk/workspace cycles in AC-019. |
+| P7 | Replace trace printing with durable intake, then add trace query/view and archive support. | E-11/E-12/E-13: trace portions of AC-001–AC-003/AC-005 and the existing recovery/archive scenarios. |
+| P8 | Replace metric printing with durable intake, then add numerical queries and archives. | E-14/E-15/E-16: metric portions of AC-001–AC-003/AC-006/AC-024 and recovery/archive scenarios. All-signal backend evidence closes here. |
+| P9 | Complete catalog-driven Overview panels and linked investigation across the MVC views. | E-17 then E-18: full AC-013/AC-015/AC-016/AC-022–AC-025 and operator docs. |
 
-The implementation plan also owns capture and review of requirements + original
-patch + final PR + session ID. A continuation request selects its next ready step
-after the previous handoff; phase transitions retain the product and feedback
-checks recorded there. Deployment, publication, client enablement and sibling
-edits require their own task scope.
+R2 access is first needed in P4. Trace and metric receipt is verified in P0;
+their storage/query policies and full recovery/archive evidence follow in P7/P8.
 
 ## 15. Open-decision register
 
 | ID | Decision | Suggested starting point / consequence | Needed by |
 | --- | --- | --- | --- |
-| O-001 | Installation ingress identity | Service and module are einblick. Choose the ingress domain and deployment references. | I-03 / P10 |
+| O-001 | Installation ingress identity | Service and module are einblick. Choose the ingress domain and deployment references. | Before configuring ingress |
 | O-002 | Internal ingestion authentication, TLS, certificate provisioning, and client trust | Reuse go-service mechanisms. Header-bearing remote OTLP/gRPC requires TLS under the current exporter contract. | Before a deployed client connects |
 | O-003 | Public meaning of archive retention | Object-age expiration through R2 remains the simplest proposal; infraops provides it through optional `expiration`. Document asynchronous deletion, complete-rule ownership, and explicit remote-rule removal when disabling it. Strict event-age retention requires a different documented enforcement policy. The capability does not settle this choice. | P6 |
 | O-004 | Backend event-day selection, accepted lateness, missing timestamps, and future clock skew | Inherit OTel timestamp meanings and its log Timestamp/ObservedTimestamp preference. Choose archive-day selection and only the remaining backend fallback/lateness/skew policy; do not redefine span/metric timestamp semantics. Exact backend policy is not yet agreed. | Log time policy in P1/P2; archive day in P3; traces in P7; metrics in P8 |
 | O-005 | Duplicate policy per signal | Candidate: identify duplicate spans by trace/span IDs, identify metric points by complete stream identity and point timestamps, and tolerate duplicate logs rather than collapsing legitimate identical messages. Validate counter/histogram semantics before adoption. | Logs in P1; traces in P7; metrics in P8 |
-| O-006 | Supported OTLP subset and its database mapping | Inherit protobuf/data-model definitions; derive the physical schema during feasibility/implementation. Verify representative go-service payloads, preserve typed values/nanoseconds, and document unsupported shapes/omissions explicitly. A handwritten copy of the OTel schema is unnecessary. | Log transport in P0 and storage in P1; traces in P7; metrics in P8 |
-| O-007 | R2 bucket and persistent-volume ownership/configuration | Reuse infraops' delivered protected-PVC and optional R2 expiration capabilities; choose capacity, path, provisioning profile, backing-volume reclaim policy and operational ownership. Verify the private bucket/reference. Verify actual release-tooling execution and storage preservation before activating storage; do not infer live provisioning from source support. | Local storage path in P1; test R2 access in P4; installation in P10 |
-| O-008 | Concrete resource and query bounds | Measure one-application ingestion and representative historical queries. Set memory/native headroom, workspace limits, export thresholds, and disk outage capacity from evidence. | Bound each capability as introduced in P0–P8; pilot refinement in P10 |
+| O-006 | Supported OTLP subset and its database mapping | Inherit protobuf/data-model definitions; derive the physical schema during feasibility/implementation. Verify representative go-service payloads, preserve typed values/nanoseconds, and document unsupported shapes/omissions explicitly. A handwritten copy of the OTel schema is unnecessary. | All-signal transport in P0; log storage in P1; trace storage in P7; metric storage in P8 |
+| O-007 | R2 bucket and persistent-volume ownership/configuration | Reuse infraops' delivered protected-PVC and optional R2 expiration capabilities; choose capacity, path, provisioning profile, backing-volume reclaim policy and operational ownership. Verify the private bucket/reference. Verify actual release-tooling execution and storage preservation before activating storage; do not infer live provisioning from source support. | Local storage path in P1; test R2 access in P4; runtime settings before use |
+| O-008 | Concrete resource and query bounds | Measure one-application ingestion and representative historical queries. Set memory/native headroom, workspace limits, export thresholds, and disk outage capacity from evidence. | Bound each capability as introduced in P0–P8; refine with workload measurements |
 | O-009 | Reserved: site authentication | Outside v1 under D-012/WEB-012. | No v1 work |
-| O-010 | Required platform matrix and native runtime image | Confirm Linux amd64/arm64 requirements and package the actual driver/engine/extensions accordingly. Validate the final service image on every required platform; the generic ARM capability trial is already complete. | DuckDB in P1; Parquet in P3; remote-read extensions in P4/P5; final image in P10 |
+| O-010 | Required platform matrix and native runtime image | Confirm Linux amd64/arm64 requirements and package the actual driver/engine/extensions accordingly. Validate the final service image on every required platform; the generic ARM capability trial is already complete. | DuckDB in P1; Parquet in P3; remote-read extensions in P4/P5; images validated as dependencies are introduced |
 | O-011 | Lean S3 client version | Start feasibility with go-micro-s3/client; pin only after R2 behavior, bounded-memory transfer, license, runtime dependencies, and linked binary cost are checked. | P4 |
 | O-012 | Catalog selectors and supported go-service metric profile | Use the transports field; begin with id for service identity; confirm actual server surfaces and native instruments/units. Optional resource filters must use attributes clients actually emit. | Metric profile in P8; catalog in P9 |
 | O-013 | Frontend library versions and visual refinement | MVC with embedded lightweight assets; uPlot is demonstrated by the static concept. Confirm htmx/Pico versions from the owning web pattern at implementation time. | Logs page in P2; full frontend in P9 |
@@ -567,7 +560,7 @@ Open tuning values do not require new infrastructure or repeated approval reques
 
 ## 16. Definition of first-version readiness
 
-The first version is ready for its one-application pilot when:
+The durable first version is ready for its measured one-application pilot when:
 
 - The agreed directions and necessary policy choices are reflected in code, config, and operator docs.
 - All three signals have useful query workflows, with documented support boundaries.
@@ -581,7 +574,7 @@ The first version is ready for its one-application pilot when:
 - Applicable active acceptance scenarios have actually run through the supported harness, with failures and limitations reported.
 - No unmeasured throughput, memory, latency, exactly-once, or full-volume-loss recovery guarantee is claimed.
 
-Broader rollout follows the measured pilot. Pilot readiness and full-fleet readiness are separate conclusions.
+P0 printing does not establish durable readiness or measured capacity.
 
 ## 17. References and source owners
 

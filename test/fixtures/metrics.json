@@ -1,0 +1,175 @@
+{
+  "resourceMetrics": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "host.id",
+            "value": {
+              "stringValue": "fixture-instance"
+            }
+          },
+          {
+            "key": "service.instance.id",
+            "value": {
+              "stringValue": "fixture-instance"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "e01-client"
+            }
+          },
+          {
+            "key": "service.version",
+            "value": {
+              "stringValue": "0.0.0"
+            }
+          },
+          {
+            "key": "deployment.environment.name",
+            "value": {
+              "stringValue": "development"
+            }
+          },
+          {
+            "key": "request.id",
+            "value": {
+              "stringValue": "fixture-request"
+            }
+          }
+        ]
+      },
+      "schemaUrl": "https://opentelemetry.io/schemas/1.43.0",
+      "scopeMetrics": [
+        {
+          "scope": {
+            "name": "go.opentelemetry.io/contrib/instrumentation/runtime",
+            "version": "0.72.0"
+          },
+          "metrics": [
+            {
+              "name": "go.goroutine.count",
+              "unit": "{goroutine}",
+              "gauge": {
+                "dataPoints": [
+                  {
+                    "timeUnixNano": "1795086245123456789",
+                    "asInt": "12",
+                    "attributes": [
+                      {
+                        "key": "request.id",
+                        "value": {
+                          "stringValue": "fixture-request"
+                        }
+                      },
+                      {
+                        "key": "large_integer",
+                        "value": {
+                          "intValue": "9007199254740993"
+                        }
+                      },
+                      {
+                        "key": "nested",
+                        "value": {
+                          "kvlistValue": {
+                            "values": [
+                              {
+                                "key": "values",
+                                "value": {
+                                  "arrayValue": {
+                                    "values": [
+                                      {
+                                        "boolValue": true
+                                      },
+                                      {
+                                        "doubleValue": 1.25
+                                      },
+                                      {
+                                        "bytesValue": "AP8="
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "go.memory.allocations",
+              "unit": "{allocation}",
+              "sum": {
+                "aggregationTemporality": "AGGREGATION_TEMPORALITY_CUMULATIVE",
+                "isMonotonic": true,
+                "dataPoints": [
+                  {
+                    "startTimeUnixNano": "1795086244123456789",
+                    "timeUnixNano": "1795086245123456789",
+                    "asInt": "9007199254740993"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "scope": {
+            "name": "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
+            "version": "0.72.0"
+          },
+          "metrics": [
+            {
+              "name": "rpc.server.call.duration",
+              "unit": "s",
+              "histogram": {
+                "aggregationTemporality": "AGGREGATION_TEMPORALITY_CUMULATIVE",
+                "dataPoints": [
+                  {
+                    "startTimeUnixNano": "1795086244123456789",
+                    "timeUnixNano": "1795086245123456789",
+                    "count": "3",
+                    "sum": 0.0235,
+                    "bucketCounts": [
+                      "1",
+                      "1",
+                      "1"
+                    ],
+                    "explicitBounds": [
+                      0.005,
+                      0.01
+                    ],
+                    "min": 0.0015,
+                    "max": 0.014,
+                    "attributes": [
+                      {
+                        "key": "rpc.system.name",
+                        "value": {
+                          "stringValue": "grpc"
+                        }
+                      }
+                    ],
+                    "exemplars": [
+                      {
+                        "timeUnixNano": "1795086245123456789",
+                        "asDouble": 0.014,
+                        "traceId": "AQIDBAUGBwgJCgsMDQ4PEA==",
+                        "spanId": "AQIDBAUGBwg="
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

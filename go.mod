@@ -6,6 +6,7 @@ require (
 	github.com/alexfalkowski/go-health/v2 v2.43.0
 	github.com/alexfalkowski/go-service/v3 v3.2.0
 	github.com/alexfalkowski/go-signal/v2 v2.0.0
+	go.opentelemetry.io/proto/otlp v1.11.1
 )
 
 require (
@@ -118,7 +119,6 @@ require (
 	go.opentelemetry.io/otel/sdk/log v1.47.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.47.0 // indirect
 	go.opentelemetry.io/otel/trace v1.47.0 // indirect
-	go.opentelemetry.io/proto/otlp v1.11.1 // indirect
 	go.uber.org/atomic v1.12.0 // indirect
 	go.uber.org/dig v1.19.0 // indirect
 	go.uber.org/mock v0.6.0 // indirect

@@ -23,6 +23,7 @@ transport:
     timeout: 5s
   grpc:
     address: tcp://:12000
+    max_receive_size: 1MB
     limiter:
       kind: service-method
       tokens: 1000

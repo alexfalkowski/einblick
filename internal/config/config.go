@@ -7,7 +7,10 @@ import (
 
 // Config for the service.
 type Config struct {
-	Health         *health.Config `yaml:"health,omitempty" json:"health,omitempty" toml:"health,omitempty" validate:"required"`
+	// Health configures the required service health checks and observers.
+	Health *health.Config `yaml:"health,omitempty" json:"health,omitempty" toml:"health,omitempty" validate:"required"`
+
+	// Config contains the required shared transport and telemetry configuration.
 	*config.Config `yaml:",inline" json:",inline" toml:",inline" validate:"required"`
 }
 

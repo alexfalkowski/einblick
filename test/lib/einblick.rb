@@ -1,8 +1,13 @@
 # frozen_string_literal: true
 
+require 'base64'
+require 'json'
 require 'securerandom'
 require 'yaml'
-require 'base64'
+
+require 'opentelemetry/proto/collector/logs/v1/logs_service_pb'
+require 'opentelemetry/proto/collector/metrics/v1/metrics_service_pb'
+require 'opentelemetry/proto/collector/trace/v1/trace_service_pb'
 
 module Einblick
   class << self
@@ -19,3 +24,6 @@ module Einblick
     end
   end
 end
+
+require 'einblick/otlp'
+require 'einblick/otlp/world'
