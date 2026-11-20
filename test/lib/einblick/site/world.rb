@@ -2,10 +2,28 @@
 
 module Einblick
   module Site
+    OUTCOME_FILTERS = {
+      'empty' => { 'service' => 'missing-site-service' },
+      'broken link' => { 'page_token' => 'broken-page' },
+      'dates out of order' => { 'end_time' => '2026-11-19T11:04:04Z' },
+      'invalid dates' => { 'start_time' => 'invalid' },
+      'wide date range' => { 'end_time' => '2026-11-27T11:04:05Z' },
+      'invalid filter' => { 'trace_id' => 'invalid' }
+    }.freeze
+    MARKUP_TERM = '<b>message</b>'
+    MARKUP_MESSAGE = "<script>telemetry</script>#{'ɸ' * 16}#{MARKUP_TERM}#{'é' * 16}".freeze
+    MISSING_TERM = '<img src=x>missing message'
+    RELATED_LOG_FILTERS = { 'page_size' => '1', 'text' => 'first', 'severity' => 'INFO' }.freeze
+    FIXTURE_TRACE_ID = '0102030405060708090a0b0c0d0e0f10'
+
     # Investigates logs using the browser routes and the existing acknowledged OTLP fixtures.
     module World
       def open_logs
         @response = site_client.open('/logs', 'en')
+      end
+
+      def open_logs_with_assets
+        @log_assets = site_client.load_log_assets(open_logs)
       end
 
       def investigate_logs(layout, languages, overrides = {})
@@ -22,27 +40,43 @@ module Einblick
         investigate_logs('partial', 'en', @browser_filters)
       end
 
-      def choose_last_hour
+      def choose_time_range(preset, page: investigate_logs('full', 'en'), layout: 'partial')
         @preset_started = Time.now.utc
-        submit_rendered_log_form(preset: '1h')
+        @response = site_client.submit_log_form(page, 'en', submitter: preset, layout: layout)
         @preset_finished = Time.now.utc
       end
 
-      def submit_displayed_utc_range
-        submit_rendered_log_form
+      def choose_configured_time_range(preset, minutes)
+        with_query_profile("query_range_#{minutes}m") do
+          @preset_page = open_logs
+          choose_time_range(preset, page: @preset_page)
+        end
       end
 
-      def choose_utc_range(start_time, end_time)
-        investigate_logs('partial', 'en', 'start_utc' => start_time, 'end_utc' => end_time)
+      def submit_displayed_search
+        @response = site_client.submit_log_form(investigate_logs('full', 'en'), 'en')
+      end
+
+      def clear_message_search(layout)
+        @empty_message_search = investigate_logs('full', 'en', 'text' => MISSING_TERM, 'severity' => 'WARN')
+        @response = site_client.submit_log_form(@empty_message_search, 'en', submitter: 'Clear search', layout: layout)
+      end
+
+      def open_saved_search(start_time, end_time)
+        @saved_time_range = { 'start_time' => start_time, 'end_time' => end_time }
+        investigate_logs('full', 'en', @saved_time_range)
+      end
+
+      def open_utc_bookmark(start_utc, end_utc)
+        investigate_logs('full', 'en', 'start_utc' => start_utc, 'end_utc' => end_utc)
       end
 
       def investigate_log_outcome(outcome, layout, languages)
-        filters = outcome == 'empty' ? { 'text' => 'a message that does not exist' } : { 'end_time' => @query.fetch('start_time') }
-        investigate_logs(layout, languages, filters)
+        investigate_logs(layout, languages, OUTCOME_FILTERS.fetch(outcome))
       end
 
-      def read_log_pages
-        investigate_logs('full', 'en', 'page_size' => 2)
+      def read_log_pages(filters = { 'page_size' => 2 })
+        investigate_logs('full', 'en', filters)
         @site_pages = [@response]
         2.times do
           link = Nokogiri::HTML5.fragment(@response.body).at_css('a.next')
@@ -51,6 +85,16 @@ module Einblick
           @response = site_client.submit(link['hx-put'], {}, 'en')
           @site_pages << @response
         end
+      end
+
+      def find_related_logs
+        read_log_pages(RELATED_LOG_FILTERS)
+        @response = site_client.open_related_logs(@site_pages.fetch(1), 'en')
+      end
+
+      def search_and_page_without_htmx
+        choose_time_range('1 hour', layout: 'full')
+        @native_pages = [@response, site_client.open_next_page(@response, 'en')]
       end
 
       def submit_logs_with_storage_unavailable
@@ -63,48 +107,7 @@ module Einblick
         with_query_profile('query_timeout') { investigate_logs('partial', 'es') }
       end
 
-      def prepare_markup_log
-        prepare_searchable_logs
-        @query_service = "#{@query_service}-<b>service</b>"
-        @query['service'] = @query_service
-        request = query_fixture('log_queries')
-        scope = request.resource_logs.first.scope_logs.first
-        scope.log_records.replace([log_with_markup(scope.log_records[2])])
-        acknowledge_query_export(request)
-      end
-
-      def prepare_blank_logs
-        prepare_searchable_logs
-        @query_service = "#{@query_service}-blank"
-        @query['service'] = @query_service
-        start = Einblick::Logs::World::QUERY_TIME
-        request = timed_query_export([start, start + 1])
-        records = log_query_records(request)
-        records[0].body.string_value = ''
-        records[1].body.string_value = " \t"
-        acknowledge_query_export(request)
-      end
-
-      def prepare_unsigned_logs
-        prepare_searchable_logs
-        upper = 2**64
-        acknowledge_query_export(timed_query_export([upper - 1, upper - 2]))
-        @query.merge!('start_time' => query_time(upper - 2), 'end_time' => query_time(upper))
-      end
-
       private
-
-      def submit_rendered_log_form(preset: nil)
-        investigate_logs('full', 'en')
-        @response = site_client.submit_log_form(@response, 'en', preset: preset)
-      end
-
-      def log_with_markup(record)
-        record.body.string_value = '<script>telemetry</script><b>message</b>'
-        record.attributes.first.value.string_value = '<img src=x>attribute'
-        record.severity_number = 100
-        record
-      end
 
       def site_client
         HTTP.new('http://localhost:11000')

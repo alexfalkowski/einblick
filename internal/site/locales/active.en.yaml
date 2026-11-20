@@ -4,41 +4,85 @@ logs.heading: Logs
 logs.scope: Recent logs from local storage
 logs.service: Service
 logs.all_services: All services
-logs.start: Start (UTC)
-logs.end: End (UTC)
-logs.time_presets: Time presets
-logs.last_15_minutes: Last 15 minutes
-logs.last_hour: Last hour
-logs.last_24_hours: Last 24 hours
-logs.range_format: 02 Jan 2006, 15:04:05
+logs.time_range: Time range
+logs.current_range: Current range
+logs.range_15_minutes: 15 min
+logs.range_one_hour: 1 hour
+logs.range_24_hours: 24 hours
+logs.range_three_days: 3 days
+logs.range_seven_days: 7 days
+logs.range_recent: Recent
 logs.event_format: 02 Jan, 15:04:05
 logs.level.debug: Debug
 logs.level.info: Info
 logs.level.warn: Warn
 logs.level.error: Error
 logs.level.fatal: Fatal
-logs.text: Search string messages
+logs.text: Search messages
 logs.severity: Severity
 logs.all_severities: All severities
 logs.trace_id: Trace ID
-logs.query: Query logs
-logs.reset: Reset filters and time range
+logs.related_logs: Find related logs
+logs.query: Search
+logs.clear_search: Clear search
+logs.reset: Reset
 logs.loading: Loading logs…
-logs.request_failed: The log request failed. Try again.
+logs.request_failed: Couldn’t load logs
+logs.retry: Try again
 logs.results: Log query results
 logs.order: Newest first
 logs.timestamp: Event time (UTC)
 logs.message: Message
+logs.details: Log details
+logs.close_details: Close details
 logs.no_service: No service name
 logs.no_body: No message
 logs.structured_body: Structured message
 logs.received: Received (UTC)
-logs.record: Log record
-logs.resource: Resource
+logs.received_short: Received
+logs.received_later: '{{.ReceiptOffset}} later'
+logs.received_earlier: '{{.ReceiptOffset}} earlier'
+logs.received_same: At the same time
+logs.observed: Observed time (UTC)
+logs.detail_time_format: 02 Jan 2006, 15:04:05.000
+logs.attributes: Attributes
+logs.source: Source
+logs.timing: Timing and IDs
+logs.environment: Environment
+logs.service_version: Service version
+logs.instance_id: Instance ID
+logs.host_id: Host ID
 logs.instrumentation: Instrumentation scope
+logs.scope_name: Scope name
+logs.scope_version: Scope version
+logs.schema_url: Schema URL
+logs.entity_refs: Entity references
+logs.entity_type: Type
+logs.entity_id_keys: Identity keys
+logs.entity_description_keys: Description keys
+logs.dropped_attributes: Dropped attributes
+logs.event_name: Event name
+logs.span_id: Span ID
+logs.flags: Flags
+logs.http_status: HTTP status
+logs.grpc_status: gRPC status
+logs.request_duration: Request duration
+logs.list: List
+logs.map: Key-value pairs
+logs.bytes: Base64 bytes
+logs.string_index: String index
+logs.blank_value: Blank string
+logs.empty_value: No value
 logs.next: Next page
-logs.empty: No logs match these filters in the selected time range.
-logs.invalid: Invalid log query. Check the time range, filters, or page link and try again.
+logs.empty: No logs found
+logs.no_message_matches: 'No messages match “{{.Term}}”'
+logs.empty_hint: Try a wider time range or clear a filter.
+logs.invalid_link: This search link couldn’t be opened.
+logs.open: Open Logs
+logs.invalid_filters: Check the search filters and try again.
+logs.date_order: End time must be after start time.
+logs.date_range_too_wide: This time range exceeds the search limit.
+logs.invalid_dates: Enter a valid start and end time in UTC.
 logs.cancelled: The log query was cancelled.
 logs.timed_out: The log query timed out. Try a narrower time range.
 logs.unavailable: Local log storage is unavailable. Try again.

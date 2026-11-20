@@ -4,41 +4,85 @@ logs.heading: Registros
 logs.scope: Registros recientes del almacenamiento local
 logs.service: Servicio
 logs.all_services: Todos los servicios
-logs.start: Inicio (UTC)
-logs.end: Fin (UTC)
-logs.time_presets: Intervalos predefinidos
-logs.last_15_minutes: Últimos 15 minutos
-logs.last_hour: Última hora
-logs.last_24_hours: Últimas 24 horas
-logs.range_format: 02/01/2006, 15:04:05
+logs.time_range: Intervalo
+logs.current_range: Intervalo actual
+logs.range_15_minutes: 15 min
+logs.range_one_hour: 1 hora
+logs.range_24_hours: 24 horas
+logs.range_three_days: 3 días
+logs.range_seven_days: 7 días
+logs.range_recent: Reciente
 logs.event_format: 02/01, 15:04:05
 logs.level.debug: Depuración
 logs.level.info: Información
 logs.level.warn: Advertencia
 logs.level.error: Error
 logs.level.fatal: Fatal
-logs.text: Buscar en mensajes de texto
+logs.text: Buscar mensajes
 logs.severity: Gravedad
 logs.all_severities: Todos los niveles
 logs.trace_id: ID de traza
-logs.query: Consultar registros
-logs.reset: Restablecer filtros e intervalo
+logs.related_logs: Buscar registros relacionados
+logs.query: Buscar
+logs.clear_search: Borrar búsqueda
+logs.reset: Restablecer
 logs.loading: Cargando registros…
-logs.request_failed: Falló la solicitud de registros. Vuelve a intentarlo.
+logs.request_failed: No se pudieron cargar los registros
+logs.retry: Volver a intentar
 logs.results: Resultados de la consulta de registros
 logs.order: Más recientes primero
 logs.timestamp: Hora del evento (UTC)
 logs.message: Mensaje
+logs.details: Detalles del registro
+logs.close_details: Cerrar detalles
 logs.no_service: Sin nombre de servicio
 logs.no_body: Sin mensaje
 logs.structured_body: Mensaje estructurado
 logs.received: Recepción (UTC)
-logs.record: Entrada de registro
-logs.resource: Recurso
+logs.received_short: Recepción
+logs.received_later: '{{.ReceiptOffset}} después'
+logs.received_earlier: '{{.ReceiptOffset}} antes'
+logs.received_same: En el mismo instante
+logs.observed: Hora de observación (UTC)
+logs.detail_time_format: 02/01/2006, 15:04:05,000
+logs.attributes: Atributos
+logs.source: Origen
+logs.timing: Tiempos e identificadores
+logs.environment: Entorno
+logs.service_version: Versión del servicio
+logs.instance_id: ID de instancia
+logs.host_id: ID del host
 logs.instrumentation: Ámbito de instrumentación
+logs.scope_name: Nombre del ámbito
+logs.scope_version: Versión del ámbito
+logs.schema_url: URL del esquema
+logs.entity_refs: Referencias a entidades
+logs.entity_type: Tipo
+logs.entity_id_keys: Claves de identidad
+logs.entity_description_keys: Claves descriptivas
+logs.dropped_attributes: Atributos descartados
+logs.event_name: Nombre del evento
+logs.span_id: ID de span
+logs.flags: Indicadores
+logs.http_status: Estado HTTP
+logs.grpc_status: Estado gRPC
+logs.request_duration: Duración de la solicitud
+logs.list: Lista
+logs.map: Pares de clave y valor
+logs.bytes: Bytes en base64
+logs.string_index: Índice de cadena
+logs.blank_value: Cadena en blanco
+logs.empty_value: Sin valor
 logs.next: Página siguiente
-logs.empty: No hay registros que coincidan con estos filtros en el intervalo seleccionado.
-logs.invalid: Consulta de registros no válida. Revisa el intervalo, los filtros o el enlace de página y vuelve a intentarlo.
+logs.empty: No se encontraron registros
+logs.no_message_matches: 'Ningún mensaje coincide con «{{.Term}}»'
+logs.empty_hint: Amplía el intervalo o quita un filtro.
+logs.invalid_link: No se pudo abrir este enlace de búsqueda.
+logs.open: Abrir registros
+logs.invalid_filters: Revisa los filtros de búsqueda y vuelve a intentarlo.
+logs.date_order: La hora de fin debe ser posterior a la de inicio.
+logs.date_range_too_wide: Este intervalo supera el límite de búsqueda.
+logs.invalid_dates: Introduce una hora de inicio y una de fin válidas en UTC.
 logs.cancelled: Se canceló la consulta de registros.
 logs.timed_out: La consulta de registros agotó el tiempo de espera. Prueba con un intervalo más corto.
 logs.unavailable: El almacenamiento local de registros no está disponible. Vuelve a intentarlo.

@@ -17,6 +17,15 @@ import (
 // ErrInvalidQuery identifies invalid filters, bounds or pagination tokens.
 var ErrInvalidQuery = errors.New("logs: invalid query")
 
+// ErrTimeBounds identifies search dates outside the supported OTLP timestamp range.
+var ErrTimeBounds = errors.New("logs: dates outside the supported range")
+
+// ErrTimeOrder identifies a search end time at or before its start time.
+var ErrTimeOrder = errors.New("logs: end time must be after start time")
+
+// ErrTimeRangeTooWide identifies a search interval longer than the configured maximum.
+var ErrTimeRangeTooWide = errors.New("logs: search interval exceeds the configured maximum")
+
 const timestampBits = 64
 
 type cursor struct {
@@ -108,33 +117,38 @@ func (r *repository) validateQuery(query Query) error {
 	if err := r.validateRange(query); err != nil {
 		return err
 	}
+
 	if query.PageSize < 1 || query.PageSize > r.config.MaxResults {
 		return ErrInvalidQuery
 	}
+
 	if !strings.IsEmpty(query.Severity) {
 		if _, ok := logs.SeverityNumber_value[strings.Concat("SEVERITY_NUMBER_", query.Severity)]; !ok {
 			return ErrInvalidQuery
 		}
 	}
-	if !strings.IsEmpty(query.TraceID) {
-		if _, err := hex.DecodeString(query.TraceID); err != nil || len(query.TraceID) != 32 {
-			return ErrInvalidQuery
-		}
+
+	if !strings.IsEmpty(query.TraceID) && !ValidTraceID(query.TraceID) {
+		return ErrInvalidQuery
 	}
+
 	return nil
 }
 
 func (r *repository) validateRange(query Query) error {
 	start, end := unixNanoseconds(query.StartTime), unixNanoseconds(query.EndTime)
-	if start.Sign() < 0 || start.BitLen() > timestampBits {
-		return ErrInvalidQuery
+	if start.Sign() < 0 || start.BitLen() > timestampBits || end.Cmp(new(big.Int).Lsh(big.NewInt(1), timestampBits)) > 0 {
+		return errors.Join(ErrInvalidQuery, ErrTimeBounds)
 	}
-	if end.Cmp(new(big.Int).Lsh(big.NewInt(1), timestampBits)) > 0 || end.Cmp(start) <= 0 {
-		return ErrInvalidQuery
+
+	if end.Cmp(start) <= 0 {
+		return errors.Join(ErrInvalidQuery, ErrTimeOrder)
 	}
+
 	if new(big.Int).Sub(end, start).Cmp(big.NewInt(int64(r.config.MaxRange))) > 0 {
-		return ErrInvalidQuery
+		return errors.Join(ErrInvalidQuery, ErrTimeRangeTooWide)
 	}
+
 	return nil
 }
 
@@ -145,6 +159,7 @@ func queryCursor(query Query) (*cursor, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	// Bind normalized filters without repeating large text in every token.
 	sum := sha256.Sum256(content)
 	fingerprint := hex.EncodeToString(sum[:])
@@ -154,14 +169,17 @@ func queryCursor(query Query) (*cursor, error) {
 		if err != nil {
 			return nil, ErrInvalidQuery
 		}
+
 		var position cursor
 		if err := json.Unmarshal(content, &position); err != nil {
 			return nil, ErrInvalidQuery
 		}
+
 		_, err = strconv.ParseUint(position.BeforeNS, 10, 64)
 		if err != nil || position.QueryHash != fingerprint || position.BeforeID <= 0 {
 			return nil, ErrInvalidQuery
 		}
+
 		return &position, nil
 	}
 

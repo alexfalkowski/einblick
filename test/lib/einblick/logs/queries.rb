@@ -11,7 +11,8 @@ module Einblick
         @query_receipt_windows = {}
         @query_record_count = 0
         request = query_fixture('log_queries')
-        records = request.resource_logs.first.scope_logs.first.log_records
+        records = log_query_records(request)
+        yield records if block_given?
         acknowledge_query_export(request)
         @query = { 'start_time' => query_time(QUERY_TIME), 'end_time' => query_time(QUERY_TIME + 10), 'service' => @query_service }
         @expected_query_records = [5, 4, 3, 2, 1].map { |index| records[index] }

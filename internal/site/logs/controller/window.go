@@ -5,13 +5,19 @@ import (
 
 	"github.com/alexfalkowski/einblick/internal/logs/storage"
 	"github.com/alexfalkowski/einblick/internal/site/logs/model"
+	"github.com/alexfalkowski/go-service/v3/errors"
 	"github.com/alexfalkowski/go-service/v3/strings"
 	"github.com/alexfalkowski/go-service/v3/time"
 )
 
+var errInvalidDates = errors.New("logs: could not read the submitted dates")
+
 const (
 	quarterHour = 15 * time.Minute
 	day         = 24 * time.Hour
+	threeDays   = 3 * day
+	week        = 7 * day
+	recentRange = "recent"
 )
 
 type timePreset struct {
@@ -25,9 +31,11 @@ type timeWindow struct {
 }
 
 var presets = []timePreset{
-	{option: model.FilterOption{Value: "15m", Label: "logs.last_15_minutes"}, duration: quarterHour},
-	{option: model.FilterOption{Value: "1h", Label: "logs.last_hour"}, duration: time.Hour},
-	{option: model.FilterOption{Value: "24h", Label: "logs.last_24_hours"}, duration: day},
+	{option: model.FilterOption{Value: "15m", Label: "logs.range_15_minutes"}, duration: quarterHour},
+	{option: model.FilterOption{Value: "1h", Label: "logs.range_one_hour"}, duration: time.Hour},
+	{option: model.FilterOption{Value: "24h", Label: "logs.range_24_hours"}, duration: day},
+	{option: model.FilterOption{Value: "3d", Label: "logs.range_three_days"}, duration: threeDays},
+	{option: model.FilterOption{Value: "7d", Label: "logs.range_seven_days"}, duration: week},
 }
 
 func resolveWindow(form url.Values, maxRange time.Duration) (timeWindow, error) {
@@ -46,24 +54,43 @@ func resolveWindow(form url.Values, maxRange time.Duration) (timeWindow, error) 
 
 	start, err := parseBound(form, "start_time", "start_utc")
 	if err != nil {
-		return timeWindow{}, err
+		return timeWindow{}, errors.Join(errInvalidDates, err)
 	}
 
 	end, err := parseBound(form, "end_time", "end_utc")
-	return timeWindow{start: start, end: end}, err
+	if err != nil {
+		return timeWindow{}, errors.Join(errInvalidDates, err)
+	}
+
+	return timeWindow{start: start, end: end}, nil
 }
 
-func windowOptions(maxRange time.Duration) []model.FilterOption {
+func windowOptions(maxRange, appliedRange time.Duration) ([]model.FilterOption, string) {
 	options := make([]model.FilterOption, 0, len(presets))
+	selected := strings.Empty
 	for _, preset := range presets {
 		if preset.duration <= maxRange {
 			options = append(options, preset.option)
+			if preset.duration == appliedRange {
+				selected = preset.option.Value
+			}
 		}
 	}
-	return options
+
+	if len(options) == 0 {
+		options = append(options, model.FilterOption{Value: recentRange, Label: "logs.range_recent"})
+		if appliedRange == maxRange {
+			selected = recentRange
+		}
+	}
+	return options, selected
 }
 
 func resolvePreset(value string, maxRange time.Duration) (timeWindow, error) {
+	if value == recentRange && maxRange < quarterHour {
+		return recentWindow(maxRange), nil
+	}
+
 	for _, preset := range presets {
 		if preset.option.Value == value && preset.duration <= maxRange {
 			return recentWindow(preset.duration), nil

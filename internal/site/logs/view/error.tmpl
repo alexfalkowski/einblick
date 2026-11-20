@@ -3,19 +3,33 @@
   <aside class="sidebar"><a class="brand" href="/logs">Einblick</a></aside>
   <section class="workspace" aria-labelledby="logs-heading">
     <h1 id="logs-heading">{{.Localizer.Text "logs.heading"}}</h1>
-    {{template "results" .}}
+    {{template "query-error" (dict "Localizer" .Localizer "Model" .Model "Full" true)}}
   </section>
 </div>
 {{end}}
 
 {{define "results"}}
+{{template "query-error" (dict "Localizer" .Localizer "Model" .Model "Full" false)}}
+{{end}}
+
+{{define "query-error"}}
+{{$label := "logs.request_failed"}}
+{{$message := .Model.Message}}
+{{if eq .Model.Code 400}}
+  {{$label = "logs.invalid_filters"}}
+  {{if or (eq $message "logs.invalid_link") (eq $message "logs.date_order") (eq $message "logs.invalid_dates") (eq $message "logs.date_range_too_wide")}}
+    {{$label = $message}}
+  {{end}}
+{{else if eq .Model.Code 499}}{{$label = "logs.cancelled"}}
+{{else if eq .Model.Code 504}}{{$label = "logs.timed_out"}}
+{{else if eq .Model.Code 503}}{{$label = "logs.unavailable"}}
+{{end}}
 <section id="results" lang="{{.Localizer.Tag}}" aria-label="{{.Localizer.Text "logs.results"}}">
-  <p class="notice error" role="alert">
-    {{if eq .Model.Code 400}}{{.Localizer.Text "logs.invalid"}}
-    {{else if eq .Model.Code 499}}{{.Localizer.Text "logs.cancelled"}}
-    {{else if eq .Model.Code 504}}{{.Localizer.Text "logs.timed_out"}}
-    {{else}}{{.Localizer.Text "logs.unavailable"}}{{end}}
-  </p>
-  <a href="/logs">{{.Localizer.Text "logs.reset"}}</a>
+  <div class="query-alert" role="alert">
+    <p>{{.Localizer.Text $label}}</p>
+    {{if or .Full (eq $label "logs.invalid_link")}}
+    <a class="btn btn-outline btn-sm" href="/logs">{{.Localizer.Text "logs.open"}}</a>
+    {{end}}
+  </div>
 </section>
 {{end}}

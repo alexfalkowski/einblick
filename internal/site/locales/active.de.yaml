@@ -4,41 +4,85 @@ logs.heading: Protokolle
 logs.scope: Aktuelle Protokolle aus dem lokalen Speicher
 logs.service: Dienst
 logs.all_services: Alle Dienste
-logs.start: Beginn (UTC)
-logs.end: Ende (UTC)
-logs.time_presets: Vordefinierte Zeiträume
-logs.last_15_minutes: Letzte 15 Minuten
-logs.last_hour: Letzte Stunde
-logs.last_24_hours: Letzte 24 Stunden
-logs.range_format: 02.01.2006, 15:04:05
+logs.time_range: Zeitraum
+logs.current_range: Aktueller Zeitraum
+logs.range_15_minutes: 15 Min.
+logs.range_one_hour: 1 Stunde
+logs.range_24_hours: 24 Stunden
+logs.range_three_days: 3 Tage
+logs.range_seven_days: 7 Tage
+logs.range_recent: Letzte Einträge
 logs.event_format: 02.01., 15:04:05
 logs.level.debug: Debug
 logs.level.info: Info
 logs.level.warn: Warnung
 logs.level.error: Fehler
 logs.level.fatal: Fatal
-logs.text: Textmeldungen durchsuchen
+logs.text: Meldungen durchsuchen
 logs.severity: Schweregrad
 logs.all_severities: Alle Schweregrade
 logs.trace_id: Trace-ID
-logs.query: Protokolle abfragen
-logs.reset: Filter und Zeitraum zurücksetzen
+logs.related_logs: Zugehörige Protokolle finden
+logs.query: Suchen
+logs.clear_search: Suchtext löschen
+logs.reset: Zurücksetzen
 logs.loading: Protokolle werden geladen …
-logs.request_failed: Die Protokollanfrage ist fehlgeschlagen. Erneut versuchen.
+logs.request_failed: Protokolle konnten nicht geladen werden
+logs.retry: Erneut versuchen
 logs.results: Ergebnisse der Protokollabfrage
 logs.order: Neueste zuerst
 logs.timestamp: Ereigniszeit (UTC)
 logs.message: Meldung
+logs.details: Protokolldetails
+logs.close_details: Details schließen
 logs.no_service: Kein Dienstname
 logs.no_body: Keine Meldung
 logs.structured_body: Strukturierte Meldung
 logs.received: Empfangen (UTC)
-logs.record: Protokolleintrag
-logs.resource: Ressource
+logs.received_short: Empfangen
+logs.received_later: '{{.ReceiptOffset}} später'
+logs.received_earlier: '{{.ReceiptOffset}} früher'
+logs.received_same: Zur selben Zeit
+logs.observed: Beobachtungszeit (UTC)
+logs.detail_time_format: 02.01.2006, 15:04:05,000
+logs.attributes: Attribute
+logs.source: Quelle
+logs.timing: Zeitangaben und IDs
+logs.environment: Umgebung
+logs.service_version: Dienstversion
+logs.instance_id: Instanz-ID
+logs.host_id: Host-ID
 logs.instrumentation: Instrumentierungsbereich
+logs.scope_name: Name des Bereichs
+logs.scope_version: Version des Bereichs
+logs.schema_url: Schema-URL
+logs.entity_refs: Entitätsreferenzen
+logs.entity_type: Typ
+logs.entity_id_keys: Identitätsschlüssel
+logs.entity_description_keys: Beschreibungsschlüssel
+logs.dropped_attributes: Verworfene Attribute
+logs.event_name: Ereignisname
+logs.span_id: Span-ID
+logs.flags: Flags
+logs.http_status: HTTP-Status
+logs.grpc_status: gRPC-Status
+logs.request_duration: Anfragedauer
+logs.list: Liste
+logs.map: Schlüssel-Wert-Paare
+logs.bytes: Base64-kodierte Bytes
+logs.string_index: Zeichenfolgenindex
+logs.blank_value: Leere Zeichenfolge
+logs.empty_value: Kein Wert
 logs.next: Nächste Seite
-logs.empty: Im gewählten Zeitraum gibt es keine Protokolle, die diesen Filtern entsprechen.
-logs.invalid: Ungültige Protokollabfrage. Zeitraum, Filter oder Seitenlink prüfen und erneut versuchen.
+logs.empty: Keine Protokolle gefunden
+logs.no_message_matches: 'Keine Meldung enthält „{{.Term}}“'
+logs.empty_hint: Wähle einen größeren Zeitraum oder entferne einen Filter.
+logs.invalid_link: Dieser Suchlink konnte nicht geöffnet werden.
+logs.open: Protokolle öffnen
+logs.invalid_filters: Prüfe die Suchfilter und versuche es erneut.
+logs.date_order: Das Ende muss nach dem Beginn liegen.
+logs.date_range_too_wide: Dieser Zeitraum überschreitet das Suchlimit.
+logs.invalid_dates: Gib einen gültigen Beginn und ein gültiges Ende in UTC ein.
 logs.cancelled: Die Protokollabfrage wurde abgebrochen.
 logs.timed_out: Zeitlimit der Protokollabfrage überschritten. Einen kürzeren Zeitraum wählen.
 logs.unavailable: Der lokale Protokollspeicher ist nicht verfügbar. Erneut versuchen.

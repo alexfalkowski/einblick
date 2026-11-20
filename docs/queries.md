@@ -6,31 +6,58 @@
 
 Open `http://localhost:11000/logs` with the development configuration.
 The page opens on local logs over the configured maximum range ending now.
-Choose a recent time preset or set the start and end with the UTC date and time
-pickers. The available presets fit the configured maximum range. Enter the exact
-service name in the sidebar and narrow the results by string message text,
-hexadecimal trace ID or severity as needed. The severity choices are Debug,
-Info, Warn, Error, and Fatal. Each matches its exact level. **All severities**
+Choose **15 min**, **1 hour**, **24 hours**, **3 days**, or **7 days** to run a
+search ending now with the filters in the form. The page shows the presets that
+fit the configured search limit and highlights the applied duration. A limit
+shorter than 15 minutes offers **Recent**, which uses the configured duration.
+Enter the exact service name in the sidebar and narrow the results with
+**Search messages**, a hexadecimal trace ID, or severity. The severity choices
+are Debug, Info, Warn, Error, and Fatal. Each matches its exact level. **All severities**
 includes any other levels in the stored data. An empty service filter includes
 logs from all services, including records without a service name.
 
-Choose **Query logs** to search, expand a message to inspect the record, resource
-and instrumentation scope as typed OTLP JSON, and follow **Next page** to
-continue the same query. The address bar captures the submitted absolute range,
-filters and page position. Use Back to return to the previous query and reset
-the filters and time range to start from the latest local window. The table
-shows event time in UTC to the second. The inspector shows exact event and
-receipt timestamps. Reapplying filters with the same picker values preserves
-the original fractional seconds in the selected bounds.
-Trace IDs can be copied into the trace-ID filter to find correlated logs in
-the selected range. In-place updates use htmx from jsDelivr. When the browser
-cannot load it, searches and pagination open full pages.
+Choose **Search** or press Enter to apply filter edits to the current time
+window. Matching text is highlighted in the message preview. Clear the message
+search with **×** or **Clear search** in the empty state to rerun with the same
+time window and other filters.
+
+Select a row or focus its message and press Enter to open **Log details**.
+The inspector slides over the results from the right and fills the screen on
+narrow displays. Use the close button or press Escape to return to the selected
+message. On wide screens, clicking the dimmed backdrop also closes the inspector.
+
+The inspector shows the full message, service, environment and time to receipt
+when available. HTTP and gRPC request logs also show the reported status and
+request duration. Expand **Attributes** for individual values and nested
+lists, **Source** for resource and instrumentation details, or
+**Timing and IDs** for exact timestamps and copyable trace and span IDs.
+Use the query API to retrieve the original typed OTLP fields.
+
+Follow **Next page** to continue the same query. The address bar captures the
+submitted absolute range, filters and page position. Use Back to return to the
+previous query. **Reset** clears the filters and opens the latest local
+window. The table shows event time in UTC to the second. When the producer
+omits event time, the summary labels the observation or receipt time used in its
+place. Shared links retain the exact bounds, including fractional seconds. A
+duration outside the presets is marked **Current range**. Presets replace the
+UTC date and time pickers. Existing absolute-range bookmarks still open within
+the configured query limit. To construct a custom interval, supply both
+`start_time` and `end_time` as RFC 3339 timestamps in the `/logs` URL or use
+the [query API](#-query-recent-logs-through-the-api).
+Open **Timing and IDs** on a log and choose **Find related logs** to search for
+its trace in the current time range with the other filters still applied. You
+can also paste an ID from another tool into **Trace ID**. In-place updates use
+htmx from jsDelivr. When the browser cannot load it, searches and pagination
+open full pages.
 
 The browser negotiates English, German or Spanish with English fallback.
-Queries distinguish loading, no matches, invalid input, storage failure and
-query timeout. If the shared HTTP deadline expires first, in-place queries show
-a timeout and direct navigation can return an empty HTTP 504 response. The
-page reads local storage and uses the same query bounds and ordering as the API.
+If there are no matches, select a longer preset or clear a filter. If a saved
+search link fails, choose **Open Logs** to start a fresh search.
+If the shared HTTP deadline expires first, in-place queries show
+a timeout and direct navigation can return an empty HTTP 504 response. When
+offered after a network or gateway error, **Try again** sends the failed search
+with the same inputs. The page reads local storage and uses the same query
+bounds and ordering as the API.
 Anyone who can reach the route through the HTTP listener can query it without
 a site login.
 

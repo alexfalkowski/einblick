@@ -24,6 +24,9 @@ func parseQuery(req *http.Request, maxRange time.Duration) (storage.Query, error
 		Service: form.Get("service"), Severity: form.Get("severity"),
 		Text: form.Get("text"), TraceID: form.Get("trace_id"), PageToken: form.Get("page_token"),
 	}
+	if form.Get("clear_message") == "1" {
+		query.Text = strings.Empty
+	}
 	if size := form.Get("page_size"); !strings.IsEmpty(size) {
 		var err error
 		if query.PageSize, err = strconv.Atoi(size); err != nil {

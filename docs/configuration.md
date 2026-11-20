@@ -53,7 +53,7 @@ All query limits are required, without implicit defaults:
 ```yaml
 queries:
   max_results: 100
-  max_range: 24h
+  max_range: 168h
   timeout: 30s
   concurrency: 1
 ```
