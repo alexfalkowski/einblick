@@ -1,0 +1,74 @@
+{
+  "resourceLogs": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "host.id",
+            "value": {
+              "stringValue": "fixture-instance"
+            }
+          },
+          {
+            "key": "service.instance.id",
+            "value": {
+              "stringValue": "fixture-instance"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "fixture-query-service"
+            }
+          },
+          {
+            "key": "service.version",
+            "value": {
+              "stringValue": "0.0.0"
+            }
+          },
+          {
+            "key": "deployment.environment.name",
+            "value": {
+              "stringValue": "development"
+            }
+          }
+        ]
+      },
+      "scopeLogs": [
+        {
+          "logRecords": [
+            {
+              "timeUnixNano": "1795086245123456789",
+              "body": {
+                "stringValue": "arrived 0"
+              }
+            },
+            {
+              "timeUnixNano": "1795086245123456790",
+              "body": {
+                "stringValue": "arrived 1"
+              }
+            },
+            {
+              "timeUnixNano": "1795086245123456791",
+              "body": {
+                "stringValue": "arrived 2"
+              }
+            },
+            {
+              "timeUnixNano": "1795086245123456793",
+              "body": {
+                "stringValue": "arrived 4"
+              }
+            }
+          ],
+          "scope": {
+            "name": "e01-client"
+          }
+        }
+      ],
+      "schemaUrl": "https://opentelemetry.io/schemas/1.43.0"
+    }
+  ]
+}

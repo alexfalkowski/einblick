@@ -36,6 +36,10 @@ and allow clients to retry. Repeated exports can produce duplicate records.
 Look for `component=logs` diagnostics to distinguish committed exports from
 storage failures.
 
+Recent-log reads use the same recovered database; see
+[query scope, pagination and failures](queries.md). A query failure does not
+mean that previously acknowledged logs were discarded.
+
 Pending schema migrations run automatically at startup. A failed migration
 rolls back its own changes; earlier successful migrations remain applied.
 Repair the reported cause and restart to retry. Do not manually advance recorded

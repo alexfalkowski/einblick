@@ -1,0 +1,231 @@
+{
+  "resourceLogs": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "host.id",
+            "value": {
+              "stringValue": "fixture-instance"
+            }
+          },
+          {
+            "key": "service.instance.id",
+            "value": {
+              "stringValue": "fixture-instance"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "fixture-query-service"
+            }
+          },
+          {
+            "key": "service.version",
+            "value": {
+              "stringValue": "0.0.0"
+            }
+          },
+          {
+            "key": "deployment.environment.name",
+            "value": {
+              "stringValue": "development"
+            }
+          }
+        ]
+      },
+      "schemaUrl": "https://opentelemetry.io/schemas/1.43.0",
+      "scopeLogs": [
+        {
+          "scope": {
+            "name": "e01-client"
+          },
+          "logRecords": [
+            {
+              "timeUnixNano": "1795086245123456788",
+              "observedTimeUnixNano": "1795086245123456799",
+              "severityNumber": "SEVERITY_NUMBER_INFO",
+              "severityText": "INFO",
+              "body": {
+                "stringValue": "outside before"
+              },
+              "spanId": "AQIDBAUGBwg=",
+              "flags": 1
+            },
+            {
+              "timeUnixNano": "1795086245123456789",
+              "observedTimeUnixNano": "1795086245123456799",
+              "severityNumber": "SEVERITY_NUMBER_INFO",
+              "severityText": "INFO",
+              "body": {
+                "stringValue": "first"
+              },
+              "spanId": "AQIDBAUGBwg=",
+              "flags": 1
+            },
+            {
+              "timeUnixNano": "1795086245123456790",
+              "observedTimeUnixNano": "1795086245123456799",
+              "severityNumber": "SEVERITY_NUMBER_INFO",
+              "severityText": "INFO",
+              "body": {
+                "stringValue": "same-time first"
+              },
+              "traceId": "AQIDBAUGBwgJCgsMDQ4PEA==",
+              "spanId": "AQIDBAUGBwg=",
+              "flags": 1,
+              "attributes": [
+                {
+                  "key": "request.id",
+                  "value": {
+                    "stringValue": "fixture-request"
+                  }
+                },
+                {
+                  "key": "large_integer",
+                  "value": {
+                    "intValue": "9007199254740993"
+                  }
+                },
+                {
+                  "key": "nested",
+                  "value": {
+                    "kvlistValue": {
+                      "values": [
+                        {
+                          "key": "values",
+                          "value": {
+                            "arrayValue": {
+                              "values": [
+                                {
+                                  "boolValue": true
+                                },
+                                {
+                                  "doubleValue": 1.25
+                                },
+                                {
+                                  "bytesValue": "AP8="
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "timeUnixNano": "1795086245123456790",
+              "observedTimeUnixNano": "1795086245123456799",
+              "severityNumber": "SEVERITY_NUMBER_ERROR",
+              "severityText": "INFO",
+              "body": {
+                "stringValue": "same-time second"
+              },
+              "spanId": "AQIDBAUGBwg=",
+              "flags": 1
+            },
+            {
+              "timeUnixNano": "1795086245123456791",
+              "observedTimeUnixNano": "1795086245123456799",
+              "severityNumber": "SEVERITY_NUMBER_UNSPECIFIED",
+              "severityText": "INFO",
+              "body": {
+                "intValue": "9007199254740993"
+              },
+              "spanId": "AQIDBAUGBwg=",
+              "flags": 1
+            },
+            {
+              "timeUnixNano": "1795086245123456792",
+              "observedTimeUnixNano": "1795086245123456799",
+              "severityNumber": "SEVERITY_NUMBER_WARN",
+              "severityText": "INFO",
+              "body": {
+                "stringValue": "literal %_ ' OR 1=1 --"
+              },
+              "spanId": "AQIDBAUGBwg=",
+              "flags": 1
+            },
+            {
+              "timeUnixNano": "1795086245123456799",
+              "observedTimeUnixNano": "1795086245123456799",
+              "severityNumber": "SEVERITY_NUMBER_INFO",
+              "severityText": "INFO",
+              "body": {
+                "stringValue": "outside end"
+              },
+              "spanId": "AQIDBAUGBwg=",
+              "flags": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "fixture-query-service-other"
+            }
+          }
+        ]
+      },
+      "scopeLogs": [
+        {
+          "logRecords": [
+            {
+              "timeUnixNano": "1795086245123456790",
+              "body": {
+                "stringValue": "other service"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "host.id",
+            "value": {
+              "stringValue": "unlabelled-host"
+            }
+          }
+        ]
+      },
+      "scopeLogs": [
+        {
+          "logRecords": [
+            {
+              "timeUnixNano": "1795086245123456791",
+              "body": {
+                "stringValue": "unlabelled resource"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "scopeLogs": [
+        {
+          "logRecords": [
+            {
+              "timeUnixNano": "1795086245123456791",
+              "body": {
+                "stringValue": "absent resource"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -3,11 +3,15 @@ package config
 import (
 	"github.com/alexfalkowski/einblick/internal/duckdb"
 	"github.com/alexfalkowski/einblick/internal/health"
+	"github.com/alexfalkowski/einblick/internal/logs/storage"
 	"github.com/alexfalkowski/go-service/v3/config"
 )
 
 // Config for the service.
 type Config struct {
+	// Queries configures required server-side limits for recent-log reads.
+	Queries *storage.Config `yaml:"queries,omitempty" json:"queries,omitempty" toml:"queries,omitempty" validate:"required"`
+
 	// DuckDB configures the required local file and native engine resources.
 	DuckDB *duckdb.Config `yaml:"duckdb,omitempty" json:"duckdb,omitempty" toml:"duckdb,omitempty" validate:"required"`
 
@@ -28,4 +32,8 @@ func healthConfig(cfg *Config) *health.Config {
 
 func duckdbConfig(cfg *Config) *duckdb.Config {
 	return cfg.DuckDB
+}
+
+func queryConfig(cfg *Config) *storage.Config {
+	return cfg.Queries
 }

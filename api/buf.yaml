@@ -1,0 +1,10 @@
+version: v2
+name: buf.build/afalkowski/einblick
+deps:
+  - buf.build/opentelemetry/opentelemetry:v1.11.1
+breaking:
+  use:
+    - FILE
+lint:
+  use:
+    - STANDARD

@@ -5,10 +5,11 @@ import (
 	"github.com/alexfalkowski/go-signal/v2"
 )
 
-// Module decodes service configuration and projects shared, health and database settings.
+// Module decodes service configuration and projects shared, health, database and query settings.
 var Module = signal.Module(
 	signal.Constructor(config.NewConfig[Config]),
 	signal.Decorate(decorateConfig),
 	signal.Constructor(healthConfig),
 	signal.Constructor(duckdbConfig),
+	signal.Constructor(queryConfig),
 )

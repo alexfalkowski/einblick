@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	v1 "github.com/alexfalkowski/einblick/internal/api/v1"
 	"github.com/alexfalkowski/einblick/internal/config"
 	"github.com/alexfalkowski/einblick/internal/duckdb"
 	"github.com/alexfalkowski/einblick/internal/health"
@@ -22,6 +23,7 @@ var Module = signal.Module(
 	duckdb.Module,
 	health.Module,
 	logs.Module,
+	v1.Module,
 	metrics.Module,
 	traces.Module,
 )

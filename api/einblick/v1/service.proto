@@ -1,0 +1,86 @@
+syntax = "proto3";
+
+package einblick.v1;
+
+import "google/protobuf/timestamp.proto";
+import "opentelemetry/proto/logs/v1/logs.proto";
+
+option go_package = "github.com/alexfalkowski/einblick/api/einblick/v1";
+option ruby_package = "Einblick::V1";
+
+// ListLogsRequest selects a bounded page of locally committed logs.
+// Filters are conjunctive and remain fixed across continuation requests.
+message ListLogsRequest {
+  // start_time is the required inclusive absolute event-time boundary.
+  google.protobuf.Timestamp start_time = 1;
+
+  // end_time is the required exclusive absolute event-time boundary.
+  // The interval must fit the configured maximum range and unsigned OTLP times.
+  google.protobuf.Timestamp end_time = 2;
+
+  // service exactly matches resource service.name; empty selects all services.
+  string service = 3;
+
+  // severity exactly matches an OTLP suffix such as INFO, ERROR or UNSPECIFIED.
+  // Empty selects all severities.
+  string severity = 4;
+
+  // text is a case-sensitive literal substring of string bodies only.
+  // Empty selects all bodies; attributes and non-string bodies are not searched.
+  string text = 5;
+
+  // trace_id is a 32-character hexadecimal trace ID; empty selects all records.
+  string trace_id = 6;
+
+  // page_size is positive and no greater than the configured result limit.
+  // Zero uses that limit; negative values are invalid.
+  int32 page_size = 7;
+
+  // page_token continues a previous page with identical filters and page size.
+  string page_token = 8;
+}
+
+// Log contains a committed record with its complete typed OTLP context.
+message Log {
+  // id is the stable local record identity and descending timestamp tie-breaker.
+  int64 id = 1;
+
+  // event_time selects the original Timestamp, then ObservedTimestamp, then receipt.
+  google.protobuf.Timestamp event_time = 2;
+
+  // receive_time is server receipt time, separate from the original record times.
+  google.protobuf.Timestamp receive_time = 3;
+
+  // resource preserves the ResourceLogs header without its scope_logs collection.
+  opentelemetry.proto.logs.v1.ResourceLogs resource = 4;
+
+  // scope preserves the ScopeLogs header without its log_records collection.
+  opentelemetry.proto.logs.v1.ScopeLogs scope = 5;
+
+  // record preserves the complete original OTLP log record and unsigned times.
+  opentelemetry.proto.logs.v1.LogRecord record = 6;
+}
+
+// ListLogsResponse contains one latest-first page and service metadata.
+message ListLogsResponse {
+  // meta contains infrastructure metadata such as request_id and user_agent.
+  map<string, string> meta = 1;
+
+  // logs orders records by event_time descending, then id descending.
+  repeated Log logs = 2;
+
+  // next_page_token is empty at exhaustion. Membership is not frozen: newly
+  // committed records behind the cursor may enter later pages; refresh for
+  // arrivals ahead. Existing records do not repeat. Tokens survive restart
+  // while local source rows are retained.
+  string next_page_token = 3;
+}
+
+// Service provides fixed telemetry query operations.
+service Service {
+  // ListLogs reads acknowledged local logs within explicit absolute bounds.
+  // InvalidArgument identifies invalid bounds, filters or tokens. Cancellation
+  // and deadlines propagate through queueing and database work; storage failures
+  // return Unavailable. Failed queries never return partial pages.
+  rpc ListLogs(ListLogsRequest) returns (ListLogsResponse) {}
+}

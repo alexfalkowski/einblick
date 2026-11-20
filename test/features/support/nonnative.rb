@@ -5,3 +5,7 @@ Nonnative.configure do |config|
 end
 
 require 'nonnative/startup'
+
+After('@native_query_work') do
+  restore_native_query_work
+end

@@ -27,7 +27,7 @@ the `signal` field identifies `metrics` or `traces`. The payload is not
 duplicated in a separate field. Empty requests print `{}`. Records are
 discarded after printing. Logs emit a `component=logs` diagnostic with the
 committed-record count, or a failure, without printing the incoming payload.
-There is no query endpoint yet.
+Acknowledged logs are available through the [recent-log query API](queries.md).
 
 ## 📝 Log support and delivery
 

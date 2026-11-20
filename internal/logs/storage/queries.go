@@ -10,3 +10,6 @@ var insertScopeQuery string
 
 //go:embed queries/insert_log.sql
 var insertLogQuery string
+
+//go:embed queries/list_logs.sql
+var listLogsQuery string
