@@ -12,8 +12,9 @@ storage before acknowledgement; metrics and traces print through the service
 logger and are discarded.
 
 The service recovers its local log database before serving requests and provides
-bounded recent-log queries over gRPC and HTTP RPC. Browser pages, trace/metric persistence
-and Parquet archives in Cloudflare R2 are planned.
+bounded recent-log queries in the browser and over gRPC and HTTP RPC.
+Trace and metric persistence and views are planned, along with Parquet
+archives in Cloudflare R2.
 See the [product requirements](docs/requirements.md) and
 [implementation plan](docs/review-and-plan.md) for the remaining work.
 
@@ -51,9 +52,10 @@ metric and trace exports acknowledge receipt only.
 
 ## 🔎 Log queries
 
-Read acknowledged logs with service, severity, string-body text and trace-ID
-filters through the [recent-log query API](docs/queries.md). Results preserve
-typed content and exact nanoseconds, with stable newest-first pagination.
+Open `http://localhost:11000/logs` to investigate acknowledged logs with
+service, severity, string-body text and trace-ID filters. The Logs page
+uses your browser language preferences and displays expandable typed log
+details. See [recent-log queries](docs/queries.md) for the browser and API usage.
 
 ## ⚙️ Configuration
 

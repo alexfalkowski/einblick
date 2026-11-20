@@ -2,11 +2,45 @@
 
 [← Back to README](../README.md)
 
-Query acknowledged logs through `einblick.v1.Service/ListLogs` over gRPC or
+## 🖥️ Investigate recent logs in the browser
+
+Open `http://localhost:11000/logs` with the development configuration.
+The page opens on local logs over the configured maximum range ending now.
+Choose a recent time preset or set the start and end with the UTC date and time
+pickers. The available presets fit the configured maximum range. Enter the exact
+service name in the sidebar and narrow the results by string message text,
+hexadecimal trace ID or severity as needed. The severity choices are Debug,
+Info, Warn, Error, and Fatal. Each matches its exact level. **All severities**
+includes any other levels in the stored data. An empty service filter includes
+logs from all services, including records without a service name.
+
+Choose **Query logs** to search, expand a message to inspect the record, resource
+and instrumentation scope as typed OTLP JSON, and follow **Next page** to
+continue the same query. The address bar captures the submitted absolute range,
+filters and page position. Use Back to return to the previous query and reset
+the filters and time range to start from the latest local window. The table
+shows event time in UTC to the second. The inspector shows exact event and
+receipt timestamps. Reapplying filters with the same picker values preserves
+the original fractional seconds in the selected bounds.
+Trace IDs can be copied into the trace-ID filter to find correlated logs in
+the selected range. In-place updates use htmx from jsDelivr. When the browser
+cannot load it, searches and pagination open full pages.
+
+The browser negotiates English, German or Spanish with English fallback.
+Queries distinguish loading, no matches, invalid input, storage failure and
+query timeout. If the shared HTTP deadline expires first, in-place queries show
+a timeout and direct navigation can return an empty HTTP 504 response. The
+page reads local storage and uses the same query bounds and ordering as the API.
+Anyone who can reach the route through the HTTP listener can query it without
+a site login.
+
+## 🔌 Query recent logs through the API
+
+Use `einblick.v1.Service/ListLogs` over gRPC or
 `POST /einblick.v1.Service/ListLogs` on the HTTP listener. Both use the
-[versioned protobuf contract](../api/einblick/v1/service.proto) and the same
-query operation. Queries read the local DuckDB database; archived reads and the
-browser Logs page are planned. No arbitrary SQL or query expressions are accepted.
+[versioned protobuf contract](../api/einblick/v1/service.proto). Queries read
+the local DuckDB database and accept the fixed filters below. Archived reads
+are planned.
 
 With the development configuration:
 
@@ -35,7 +69,7 @@ Query time follows the stored event-time policy: Timestamp, then
 ObservedTimestamp, then server receipt time. Original timestamps remain in each
 record. Bounds must fit the stored unsigned OTLP time range, from the Unix
 epoch through the exclusive upper boundary `2554-07-21T23:34:33.709551616Z`.
-The configured maximum range still applies; there is no implicit relative window.
+The configured maximum range still applies. API clients supply both bounds.
 
 All supplied filters must match:
 

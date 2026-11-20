@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="{{.Localizer.Tag}}" data-theme="einblick">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="htmx-config" content='{"history":"reload","includeIndicatorCSS":false}'>
+  <title>{{.Localizer.Text "site.title"}}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.8.0/components/button.css" integrity="sha384-4SwXSmMfQmW3CRgIEgwHfigqhGzhLeeUw5N50mzY6rT5b73TjB0LvQTwZaZ/ugOC" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.8.0/components/input.css" integrity="sha384-WmmOLvMZJlae3GGOcW2V7ipaMeMxcilvCGN6uHDOVYdtWPc0GqV+06m3bKxssBG+" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.8.0/components/select.css" integrity="sha384-joukrLDwmmmc5txx/GImdiLafnr98Ag+M9y9OvLGeBUpyGyqswbgE8kgDm2oTxcG" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.8.0/components/table.css" integrity="sha384-0tKJJR4bAeCQWZwCSXsYpu3Jl7qvYv/U/nySqv+qgViO6lAlO3d9rDX5MKeiAIgV" crossorigin="anonymous">
+  <link rel="stylesheet" href="/assets/logs.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/htmx.org@4.0.1/dist/htmx.min.js" integrity="sha384-Qp9rdC8H7EqOoX+nR0P3RPG2Noji+qdwJlGpfzwQJsfOpp3sGwIdSP9xO3+UlEhn" crossorigin="anonymous"></script>
+  <script defer src="/assets/logs.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">{{.Localizer.Text "site.skip"}}</a>
+  <main id="main" tabindex="-1">
+    {{block "content" .}}{{end}}
+  </main>
+</body>
+</html>

@@ -9,129 +9,50 @@ coverage and saved progress. Agent workflow and engineering guidance live in
 
 Say `Continue docs/review-and-plan.md`. Each continuation handles one step.
 
-**Current step:** E-05 — Multilingual MVC Logs page.
+**Current step:** E-06 — Durable local Parquet log export.
 
-**Status:** ready, pending owner review of the backend.
+**Status:** ready, pending owner review of E-05.
 
-**Next action:** Owner review of the recent-log backend and versioned API,
-then continue E-05 only. Implement the multilingual MVC Logs page over the
-existing unversioned query operation, following Web's MVC/i18n pattern and the
-initial design reference. Browser implementation has not started.
+**Next action:** Review the Logs page and then settle the archive-day,
+batch-membership, content-identity and interrupted-export policies. Continue
+with E-06 only.
 
 ### Resume context
 
-- [Recent-log queries](queries.md) owns the backend contract, defined by
-  `api/einblick/v1/service.proto`. HTTP RPC uses
-  `POST /einblick.v1.Service/ListLogs` with `application/pbjson` for canonical
-  protobuf JSON; generated gRPC clients call the same `ListLogs` method.
-  `internal/api/v1/logs.Service.ListLogs` adapts protobuf messages for both API
-  transports. Future MVC controllers can use the unversioned
-  `storage.Repository.List` operation directly, without protobuf or a network call.
-  `start_time`/`end_time` are start-inclusive/end-exclusive protobuf Timestamps,
-  represented as RFC 3339 in protobuf JSON. Preserve nanoseconds and the full
-  unsigned OTLP range, including dates after 2262. Results retain typed OTLP
-  resource/scope/record content and shared request metadata.
-- API references: Bezeichner `ffffecc62f2d1d1a13737b844c304481c5a897f2`,
-  `api/bezeichner/v1/service.proto`, `internal/api/v1/module.go`,
-  `internal/api/v1/ids/list.go`, and `internal/api/v1/transport/{http,grpc}`.
-  Shared identifier operations remain in Bezeichner's `internal/api/ids`.
-  Standort `be79fd79d2d2b07567c7d44d9f0e5e5bd5bfc533`,
-  `internal/location`, `internal/api/location` and `internal/api/v2/location`,
-  and Migrieren `c3d07171068c5c53980a90979067db0755494278`,
-  `internal/migrate`, `internal/api/migrate` and `internal/api/v1/migrate`,
-  confirm the shared-core/versioned-adapter split. Their versioned modules and
-  transports use the same operation-module, `NewServer` and `Register` pattern.
-- Query limits are required configuration: development uses 100 records, 24h,
-  30s and one active query. The shared HTTP timeout may end a request earlier.
-  The single query semaphore uses consumed go-sync `v1.40.0`
-  (`3a0d2bff9ea6949351be97f8504b18076d7b8940`), whose vendored
-  `semaphore.go` matches the release. Intake does not acquire it.
-- The owner deferred the [expanded-response security finding](https://github.com/alexfalkowski/einblick/pull/30#pullrequestreview-5990577441)
-  until the functional workflow is working. The repository releases query
-  admission before `internal/api/v1/logs/list.go` expands per-record headers;
-  the pinned HTTP unary handler then buffers and writes the response outside
-  that admission. Response-byte budgeting and admission through response
-  completion remain unresolved. No new cap or lifecycle policy is selected.
-- Pagination uses strict event-time/ID keysets. Arrivals behind the cursor may
-  enter later pages; arrivals ahead require a fresh query. Existing records do
-  not repeat. QRY-002/AC-004 own this agreed policy. Tokens survive restart and
-  have no time expiry while local rows remain retained; E-09 must define source
-  ownership/expiry before eviction. Do not introduce frozen membership or intake
-  coordination when adding the view.
-- WEB-017/AC-027 require embedded English, German and Spanish catalogs, browser
-  preference negotiation, English fallback, localized labels/states/accessibility
-  text and matching language/cache metadata in full/partial views. Telemetry and
-  service identities retain their original values. No browser pages are implemented
-  yet; E-05 owns the first rendering and language acceptance evidence.
-- MVC/i18n reference: Web `d3b6694df26927ecbea2965c5015a33698306ea3`,
-  `internal/site/site.go`, `internal/site/module.go`,
-  `internal/site/books/controller/controller.go` and
-  `test/features/site/site.feature`. Preserve the
-  [initial design reference](requirements.md#87-service-catalog-and-standard-ux).
-  Local go-service is consumed `v3.4.0`
-  (`9986668a068488381a0600cd6dae3d189ed7f805`), matching the local checkout
-  and vendored HTTP RPC/MVC implementations. Recheck its MVC/i18n implementation
-  and Web's actual consumed framework/assets at E-05 entry. Shared bin is
-  `00a890b21a01cfa4907262dfe19f9f2812b9e560`.
-- Current API validation: `BUNDLE_USER_HOME=/tmp/einblick-bundler make features tags=@queries`
-  passed 64 scenarios / 216 steps. The existing Cucumber/Nonnative harness uses
-  generated Ruby messages for HTTP RPC assertions and a generated gRPC client.
-  Coverage includes typed records/metadata, independently bounded receipt times,
-  literal `%`/`_` search, omitted/empty service selection with labelled/unlabelled
-  and absent-resource records, per-record headers, high-bit unsigned cursor
-  continuation, independent trace-ID length/hex validation, safe gRPC storage failures,
-  and complete single-record gRPC pages matching a 500 KiB text filter under the
-  configured 1 MB receive limit. Tokens bind the normalized query through a
-  fixed-size fingerprint, keeping filter text out of the token. Coverage also includes
-  HTTP-to-gRPC continuation, narrow invalid unsigned bounds, invalid arguments, precision,
-  arrival policy, restart, native deadlines and caller cancellation. Both page
-  collectors reject repeated IDs/tokens and stop within an exported-fixture
-  record bound. Caller cancellation waits for active SQL work, then verifies
-  idle SQL within the existing 3s RSpec wait budget against separate 30s server
-  query, gRPC transport and caller budgets. Continuation runs afterward in the same process. Native fixtures
-  use tagged scenario cleanup, armed before setup and conditional on the source
-  table's presence, so failed setup restarts also restore writable storage.
-- `BUNDLE_USER_HOME=/tmp/einblick-bundler BUF_CACHE_DIR=/tmp/einblick-buf make lint`
-  passed: Go 0 issues, Ruby 24 files without offenses, and protobuf format/lint.
-  `BUF_CACHE_DIR=/tmp/einblick-buf make proto-update-all-dep proto-format proto-generate`
-  passed. Repeating `make proto-generate` with that cache prefix left all four
-  generated Go/Ruby files byte-identical. The host's default Buf cache is not
-  writable in the agent sandbox; its documented override keeps normal Make
-  targets usable. The dependency lock pins the same OTLP schema release as Go.
-  `proto-breaking` was not run: no protobuf API exists in local `master` for
-  comparison. `proto-stale` was not run because it compares the whole dirty
-  worktree; generation was checked directly through the supported Make target.
-- Refactor assessment covered local code/test smells, boundary ownership and
-  public-contract compatibility. Versioned adapters own protobuf conversion,
-  the unversioned repository owns query policy/work, and errors map locally in
-  each transport. No further extraction is needed. Confidence in the tested
-  local backend/API behavior is 95%; browser behavior, workload capacity and
-  Linux/deployed native runtime evidence remain unavailable. CI owns the full
-  service suite. Focused mutations were rejected for SQL LIKE wildcard search,
-  event/receipt timestamp aliasing, repeated pages through HTTP and gRPC, and
-  caller cancellation detached from the server query. Each failed its intended
-  assertion through the feature harness; production sources were restored.
-  Narrow boundary cases also rejected removal of each unsigned-bound check;
-  all-service cases rejected broken empty-service filtering. A one-shot invalid
-  startup command failed during native fixture setup, after which the existing
-  ingestion/query scenario passed with the restored table. Cancellation passed
-  with delayed continuation pages and rejected detached cancellation at the SQL
-  release assertion. Temporary mutations and the startup command were restored.
-- `GOPATH=/tmp/einblick-go GOMODCACHE=/Users/alejandro/go/pkg/mod TRIVY_SKIP_FILES='**/.env,**/.env.*' make sec`
-  passed with current dependencies: govulncheck found no vulnerabilities across
-  128 modules and Go 1.27.4; Trivy reported no matching critical Go/Ruby findings.
-  The GOPATH prefix keeps checksum-cache writes in the sandbox without disabling
-  verification; the Bundler prefix avoids host-home cleanup failures. Skip
-  patterns preserve denied credential paths.
-- `python3 tools/check_handoff.py` passed with 91 requirements, 27 acceptance
-  scenarios and no unmapped IDs or broken local targets. Actual Linux CI, deployed native/runtime,
-  rollout and workload-capacity evidence remain unavailable and owner-run.
+- Confirm UTC archive-day selection under STO-007 and
+  [O-004](requirements.md#15-open-decision-register). Local logs select event time from
+  the original Timestamp, then ObservedTimestamp, then server receipt time.
+  All three values remain available. Late and future log timestamps are
+  accepted, including the full unsigned OTLP range. Keep exact nanoseconds
+  and typed record, resource and instrumentation-scope content in the Parquet
+  round-trip. See [ingestion](ingestion.md#-log-support-and-delivery).
+- Define immutable source membership, durable batch identity, expected
+  content identity and transition recovery before adding export jobs.
+  Choose workspace bounds and record how incomplete derivatives are recognized
+  and cleaned up under STO-011. Intake acknowledgement continues to depend on
+  the local transaction. Transfer and local source eviction belong to E-08
+  and E-09 respectively.
+- [Recent-log queries](queries.md) rely on strict event-time/ID cursors.
+  Arrivals behind a cursor can enter later pages and arrivals ahead require a
+  fresh query. E-09 must define continued cursor ownership or explicit expiry
+  before evicting local rows. Preserve the same behavior for the Logs page.
+- The owner deferred the [expanded-response finding](https://github.com/alexfalkowski/einblick/pull/30#pullrequestreview-5990577441).
+  Repository admission ends before response conversion and rendering. Response
+  byte budgeting and admission through response completion remain undecided.
+- E-12 and E-17 extend the existing MVC site under `internal/site`. Follow the
+  [Logs feature layout](../internal/site/logs) and reuse the
+  [embedded catalogs](../internal/site/locales), [shared layouts](../internal/site/root/layout) and
+  [Einblick daisyUI theme](../internal/site/static/logs.css). Use the
+  [initial visual reference](requirements.md#87-service-catalog-and-standard-ux).
+  E-18 still owns connected browser navigation, full accessibility acceptance
+  and historical query outcomes. With an HTTP transport timeout of `1ns`,
+  a direct German `GET /logs` returned HTTP 504 with an empty body.
+  Partial queries show a localized timeout when that response reaches htmx.
 
 ## 1. Remaining steps
 
 | Unit | Phase / entry | Remaining deliverable | Evidence to close |
 | --- | --- | --- | --- |
-| E-05 | P2; ready after owner review of E-04 | Add the thin MVC Logs page over the existing query path with safe rendering and visible loading/empty/error states. Introduce embedded English/German/Spanish catalogs and Web's language negotiation/fallback for full and partial views (WEB-017). | Log rendering in AC-015, initial frontend portions of AC-013/AC-016/AC-022/AC-027 and a useful local log investigation. No dashboard, trace view or login subsystem. |
 | E-06 | P3; E-05 reviewed and log archive-day/membership/recovery policies recorded | Add durable log batch/export jobs, completed local Parquet files, content identity and interrupted-export/workspace recovery. | Log archive-format AC-003, local-export AC-009, pending-job AC-008 and derivative cleanup in AC-019. Verify typed/nanosecond Parquet round-trip and packaging. No R2 access, source deletion or uploadable partial files. |
 | E-07 | P4; E-06 reviewed | Evaluate and integrate the lean S3 client and packaged DuckDB remote-read extensions. Verify access to a private test bucket and actual R2 operations before adding upload jobs. | AC-026 dependency/binary/resource evidence and actual upload/download/list/HEAD/delete, cancellation, reconciliation, pagination and multipart checks; separate DuckDB remote reads on required-platform service images. Log batches are sufficient at this gate. |
 | E-08 | P4; E-07 reviewed | Add job-driven bounded upload/retry, content verification, ambiguous-outcome reconciliation and durable publication state for completed log batches. | Log remote AC-008/AC-009 and durable-transfer AC-026 integration. Keep local source rows until E-09; successful intake still depends only on local commit. |
@@ -198,15 +119,15 @@ Partial local/signal evidence is not full archive/all-signal acceptance.
 | AC-012 | E-10 log policy/retry/expiration scenarios, using E-03/E-06 policies; extend with trace/metric policies in E-13/E-16. |
 | AC-013 | Query bounds/cancellation from E-04 onward, log historical work in E-09/E-10, trace/metric coverage in E-12/E-13/E-15/E-16, browser completion in E-18. |
 | AC-014 | Reserved; no v1 work. |
-| AC-015 | E-05/E-12 establish safe rendering/correlation; E-18 completes navigation acceptance. |
-| AC-016 | E-03 independent diagnostics, E-05 initial frontend states; E-09/E-10 log backend coverage/failure/recovery, extended in E-13/E-16; E-18 completes visible frontend outcomes. |
+| AC-015 | E-12 adds trace rendering and correlation; E-18 completes navigation acceptance. |
+| AC-016 | E-09/E-10 log backend coverage, failure and recovery, extended in E-13/E-16; E-18 completes visible frontend outcomes. |
 | AC-017 | Local versioned-migration/initialization/failure-recovery baseline from E-03; archive/schema evidence from E-06/E-09 and trace/metric additions; supported schema/runtime upgrade and rollback checks with each persistence/archive change. |
 | AC-018 | E-03/E-11/E-14 service recovery, shutdown and database reopen; E-06 Parquet and E-07 remote-extension packaging. Deployed runtime validation is owned by the operator. These are portions of the broader requirements scenario. |
 | AC-019 | E-06 derivative cleanup, E-09 safe complete-batch log eviction, E-10 expiration/workspace cycles; repeat for traces/metrics in E-13/E-16. |
 | AC-021 | E-04/E-09/E-12/E-13/E-15/E-16 DuckDB query review; E-06/E-08/E-13/E-16 immutable export review. Preserve the shared CGO build default with each change. |
-| AC-022 | E-05 initial Logs view without site credentials/sessions; E-18 full browser-workflow evidence. |
+| AC-022 | E-18 full browser-workflow evidence without site credentials or sessions. |
 | AC-023 | E-17 catalog behavior and uncatalogued queries, completed frontend evidence in E-18. |
 | AC-024 | E-15 verified profile/numerical fixtures, E-16 historical continuity, E-17 charts and bounded states. |
 | AC-025 | E-18 connected investigation, links, selections, keyboard details and explicit trace scope. |
 | AC-026 | E-07 actual-R2/dependency/binary/resource evidence, E-08 durable transfer integration, resource checks repeated with trace and metric archive support. |
-| AC-027 | E-05 multilingual Logs page/catalog foundation; E-12 trace views; E-17 Overview; E-18 complete navigation, accessibility and error/status language coverage. Follow WEB-017 and Web's existing full/partial language scenarios. |
+| AC-027 | E-12 trace views; E-17 Overview; E-18 complete navigation, accessibility and error/status language coverage. Follow WEB-017 and reuse the Logs page full and partial language scenarios. |

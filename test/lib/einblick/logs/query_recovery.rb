@@ -60,8 +60,12 @@ module Einblick
       end
 
       def query_unavailable_storage(transport = 'http')
+        with_unavailable_log_storage { transport == 'grpc' ? query_grpc_logs : query_logs }
+      end
+
+      def with_unavailable_log_storage
         with_log_database { |connection| connection.query('ALTER TABLE logs RENAME TO unavailable_logs') }
-        transport == 'grpc' ? query_grpc_logs : query_logs
+        yield
       ensure
         with_log_database { |connection| connection.query('ALTER TABLE unavailable_logs RENAME TO logs') }
       end

@@ -8,6 +8,7 @@ import (
 	"github.com/alexfalkowski/einblick/internal/logs"
 	"github.com/alexfalkowski/einblick/internal/metrics"
 	"github.com/alexfalkowski/einblick/internal/migrate"
+	"github.com/alexfalkowski/einblick/internal/site"
 	"github.com/alexfalkowski/einblick/internal/traces"
 	"github.com/alexfalkowski/go-service/v3/module"
 	"github.com/alexfalkowski/go-signal/v2"
@@ -24,6 +25,7 @@ var Module = signal.Module(
 	health.Module,
 	logs.Module,
 	v1.Module,
+	site.Module,
 	metrics.Module,
 	traces.Module,
 )
