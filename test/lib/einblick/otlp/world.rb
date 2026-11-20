@@ -16,6 +16,7 @@ module Einblick
         @request = request
         @payload = request.class.encode(request)
         @receipt_offset = File.size('reports/server.log')
+        @export_started_ns = Process.clock_gettime(Process::CLOCK_REALTIME, :nanosecond)
       end
 
       # Returns the response or gRPC failure for scenario assertions.

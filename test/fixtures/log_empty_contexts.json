@@ -1,0 +1,12 @@
+{
+  "resourceLogs": [
+    {
+      "resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "empty-resource"}}]},
+      "schemaUrl": "https://opentelemetry.io/schemas/1.43.0"
+    },
+    {
+      "resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "empty-scope"}}]},
+      "scopeLogs": [{"scope": {"name": "empty.scope"}, "schemaUrl": "https://opentelemetry.io/schemas/1.43.0"}]
+    }
+  ]
+}

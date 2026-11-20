@@ -1,0 +1,18 @@
+{
+  "resourceLogs": [
+    {
+      "resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "first-resource"}}]},
+      "scopeLogs": [
+        {"scope": {"name": "first.scope"}, "logRecords": [{"timeUnixNano": "1", "body": {"stringValue": "first record"}}]},
+        {"scope": {"name": "second.scope"}, "logRecords": [{"timeUnixNano": "2", "body": {"stringValue": "second record"}}]}
+      ]
+    },
+    {
+      "resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "second-resource"}}]},
+      "scopeLogs": [
+        {"scope": {"name": "third.scope"}, "logRecords": [{"timeUnixNano": "3", "body": {"stringValue": "third record"}}]},
+        {"scope": {"name": "fourth.scope"}, "logRecords": [{"timeUnixNano": "1", "body": {"stringValue": "conflicting fourth record"}}]}
+      ]
+    }
+  ]
+}

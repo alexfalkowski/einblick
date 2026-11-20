@@ -8,3 +8,5 @@ require 'einblick'
 
 World(Einblick::OTLP::World)
 World(Einblick::Startup::World)
+World(Einblick::Logs::World)
+World(Einblick::Migrate::World)

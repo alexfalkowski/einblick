@@ -1,8 +1,8 @@
 package grpc
 
 import (
+	"github.com/alexfalkowski/einblick/internal/logs/storage"
 	"github.com/alexfalkowski/go-service/v3/net/grpc"
-	"github.com/alexfalkowski/go-service/v3/telemetry/logger"
 	v1 "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 )
 
@@ -11,15 +11,14 @@ func Register(registrar grpc.ServiceRegistrar, server *Server) {
 	v1.RegisterLogsServiceServer(registrar, server)
 }
 
-// NewServer constructs the print-only receiver with the service logger.
-func NewServer(logger *logger.Logger) *Server {
-	return &Server{logger: logger}
+// NewServer constructs the receiver over the service's composed log repository.
+func NewServer(repository storage.Repository) *Server {
+	return &Server{repository: repository}
 }
 
-// Server implements standard OTLP/gRPC log receipt for local development.
-// Successful exports are printed and discarded; they are never stored.
+// Server acknowledges standard OTLP/gRPC logs after successful local commit.
 type Server struct {
 	// UnimplementedLogsServiceServer preserves upstream forward compatibility.
 	v1.UnimplementedLogsServiceServer
-	logger *logger.Logger
+	repository storage.Repository
 }

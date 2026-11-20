@@ -20,7 +20,7 @@
               "observedTimeUnixNano": "1795086245123456799",
               "severityNumber": "SEVERITY_NUMBER_INFO",
               "severityText": "INFO",
-              "body": {"stringValue": "representative local log: \"quoted\", signal=metrics payload=ignored\nsecond line"},
+              "body": {"stringValue": "representative local log: \"quoted\", signal=metrics payload=ignored\nsecond line fixture-request"},
               "traceId": "AQIDBAUGBwgJCgsMDQ4PEA==",
               "spanId": "AQIDBAUGBwg=",
               "flags": 1,

@@ -1,0 +1,36 @@
+{
+  "resourceLogs": [{
+    "scopeLogs": [{
+      "scope": {"name": "empty.sibling.scope"},
+      "schemaUrl": "https://opentelemetry.io/schemas/1.43.0"
+    }, {
+      "logRecords": [
+        {"body": {}},
+        {"body": {"stringValue": "<script>alert(\"log\")</script>"}},
+        {"body": {"boolValue": true}},
+        {"body": {"intValue": "9223372036854775807"}},
+        {"body": {"intValue": "-9223372036854775808"}},
+        {"body": {"doubleValue": 1.25}},
+        {"body": {"doubleValue": "Infinity"}},
+        {"body": {"bytesValue": "AP8="}},
+        {"body": {"arrayValue": {"values": [{"boolValue": false}, {"intValue": "9007199254740993"}]}}},
+        {"body": {"kvlistValue": {"values": [{"key": "nested", "value": {"bytesValue": "AP8="}}]}}},
+        {"eventName": "synthetic.event", "droppedAttributesCount": 3}
+      ]
+    }, {
+      "scope": {
+        "name": "synthetic.scope",
+        "version": "test",
+        "attributes": [{"key": "synthetic", "value": {"boolValue": true}}],
+        "droppedAttributesCount": 2
+      },
+      "schemaUrl": "https://opentelemetry.io/schemas/1.43.0",
+      "logRecords": [{"body": {"stringValue": "second scope"}}]
+    }]
+  }, {
+    "resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "empty-resource-sibling"}}]}
+  }, {
+    "resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "empty-scope-sibling"}}]},
+    "scopeLogs": [{"scope": {"name": "empty.sibling.resource.scope"}}]
+  }]
+}

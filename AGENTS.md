@@ -12,8 +12,8 @@ Migrieren are gRPC references; Web is the MVC reference. Compare the local
 `~/code/go-service` checkout with the version pinned by this service before
 relying on a capability. Check the caller, package ownership, dependency
 direction, module/constructor/registration pattern, configuration projections,
-lifecycle, transport and dominant test harness. Record concrete reference paths
-and consumed revisions with the change.
+lifecycle, transport and dominant test harness. Keep concrete reference paths
+and consumed revisions in review evidence.
 
 Keep each step to its agreed feature behavior. Reuse go-service and existing
 service patterns before adding anything new. Additional custom limits,
@@ -30,7 +30,48 @@ an exported error contract; otherwise create it at the failure site.
 Extract small helpers for genuinely shared behavior. Do not add abstractions
 for hypothetical future requirements.
 
+In Go code, use go-service's `strings.IsEmpty` for empty-string checks and
+`strings.Empty` for empty-string values.
+
+Keep diagnostic logging in separate decorators in `logging.go`, following
+Abgleich's `internal/github/logging.go` and `internal/github/service.go`.
+Do not mix diagnostic logger calls into transport handlers, persistence methods
+or business rules. Compose logging around the operation interface in the owning
+constructor or module. Preserve the operation's context, inputs, results, errors
+and lifecycle; emit successful outcomes only after the operation succeeds.
+Apply this pattern when introducing or extracting diagnostics in future work.
+
+## SQL naming
+
+For application-owned schemas, use unquoted `lower_snake_case` identifiers and
+descriptive words rather than compressed names such as `tstamp`. Name SQL
+timestamp columns for their event, such as `created_at` or `applied_at`. Keep
+explicit units for integer time values, such as `received_timestamp_ns`.
+
+Name boolean columns as clear, positive predicates. Prefixes such as `is_` and
+`has_` are acceptable when they make the meaning clear, for example `is_archived`
+and `has_errors`; avoid negative names and double negatives. Follow the existing
+domain vocabulary rather than imposing or banning a prefix mechanically.
+
+The DuckDB migration-history adapter records application through row presence
+and `applied_at`. Derive Goose's required boolean query results from row
+presence rather than storing a redundant flag. Preserve its query parameter
+and result order and migration-state semantics in the adapter.
+
+Before the first release, refine the bootstrap schema and migration-history
+adapter directly. Do not add compatibility migrations, legacy-schema fallbacks
+or upgrade documentation for unreleased changes unless the owner requests them.
+Keep disposable test databases aligned with the current schema. After release,
+preserve applied migrations and use new numbered migrations for schema changes.
+
 ## Feature tests
+
+Write Cucumber scenarios from a user or operator perspective, describing one
+coherent behavior rather than a list of implementation tasks. Keep setup in
+Given, actions in When and assertions in Then, with And/But extending the
+current phase. Never return to setup or actions after assertions. Keep process,
+fixture and storage-inspection mechanics in World helpers behind meaningful
+behavior steps.
 
 Never call another Cucumber step from a step definition, including through
 `step` or `steps`. Reuse plain Ruby helper methods, fixture builders or existing
@@ -56,6 +97,14 @@ outside that feature's contract. Negative cases must exercise the feature's own
 supported entrypoint.
 
 ## Documentation
+
+Write project documentation for contributors and operators: actionable tasks
+and non-obvious behavior specific to Einblick. Configuration guidance covers
+this service's additions and pitfalls; do not restate shared go-service settings.
+Keep cross-repository comparisons, revision inventories
+and agent verification notes in review evidence. Link to dependency manifests,
+lockfiles and CI configuration for versions instead of repeating them in prose;
+include an exact version only when an instruction or compatibility rule needs it.
 
 Follow Abgleich's README and documentation layout under `~/code/abgleich`.
 Keep the README accessible: a short introduction, current capabilities,
