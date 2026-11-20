@@ -7,7 +7,8 @@
     <input id="service" class="input input-sm" name="service" form="log-filters" value="{{.Model.Filters.ServiceName}}"
            placeholder="{{.Localizer.Text "logs.all_services"}}">
   </aside>
-  <section class="workspace" aria-labelledby="logs-heading">
+  <section class="workspace" aria-labelledby="logs-heading"
+           hx-disable:inherited="#log-filters [type=submit], button[form=log-filters]">
     <header>
       <h1 id="logs-heading">{{.Localizer.Text "logs.heading"}}</h1>
       <p>{{.Localizer.Text "logs.scope"}}</p>

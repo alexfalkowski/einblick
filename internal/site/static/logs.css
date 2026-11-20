@@ -79,7 +79,7 @@ a.brand { display: block; width: fit-content; margin: 0 0 2rem; color: #fff; fon
   font-weight: 700;
   cursor: pointer;
 }
-.time-presets button[aria-pressed="false"]:hover, .actions .btn-outline:hover, #clear-message:hover {
+.time-presets button[aria-pressed="false"]:enabled:hover, .actions .btn-outline:hover, #clear-message:enabled:hover {
   background: var(--primary-tint);
 }
 .time-presets button[aria-pressed="true"] { border-color: var(--color-primary); background: var(--color-primary); color: var(--color-primary-content); }
@@ -114,8 +114,12 @@ label, #time-range-label { font-size: var(--text-small); font-weight: 700; }
 .actions .btn { font-size: var(--text-body); }
 .actions .btn-outline { border-color: var(--control-border); color: var(--color-base-content); }
 .pagination .btn { font-size: var(--text-small); }
+#log-filters button:disabled, .empty-state button:disabled, .pagination[inert] .btn {
+  opacity: .55;
+  cursor: default;
+}
 
-#query-progress { min-height: 1.75rem; margin: .5rem 0; color: var(--color-primary); font-size: .85rem; }
+#query-progress { min-height: 1.75rem; margin: .5rem 0; color: var(--color-primary); font-size: .85rem; text-align: end; }
 .htmx-indicator { display: none; }
 .htmx-request .htmx-indicator { display: inline; }
 .result-header { margin: 0 0 .55rem; color: var(--muted); font-size: var(--text-small); font-weight: 650; }
