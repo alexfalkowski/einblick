@@ -20,12 +20,23 @@ type Repository interface {
 	// count, or zero and an error on failure. Duplicate exports add new records.
 	// Empty exports are successful no-ops; failures never acknowledge stored data.
 	Add(ctx context.Context, req *collector.ExportLogsServiceRequest) (int, error)
+
+	// List returns a bounded latest-first page using event-time/ID keysets.
+	// New arrivals behind the cursor can enter later pages; refresh to see those ahead.
+	// Invalid input returns ErrInvalidQuery; cancellation/deadline errors remain inspectable.
+	List(ctx context.Context, query Query) (*Page, error)
 }
 
 // NewRepository composes log persistence and diagnostic logging over the service-owned database.
 // The migrate package initializes the schema before the listeners start.
 //
 //nolint:ireturn // The constructor provides the composed Repository interface.
-func NewRepository(db *sql.DB, pool *sync.BufferPool, log *logger.Logger) Repository {
-	return &loggingRepository{Repository: &repository{db: db, pool: pool}, logger: log}
+func NewRepository(cfg *Config, db *sql.DB, pool *sync.BufferPool, log *logger.Logger) Repository {
+	return &loggingRepository{
+		Repository: &repository{
+			config: cfg, db: db, pool: pool,
+			queries: sync.NewSemaphore(int64(cfg.Concurrency)),
+		},
+		logger: log,
+	}
 }

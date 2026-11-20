@@ -11,8 +11,9 @@ It receives logs, metrics and traces over gRPC. Logs commit to local DuckDB
 storage before acknowledgement; metrics and traces print through the service
 logger and are discarded.
 
-The service recovers its local log database before serving requests.
-Queries, trace/metric persistence and Parquet archives in Cloudflare R2 are planned.
+The service recovers its local log database before serving requests and provides
+bounded recent-log queries over gRPC and HTTP RPC. Browser pages, trace/metric persistence
+and Parquet archives in Cloudflare R2 are planned.
 See the [product requirements](docs/requirements.md) and
 [implementation plan](docs/review-and-plan.md) for the remaining work.
 
@@ -48,6 +49,12 @@ See [telemetry ingestion](docs/ingestion.md) for receipt behavior, responses and
 client example. Successful log exports acknowledge local commit. Successful
 metric and trace exports acknowledge receipt only.
 
+## 🔎 Log queries
+
+Read acknowledged logs with service, severity, string-body text and trace-ID
+filters through the [recent-log query API](docs/queries.md). Results preserve
+typed content and exact nanoseconds, with stable newest-first pagination.
+
 ## ⚙️ Configuration
 
 See [configuration](docs/configuration.md) for the development settings,
@@ -56,7 +63,7 @@ telemetry exporters, request limits and timeouts.
 ## 🛠️ Operations
 
 See [operations](docs/operations.md) for health endpoints, persistent storage,
-deployment and log recovery. Query capabilities remain planned.
+deployment and log recovery.
 
 ## 🧪 Development
 

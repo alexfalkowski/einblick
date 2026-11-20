@@ -17,8 +17,10 @@ import (
 // repository writes one atomic transaction per nonempty OTLP export. It owns no
 // background queue, extra connection pool, retries or independent lifecycle.
 type repository struct {
-	db   *sql.DB
-	pool *sync.BufferPool
+	config  *Config
+	db      *sql.DB
+	pool    *sync.BufferPool
+	queries *sync.Semaphore
 }
 
 // Add commits all records and their resource/scope context before returning
@@ -28,6 +30,7 @@ type repository struct {
 // work, and the shared transport owns admission size/rate/deadline limits.
 func (r *repository) Add(ctx context.Context, req *collector.ExportLogsServiceRequest) (int, error) {
 	received := time.Now().UnixNano()
+
 	count := 0
 	for _, resource := range req.GetResourceLogs() {
 		count += recordCount(resource)

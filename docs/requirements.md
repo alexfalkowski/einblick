@@ -1,6 +1,6 @@
 # Telemetry service: first-version requirements
 
-**Status:** Implementation specification; local log persistence and recovery are implemented. Metrics/traces remain print-only; queries and archives are planned.
+**Status:** Implementation specification; local log persistence, recovery and [recent-log queries](queries.md) are implemented. Metrics/traces remain print-only; browser pages, trace/metric queries, historical queries and archives are planned.
 
 **Revision:** 0.24
 
@@ -236,8 +236,8 @@ The exact SQL schema and typed-attribute representation are implementation desig
 
 ### 8.3 Query behavior
 
-- **QRY-001 — Time and service selection.** Support an explicit time range and service selection. Proposed range semantics are start-inclusive and end-exclusive; confirm them in the query contract.
-- **QRY-002 — Logs.** Support service, severity, text, and trace-ID filtering, a latest-first result order, and bounded stable pagination.
+- **QRY-001 — Time and service selection.** Support an explicit time range and service selection through a versioned protobuf API exposed over gRPC and HTTP RPC. Recent-log ranges use start-inclusive and end-exclusive protobuf Timestamps, represented as RFC 3339 with nanosecond precision in protobuf JSON; see the [query contract](queries.md). Preserve these bounds in later browser and historical workflows. MVC controllers reuse the unversioned query operation directly.
+- **QRY-002 — Logs.** Support service, severity, text, and trace-ID filtering, a latest-first result order, and bounded stable pagination using event-time/ID keysets. New committed records behind the cursor may enter later pages; records ahead require a fresh query. Existing records must not repeat across pages. Pagination does not freeze membership or coordinate with ingestion.
 - **QRY-003 — Traces.** Support trace-ID lookup and basic service, duration, and error selection. Assemble spans across services and the day partitions covered by the lookup's search range.
 - **QRY-004 — Trace completeness.** Make bounded trace-search scope visible. Do not imply a trace is complete when its parent or other spans may fall outside the selected range, retention, or available data.
 - **QRY-005 — Metrics.** Support basic gauge charts, counter rates, and histogram-based distributions/percentiles for the supported metric types. Separate instances and stream identities before applying the appropriate aggregation.
@@ -297,6 +297,7 @@ Initial archive compaction and a remote manifest service are unnecessary for an 
 - **WEB-014 — Chart behavior.** Show units and aggregation scope, use a shared time axis, support hover values and selecting a narrower time range, and provide a route into matching logs/traces. Bound/downsample chart results on the server; never send all raw metric points merely to draw a small chart.
 - **WEB-015 — Log and trace details.** Show bounded, latest-first log results with expandable structured attributes and trace links. Show trace search results with duration/status and an inspectable span waterfall, selected-span attributes/events, and related-log navigation. Trace details must remain usable without loading an unbounded number of spans.
 - **WEB-016 — Interpretable states.** Distinguish no samples, zero values, query errors, incomplete coverage, and stale signals. Preserve visible selection context across navigation. Use responsive layouts, labelled controls, readable contrast, and keyboard-operable navigation; charts must have textual labels and current-value context.
+- **WEB-017 — Multilingual pages.** Follow Web's go-service i18n/MVC pattern: embed English, German and Spanish translation catalogs, negotiate the browser's preferred language, and use English as the fallback. Localize page titles, navigation, controls, chart labels, accessibility text and loading/empty/error/status messages in full pages and partial views. Keep telemetry content, service identities and technical identifiers in their original form. Verify supported languages, fallback and response language/cache metadata through the existing feature harness as each page is introduced.
 
 ### 8.7 Service catalog and standard UX
 
@@ -447,8 +448,8 @@ This is a logical configuration inventory, not a finalized YAML schema or comman
 | R2 lifecycle configuration | If object-age expiration is selected, reuse infraops `expiration`, for example `168h` normally or `24h` for testing; `7d` is not valid Go duration syntax. | Installation policy/activation open |
 | DuckDB memory / threads | Required explicit settings; development uses `64MiB` and one worker. Production values require measured Go/native headroom. | Interface implemented; production tuning open |
 | Historical-query concurrency | One initially. | Proposed |
-| Query timeout | 30 seconds, configurable. | Proposed |
-| Result and search-range limits | Bounded; concrete initial limits chosen with the initial query workflows. | Open tuning |
+| Query timeout | Required and configurable; development uses 30 seconds, subject to the HTTP deadline. | Recent-log interface implemented; production tuning open |
+| Result and search-range limits | Required; development uses 100 records per page and a 24-hour maximum range. | Recent-log interface implemented; production tuning open |
 | Pending-ingestion disk budget | Sized for a chosen R2 outage window plus recovery/export workspace. | Open tuning |
 | Service catalog | Service ID plus transports list; optional display label/resource narrowing. | `transports` name agreed; optional selectors proposed |
 | Chart profile | Built-in go-service panel/query profile; no user-authored dashboards. | Agreed direction |
@@ -484,7 +485,7 @@ These are service-boundary scenarios for future implementation, not claims that 
 | AC-001 | A standard go-service client sends logs, metrics, and traces over gRPC, including gzip; supported records are queryable after successful acknowledgement. | ING-001, ING-002, ING-006, DAT-005 |
 | AC-002 | Invalid, unsupported, empty, and capacity-rejected exports produce the documented OTLP responses; rejected records are not silently counted as stored. | ING-003, ING-004, ING-005, DAT-006 |
 | AC-003 | A sample containing typed attributes, large integer values, span events/links, supported histogram fields, correlation IDs, and sub-microsecond timestamps retains its documented content after archival and query. | DAT-001, DAT-002, DAT-003, DAT-007, DAT-008 |
-| AC-004 | Matching logs are returned latest first with stable bounded pagination; result counts and ordering remain correct as new records arrive. | QRY-001, QRY-002, QRY-009 |
+| AC-004 | Matching logs are returned latest first with bounded keyset pagination and no repeated records. Arrivals behind the cursor can enter later pages; a fresh query reveals arrivals ahead. Page counts and ordering follow that policy as records arrive. | QRY-001, QRY-002, QRY-009 |
 | AC-005 | A trace crossing services and midnight is assembled within the documented search scope; missing/out-of-range spans are not presented as guaranteed completeness. | QRY-003, QRY-004, STO-007 |
 | AC-006 | Gauge charts, cumulative/delta sums, reset counters, gaps, and compatible/incompatible histogram examples produce the documented results or explicit unsupported-query outcome. | QRY-005, QRY-006 |
 | AC-007 | A query running during export, upload completion, and local batch eviction returns the expected records once, without local/archive gaps or double counting. | QRY-008, STO-006 |
@@ -507,6 +508,7 @@ These are service-boundary scenarios for future implementation, not claims that 
 | AC-024 | Real representative go-service metric fixtures populate the standard charts with correct units, histogram percentiles, rates, and non-success labels. Missing/zero/stale/partial data remain distinct. Chart data is bounded for long ranges. | QRY-013, WEB-014, WEB-016 |
 | AC-025 | Select a chart time window and instance/protocol, open logs, follow a trace ID, inspect a span, and return to related logs. Selections and trace lookup scope remain clear; shared links reproduce the selection. Sampled traces are labelled accordingly. | QRY-014, WEB-003, WEB-015, WEB-016 |
 | AC-026 | Source/dependency review and linked-binary measurements confirm the selected storage runtime path excludes the AWS Go SDKs. Actual R2 upload/download/list/HEAD/delete, multipart failures, cancellation, ambiguous completion, and checksum reconciliation meet the bounded-memory/recovery contract. | STO-013, STO-014, STO-015 |
+| AC-027 | Full pages, partial views and visible error/status states render in English, German and Spanish from browser language preferences, including regional/weighted preferences and English fallback for unsupported or invalid preferences. Language/cache metadata matches the rendered language; telemetry and service identities remain unchanged. | WEB-001, WEB-017 |
 
 The acceptance matrix should be updated when a requirement changes. Tests should assert user-visible data, errors, recovery, ordering, and resource behavior rather than internal method sequences.
 
@@ -574,6 +576,7 @@ The durable first version is ready for its measured one-application pilot when:
 - Locally committed records and pending exports recover on an intact persistent volume.
 - R2 archival and local/archive query ownership preserve data across interruption.
 - Ready-made service charts, logs, and trace views work through the embedded frontend without Grafana or dashboard authoring.
+- Full and partial pages support the English/German/Spanish language and fallback contract in WEB-017.
 - Site authentication remains deferred; internal ingestion has its documented transport/authentication boundary.
 - The selected lean S3 client has actual R2 operation and resource evidence, with no AWS Go SDK in its runtime path.
 - Resource and query work are bounded and operational state is visible.

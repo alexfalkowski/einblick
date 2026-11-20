@@ -1,4 +1,9 @@
 environment: development
+queries:
+  max_results: 100
+  max_range: 24h
+  timeout: 30s
+  concurrency: 1
 duckdb:
   path: ""
   memory_limit: 64MiB

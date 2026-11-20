@@ -3,13 +3,15 @@ module github.com/alexfalkowski/einblick
 go 1.27.0
 
 require (
-	github.com/alexfalkowski/go-health/v2 v2.43.0
-	github.com/alexfalkowski/go-service/v3 v3.3.0
-	github.com/alexfalkowski/go-signal/v2 v2.0.0
-	github.com/alexfalkowski/go-sync v1.39.0
+	github.com/alexfalkowski/go-health/v2 v2.44.0
+	github.com/alexfalkowski/go-service/v3 v3.4.0
+	github.com/alexfalkowski/go-signal/v2 v2.1.0
+	github.com/alexfalkowski/go-sync v1.40.0
 	github.com/duckdb/duckdb-go/v2 v2.20000.0
 	github.com/pressly/goose/v3 v3.30.1
 	go.opentelemetry.io/proto/otlp v1.11.1
+	google.golang.org/grpc v1.85.0
+	google.golang.org/protobuf v1.36.12
 )
 
 require (
@@ -153,6 +155,4 @@ require (
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20261110000943-09e21b237f2c // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20261110000943-09e21b237f2c // indirect
-	google.golang.org/grpc v1.85.0 // indirect
-	google.golang.org/protobuf v1.36.12 // indirect
 )

@@ -59,6 +59,31 @@ conflict: the initial migration fails after creating resource/scope tables and
 their sequence, so the scenarios can verify transactional rollback, unchanged version-0 history
 and successful startup/ingestion after repairing only that conflict.
 
+`log_queries.json` supplies synthetic service/time boundaries, timestamp ties,
+severities, correlation, typed values and literal search text for HTTP queries.
+It also includes an unlabelled resource and a record with absent resource
+context; all-service queries must return both with their original headers.
+`log_query_arrivals.json` adds newer, equal-time and late arrivals after the first
+page. `log_query_times.json` supplies original records for runtime unsigned/receipt
+time cases. Each scenario substitutes a unique service identity. All-service
+queries shift fixture event times into an isolated window, so labelled and
+unlabelled records can be asserted without selecting records left by other scenarios.
+Unsigned timestamp queries read one record per page to exercise high-bit cursor
+encoding/decoding as well as record precision and token exhaustion.
+Large-filter queries reuse these headers with two separately exported 500 KiB
+string bodies and single-record gRPC pages under the existing receive limit.
+`query_work.sql` temporarily replaces the disposable logs table with a view
+that generates native scan work. Query cancellation tests use the named
+`query_timeout.yaml` and `query_work.yaml` profiles through the existing
+Nonnative process. Caller cancellation uses `query_cancellation.yaml`, whose
+server and client budgets exceed the existing RSpec wait budget. It waits for native work,
+cancels and verifies SQL release before reading continuation pages; client setup
+and pagination latency are outside that release wait. Both native-work profiles
+delay periodic health checks so SQL connection metrics measure query work alone.
+The tagged scenario cleanup conditionally restores the real table, including
+when setup or its restart fails.
+The view is never part of the application schema and does not measure capacity.
+
 ## 📊 Metrics
 
 The pinned `telemetry/metrics/provider.go` registers runtime and host

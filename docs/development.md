@@ -27,6 +27,7 @@ Choose the feature group you are changing:
 
 ```sh
 make features tags=@storage
+make features tags=@queries
 make features tags=@printing
 make features feature=features/migrate
 make features feature=features/health
@@ -38,7 +39,7 @@ synthetic OTLP payloads. Storage scenarios stop the server before inspecting its
 database. Some scenarios reset that database, so use only the disposable test
 configuration. Logs and reports go to `test/reports/`.
 
-Use `make lint` for Go and Ruby checks and `make help` for other commands.
+Use `make lint` for Go, Ruby and protobuf checks and `make help` for other commands.
 After documentation edits, run:
 
 ```sh
@@ -54,9 +55,39 @@ transactional `Add` operation live in `repository.go`; the diagnostic decorator
 lives in `logging.go`. SQL files live in `queries/` and are embedded as strings
 declared in `queries.go`.
 
+`Repository.List` supplies the versioned query operation in `internal/api/v1/logs`.
+Both API transports use that typed adapter. Future MVC controllers can call the
+unversioned `Repository.List` operation directly, without protobuf or a network call.
+Query validation, queueing and SQL execution share one
+deadline. One go-sync semaphore bounds concurrent queries and allows waiting requests
+to cancel; intake does not acquire it. Continuation pages use strict
+event-time/ID keysets within fixed absolute bounds. New arrivals behind the
+cursor can enter later pages; refresh to see arrivals ahead of it.
+
 Keep timestamps as unsigned nanoseconds. Writes bind decimal strings to
 `UBIGINT` to preserve the full unsigned range; conversions through floating-point
 values or lower-precision timestamp types can lose data.
+
+## 🔌 Query API
+
+The [protobuf contract](../api/einblick/v1/service.proto) defines the generated
+gRPC and HTTP RPC request/response messages. `internal/api/v1` composes the
+query operation and its `NewServer`/`Register` transport adapters. HTTP uses
+`POST /einblick.v1.Service/ListLogs`; select `application/pbjson` for canonical
+protobuf JSON with RFC 3339 Timestamp values. See [query usage](queries.md).
+
+After changing the contract, regenerate Go and Ruby clients with:
+
+```sh
+make proto-format
+make proto-generate
+make proto-lint
+```
+
+Buf downloads the dependencies pinned in [api/buf.lock](../api/buf.lock) and
+uses the remote plugins in [api/buf.gen.yaml](../api/buf.gen.yaml). Update the
+OTLP schema dependency together with the Go and Ruby OTLP messages. Generated
+files are checked in; edit the proto source and regenerate them.
 
 ## 🪿 Schema migrations
 
