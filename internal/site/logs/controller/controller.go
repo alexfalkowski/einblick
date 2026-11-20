@@ -24,7 +24,7 @@ func NewLogs(repo storage.Repository, maxRange time.Duration, view, errorView *m
 			res.Header().Set("Einblick-View", "logs-results")
 		}
 
-		query, err := parseQuery(req, maxRange)
+		query, recent, err := parseQuery(req, maxRange)
 		if err != nil {
 			return errorView, nil, queryError(req, err)
 		}
@@ -34,7 +34,7 @@ func NewLogs(repo storage.Repository, maxRange time.Duration, view, errorView *m
 			return errorView, nil, queryError(req, err)
 		}
 
-		viewModel, err := newLogsModel(ctx, query, result, maxRange)
+		viewModel, err := newLogsModel(ctx, query, result, recent, maxRange)
 		if err != nil {
 			return errorView, nil, queryError(req, err)
 		}

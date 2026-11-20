@@ -70,6 +70,8 @@ if (failure) {
   const failureMessage = document.querySelector("#query-failure-message");
   const retryButton = document.querySelector("#retry-query");
   const filters = document.querySelector("#log-filters");
+  const searchButtons = filters.querySelectorAll("[data-search-submit]");
+  const searchWindow = filters.querySelector("#search-window");
   const messageInput = document.querySelector("#text");
   const clearMessage = document.querySelector("#clear-message");
   const updateClearMessage = () => { clearMessage.hidden = !messageInput.value; };
@@ -90,7 +92,7 @@ if (failure) {
 
   const locationQuery = new URLSearchParams(location.search);
   const queryURL = document.querySelector("#results").dataset.queryUrl;
-  if (queryURL && ["window", "start_utc", "end_utc", "clear_message"].some((name) => locationQuery.has(name))) {
+  if (queryURL && ["window", "search_window", "start_utc", "end_utc", "clear_message"].some((name) => locationQuery.has(name))) {
     history.replaceState(history.state, "", queryURL);
   }
 
@@ -151,10 +153,12 @@ if (failure) {
 
   document.addEventListener("htmx:after:swap", () => {
     closeLogDetails = setupLogDetails();
-    const { startTime, endTime, window } = document.querySelector("#results").dataset;
+    const { startTime, endTime, window, recentWindow } = document.querySelector("#results").dataset;
     if (startTime && endTime) {
       document.querySelector("#start-time").value = startTime;
       document.querySelector("#end-time").value = endTime;
+      searchWindow.value = recentWindow;
+      searchButtons.forEach((button) => { button.value = recentWindow; });
       currentRange.hidden = Boolean(window);
       timePresets.forEach((preset) => preset.setAttribute("aria-pressed", preset.value === window));
     }

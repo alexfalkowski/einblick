@@ -26,10 +26,12 @@ var severityOptions = []model.FilterOption{
 	{Value: "FATAL", Label: "logs.level.fatal"},
 }
 
-func newLogsModel(ctx context.Context, query storage.Query, results *storage.Page, maxRange time.Duration) (*model.Logs, error) {
+func newLogsModel(
+	ctx context.Context, query storage.Query, results *storage.Page, recent string, maxRange time.Duration,
+) (*model.Logs, error) {
 	windows, selectedWindow := windowOptions(maxRange, time.Duration(query.EndTime.Sub(query.StartTime)))
 	viewModel := &model.Logs{
-		QueryURL: logsURL(query),
+		QueryURL: logsURL(query, strings.Empty),
 		Filters: model.Filters{
 			StartTime:       query.StartTime.UTC(),
 			EndTime:         query.EndTime.UTC(),
@@ -40,6 +42,7 @@ func newLogsModel(ctx context.Context, query storage.Query, results *storage.Pag
 			SeverityOptions: severityOptions,
 			Windows:         windows,
 			SelectedWindow:  selectedWindow,
+			RecentWindow:    recent,
 			PageSize:        query.PageSize,
 		},
 		Rows: make([]model.LogRow, 0, len(results.Logs)),
@@ -58,7 +61,7 @@ func newLogsModel(ctx context.Context, query storage.Query, results *storage.Pag
 		if storage.ValidTraceID(row.TraceID) {
 			related := query
 			related.TraceID, related.PageToken = row.TraceID, strings.Empty
-			row.RelatedLogsURL = logsURL(related)
+			row.RelatedLogsURL = logsURL(related, strings.Empty)
 		}
 
 		viewModel.Rows = append(viewModel.Rows, row)
@@ -66,7 +69,7 @@ func newLogsModel(ctx context.Context, query storage.Query, results *storage.Pag
 
 	if !strings.IsEmpty(results.NextPageToken) {
 		query.PageToken = results.NextPageToken
-		viewModel.NextURL = logsURL(query)
+		viewModel.NextURL = logsURL(query, recent)
 	}
 	return viewModel, nil
 }

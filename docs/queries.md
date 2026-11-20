@@ -16,14 +16,17 @@ are Debug, Info, Warn, Error, and Fatal. Each matches its exact level. **All sev
 includes any other levels in the stored data. An empty service filter includes
 logs from all services, including records without a service name.
 
-Choose **Search** or press Enter to apply filter edits to the current time
-window. During an in-place query, **Loading logs…** appears below the filters.
+Choose **Search** or press Enter to apply filter edits. The default recent
+window and any preset you choose advance to now with each search. Search from
+an absolute-range bookmark to keep its exact bounds. During an in-place query,
+**Loading logs…** appears below the filters.
 The page temporarily disables Search, time presets, Clear search and Next page.
 You can edit the filters and submit them when the query finishes.
 
 Matching text is highlighted in the message preview. Clear the message search
 with **×** or **Clear search** in the empty state to rerun with the same time
-window and other filters.
+window and other filters. Clearing the message search or choosing **Next page**
+keeps the current bounds for that action and the preset for your next **Search**.
 
 Select a row or focus its message and press Enter to open **Log details**.
 The inspector slides over the results from the right and fills the screen on
