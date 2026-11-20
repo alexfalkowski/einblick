@@ -31,7 +31,7 @@ module Einblick
         form = document.at_css('#log-filters')
         filters = log_form_filters(document, form)
         button = log_form_button(document, form, submitter) if submitter
-        filters[button['name']] = button['value'] if button
+        filters[button['name']] = button['value'] if button&.[]('name')
         return submit_get_form(form, button, filters, languages) if layout == 'full'
 
         submit(form['hx-put'], filters, languages)
@@ -45,7 +45,7 @@ module Einblick
       private
 
       def log_form_button(document, form, label)
-        buttons = form.css('button[type=submit][name]:not([disabled]):not([form])') +
+        buttons = form.css('button[type=submit]:not([disabled]):not([form])') +
                   document.css("button[type=submit][name][form='#{form['id']}']:not([disabled])")
         buttons.find { |button| button.text == label } || raise("no enabled Logs submit button labelled #{label.inspect}")
       end
@@ -60,7 +60,8 @@ module Einblick
       end
 
       def log_form_filters(document, form)
-        inputs = document.css('#log-filters input[name]:not([disabled]), input[form=log-filters][name]:not([disabled])')
+        inputs = form.css('input[name]:not([type=submit]):not([disabled]):not([form])') +
+                 document.css("input[name][form='#{form['id']}']:not([type=submit]):not([disabled])")
         filters = inputs.to_h { |input| [input['name'], input['value'].to_s] }
         form.css('select[name]:not([disabled])').each_with_object(filters) do |select, values|
           option = select.at_css('option[selected]') || select.at_css('option')

@@ -14,9 +14,9 @@ import (
 // Query bounds retain nanoseconds in the form and pagination URLs.
 const queryTimeLayout = "2006-01-02T15:04:05.999999999Z07:00"
 
-func parseQuery(req *http.Request, maxRange time.Duration) (storage.Query, error) {
+func parseQuery(req *http.Request, maxRange time.Duration) (storage.Query, string, error) {
 	if err := req.ParseForm(); err != nil {
-		return storage.Query{}, errors.Join(storage.ErrInvalidQuery, err)
+		return storage.Query{}, strings.Empty, errors.Join(storage.ErrInvalidQuery, err)
 	}
 
 	form := req.Form
@@ -30,30 +30,31 @@ func parseQuery(req *http.Request, maxRange time.Duration) (storage.Query, error
 	if size := form.Get("page_size"); !strings.IsEmpty(size) {
 		var err error
 		if query.PageSize, err = strconv.Atoi(size); err != nil {
-			return storage.Query{}, errors.Join(storage.ErrInvalidQuery, err)
+			return storage.Query{}, strings.Empty, errors.Join(storage.ErrInvalidQuery, err)
 		}
 	}
 
 	window, err := resolveWindow(form, maxRange)
 	if err != nil {
-		return storage.Query{}, errors.Join(storage.ErrInvalidQuery, err)
+		return storage.Query{}, strings.Empty, errors.Join(storage.ErrInvalidQuery, err)
 	}
 	query.StartTime, query.EndTime = window.start, window.end
 
-	return query, nil
+	return query, window.recent, nil
 }
 
-func logsURL(query storage.Query) string {
+func logsURL(query storage.Query, searchWindow string) string {
 	values := url.Values{
 		"start_time": {query.StartTime.Format(queryTimeLayout)},
 		"end_time":   {query.EndTime.Format(queryTimeLayout)},
 	}
 	optionalValues := map[string]string{
-		"service":    query.Service,
-		"severity":   query.Severity,
-		"text":       query.Text,
-		"trace_id":   query.TraceID,
-		"page_token": query.PageToken,
+		"service":       query.Service,
+		"severity":      query.Severity,
+		"text":          query.Text,
+		"trace_id":      query.TraceID,
+		"page_token":    query.PageToken,
+		"search_window": searchWindow,
 	}
 
 	for name, value := range optionalValues {

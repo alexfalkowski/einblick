@@ -17,8 +17,9 @@
           hx-indicator="#query-progress" hx-sync="#main:drop">
       <input id="start-time" type="hidden" name="start_time" value="{{.Model.Filters.StartTime.Format $exactTime}}">
       <input id="end-time" type="hidden" name="end_time" value="{{.Model.Filters.EndTime.Format $exactTime}}">
-      <!-- Enter applies filters to the current range. -->
-      <input type="submit" hidden>
+      <input id="search-window" type="hidden" name="search_window" value="{{.Model.Filters.RecentWindow}}">
+      <!-- Enter uses the first submit control, so give it the same value as Search. -->
+      <input type="submit" name="window" value="{{.Model.Filters.RecentWindow}}" data-search-submit hidden>
       <div class="filters">
         <span id="time-range-label">{{.Localizer.Text "logs.time_range"}}</span>
         <div class="time-presets" role="group" aria-labelledby="time-range-label">
@@ -46,7 +47,8 @@
         {{if .Model.Filters.PageSize}}<input type="hidden" name="page_size" value="{{.Model.Filters.PageSize}}">{{end}}
         <div class="actions">
           <a class="btn btn-outline btn-sm" href="/logs">{{.Localizer.Text "logs.reset"}}</a>
-          <button type="submit" class="btn btn-primary btn-sm">{{.Localizer.Text "logs.query"}}</button>
+          <button type="submit" name="window" value="{{.Model.Filters.RecentWindow}}" data-search-submit
+                  class="btn btn-primary btn-sm">{{.Localizer.Text "logs.query"}}</button>
         </div>
       </div>
     </form>
@@ -74,7 +76,8 @@
          data-query-url="{{.Model.QueryURL}}"
          data-start-time="{{.Model.Filters.StartTime.Format $exactTime}}"
          data-end-time="{{.Model.Filters.EndTime.Format $exactTime}}"
-         data-window="{{.Model.Filters.SelectedWindow}}">
+         data-window="{{.Model.Filters.SelectedWindow}}"
+         data-recent-window="{{.Model.Filters.RecentWindow}}">
   {{if .Model.Rows}}
   <p class="result-header">{{.Localizer.Text "logs.order"}}</p>
   <div class="table-card" tabindex="0" role="region" aria-label="{{.Localizer.Text "logs.results"}}">

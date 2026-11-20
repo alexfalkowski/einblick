@@ -44,6 +44,7 @@ module Einblick
         @preset_started = Time.now.utc
         @response = site_client.submit_log_form(page, 'en', submitter: preset, layout: layout)
         @preset_finished = Time.now.utc
+        @response
       end
 
       def choose_configured_time_range(preset, minutes)
@@ -54,7 +55,7 @@ module Einblick
       end
 
       def submit_displayed_search
-        @response = site_client.submit_log_form(investigate_logs('full', 'en'), 'en')
+        @response = site_client.submit_log_form(investigate_logs('full', 'en'), 'en', submitter: 'Search')
       end
 
       def clear_message_search(layout)

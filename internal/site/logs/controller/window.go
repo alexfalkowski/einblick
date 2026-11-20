@@ -26,8 +26,9 @@ type timePreset struct {
 }
 
 type timeWindow struct {
-	start time.Time
-	end   time.Time
+	start  time.Time
+	end    time.Time
+	recent string
 }
 
 var presets = []timePreset{
@@ -41,17 +42,21 @@ var presets = []timePreset{
 func resolveWindow(form url.Values, maxRange time.Duration) (timeWindow, error) {
 	hasCursor := !strings.IsEmpty(form.Get("page_token"))
 	if preset := form.Get("window"); !strings.IsEmpty(preset) {
-		if hasCursor {
+		duration := presetDuration(preset, maxRange)
+		if hasCursor || duration == 0 {
 			return timeWindow{}, storage.ErrInvalidQuery
 		}
-		return resolvePreset(preset, maxRange)
+		return recentWindow(preset, duration), nil
 	}
 
 	hasBounds := form.Has("start_time") || form.Has("end_time") || form.Has("start_utc") || form.Has("end_utc")
 	if !hasBounds && !hasCursor {
-		return recentWindow(maxRange), nil
+		return recentWindow(recentRange, maxRange), nil
 	}
+	return absoluteWindow(form, maxRange, hasCursor)
+}
 
+func absoluteWindow(form url.Values, maxRange time.Duration, hasCursor bool) (timeWindow, error) {
 	start, err := parseBound(form, "start_time", "start_utc")
 	if err != nil {
 		return timeWindow{}, errors.Join(errInvalidDates, err)
@@ -62,7 +67,14 @@ func resolveWindow(form url.Values, maxRange time.Duration) (timeWindow, error) 
 		return timeWindow{}, errors.Join(errInvalidDates, err)
 	}
 
-	return timeWindow{start: start, end: end}, nil
+	// Clearing a filter or following a cursor keeps these bounds and carries the preset for the next search.
+	window := timeWindow{start: start, end: end}
+	if hasCursor || form.Get("clear_message") == "1" {
+		if preset := form.Get("search_window"); presetDuration(preset, maxRange) != 0 {
+			window.recent = preset
+		}
+	}
+	return window, nil
 }
 
 func windowOptions(maxRange, appliedRange time.Duration) ([]model.FilterOption, string) {
@@ -86,27 +98,27 @@ func windowOptions(maxRange, appliedRange time.Duration) ([]model.FilterOption, 
 	return options, selected
 }
 
-func resolvePreset(value string, maxRange time.Duration) (timeWindow, error) {
-	if value == recentRange && maxRange < quarterHour {
-		return recentWindow(maxRange), nil
+func presetDuration(value string, maxRange time.Duration) time.Duration {
+	if value == recentRange {
+		return maxRange
 	}
 
 	for _, preset := range presets {
 		if preset.option.Value == value && preset.duration <= maxRange {
-			return recentWindow(preset.duration), nil
+			return preset.duration
 		}
 	}
-	return timeWindow{}, storage.ErrInvalidQuery
+	return 0
 }
 
-func recentWindow(duration time.Duration) timeWindow {
+func recentWindow(value string, duration time.Duration) timeWindow {
 	end := time.Now().UTC()
 	start := end.Add(-duration.Duration())
 	// The configured range can reach before the unsigned storage epoch.
 	if epoch := time.Unix(0).UTC(); start.Before(epoch) {
 		start = epoch
 	}
-	return timeWindow{start: start, end: end}
+	return timeWindow{start: start, end: end, recent: value}
 }
 
 func parseBound(form url.Values, exactKey, pickerKey string) (time.Time, error) {

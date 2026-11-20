@@ -34,6 +34,23 @@ Feature: Investigate recent logs in the browser
     Then I should see the selected service's log messages and exact event times
     And the query link should retain the original fractional seconds
 
+  Scenario Outline: Search again after new logs arrive
+    Given acknowledged searchable logs
+    When I repeat a search for the "<range>" range after a new log arrives in the "<layout>" view
+    Then the new log should appear in a refreshed "<preset>" window of <hours> hours
+
+    Examples:
+      | range   | layout  | preset | hours |
+      | default | partial | 7 days | 168   |
+      | 1 hour  | partial | 1 hour | 1     |
+      | 1 hour  | full    | 1 hour | 1     |
+
+  Scenario: Clear a filter and refresh recent logs without htmx
+    Given acknowledged searchable logs
+    When I clear the message filter before rerunning a one-hour search after a new log arrives
+    Then clearing the filter should keep the exact time bounds
+    And the next search should show the new log in a refreshed one-hour window
+
   Scenario: Open a saved search with a custom time range
     Given acknowledged searchable logs
     When I open a saved search from "2026-11-19T11:04:00Z" to "2026-11-19T11:04:04Z"
@@ -117,7 +134,9 @@ Feature: Investigate recent logs in the browser
   Scenario: Search and page through filtered logs when htmx is unavailable
     Given acknowledged recent logs with matching requests and other messages, severities and traces
     When I choose the last hour and follow Next page without htmx
+    And I rerun the paged search after a matching log arrives
     Then the full pages should show "same-time first" followed by "first" in the same filtered search
+    And the next search should show the new matching log in a refreshed one-hour window
 
   Scenario: Find related logs from a later page
     Given acknowledged logs with related requests of different severities and messages

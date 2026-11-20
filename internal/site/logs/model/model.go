@@ -40,6 +40,9 @@ type Filters struct {
 	// SelectedWindow is the preset matching the applied duration, or empty for another duration.
 	SelectedWindow string
 
+	// RecentWindow is the preset for the next search. An empty value keeps the absolute bounds.
+	RecentWindow string
+
 	// SeverityOptions lists the available levels in ascending severity order.
 	SeverityOptions []FilterOption
 

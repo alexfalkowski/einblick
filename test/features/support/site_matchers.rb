@@ -443,6 +443,15 @@ RSpec::Matchers.define :preserve_recent_window do |preset, seconds, expected_end
   end
 end
 
+RSpec::Matchers.define :keep_log_time_bounds do |before, layout|
+  match(notify_expectation_failures: true) do |response|
+    expect(response.code).to eq(200)
+    original_bounds = URI.decode_www_form(LogView.query_url(before, layout).query).to_h.slice('start_time', 'end_time')
+    actual_bounds = URI.decode_www_form(LogView.query_url(response, layout).query).to_h.slice('start_time', 'end_time')
+    expect(actual_bounds).to eq(original_bounds)
+  end
+end
+
 RSpec::Matchers.define :show_saved_time_range do |bounds|
   match(notify_expectation_failures: true) do |response|
     expect(response.code).to eq(200)
