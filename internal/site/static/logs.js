@@ -69,15 +69,22 @@ if (failure) {
   const currentRange = document.querySelector("#current-range");
   const failureMessage = document.querySelector("#query-failure-message");
   const retryButton = document.querySelector("#retry-query");
+  const filters = document.querySelector("#log-filters");
   const messageInput = document.querySelector("#text");
   const clearMessage = document.querySelector("#clear-message");
   const updateClearMessage = () => { clearMessage.hidden = !messageInput.value; };
   messageInput.addEventListener("input", updateClearMessage);
-  document.querySelector("#log-filters").addEventListener("submit", (event) => {
+  filters.addEventListener("submit", (event) => {
     if (event.submitter?.name === "clear_message") {
       messageInput.value = "";
       messageInput.focus();
       updateClearMessage();
+    }
+  });
+  filters.addEventListener("htmx:config:request", (event) => {
+    // htmx disables the submit buttons before htmx:before:request.
+    if (event.detail.ctx.sourceEvent.submitter === document.activeElement) {
+      messageInput.focus();
     }
   });
 
@@ -108,6 +115,17 @@ if (failure) {
   document.addEventListener("htmx:before:request", () => {
     failedQuery = undefined;
     failure.hidden = true;
+    const pagination = document.querySelector(".pagination");
+    if (pagination) {
+      if (pagination.contains(document.activeElement)) {
+        messageInput.focus();
+      }
+      pagination.inert = true;
+    }
+  });
+
+  document.addEventListener("htmx:finally:request", () => {
+    document.querySelector(".pagination")?.removeAttribute("inert");
   });
 
   document.addEventListener("htmx:after:request", (event) => {

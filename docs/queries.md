@@ -17,9 +17,13 @@ includes any other levels in the stored data. An empty service filter includes
 logs from all services, including records without a service name.
 
 Choose **Search** or press Enter to apply filter edits to the current time
-window. Matching text is highlighted in the message preview. Clear the message
-search with **×** or **Clear search** in the empty state to rerun with the same
-time window and other filters.
+window. During an in-place query, **Loading logs…** appears below the filters.
+The page temporarily disables Search, time presets, Clear search and Next page.
+You can edit the filters and submit them when the query finishes.
+
+Matching text is highlighted in the message preview. Clear the message search
+with **×** or **Clear search** in the empty state to rerun with the same time
+window and other filters.
 
 Select a row or focus its message and press Enter to open **Log details**.
 The inspector slides over the results from the right and fills the screen on
