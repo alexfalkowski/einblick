@@ -28,6 +28,7 @@ Choose the feature group you are changing:
 ```sh
 make features tags=@storage
 make features tags=@queries
+make features tags=@site
 make features tags=@printing
 make features feature=features/migrate
 make features feature=features/health
@@ -56,8 +57,8 @@ lives in `logging.go`. SQL files live in `queries/` and are embedded as strings
 declared in `queries.go`.
 
 `Repository.List` supplies the versioned query operation in `internal/api/v1/logs`.
-Both API transports use that typed adapter. Future MVC controllers can call the
-unversioned `Repository.List` operation directly, without protobuf or a network call.
+Both API transports use that typed adapter. The Logs MVC controller calls the
+unversioned `Repository.List` operation directly.
 Query validation, queueing and SQL execution share one
 deadline. One go-sync semaphore bounds concurrent queries and allows waiting requests
 to cancel; intake does not acquire it. Continuation pages use strict
@@ -89,6 +90,21 @@ uses the remote plugins in [api/buf.gen.yaml](../api/buf.gen.yaml). Update the
 OTLP schema dependency together with the Go and Ruby OTLP messages. Generated
 files are checked in; edit the proto source and regenerate them.
 
+## 🖥️ Logs site
+
+The shared MVC server renders the embedded templates in
+[`internal/site`](../internal/site). `GET /logs` returns a full document, and
+the form and pagination use `PUT /logs` to replace the results fragment.
+The [Logs route package](../internal/site/logs/route) wires both requests to
+the controller. Change the [Logs views](../internal/site/logs/view) for
+page-specific markup and `root/layout` for the shared page and fragment layouts.
+Keep user-facing strings in each [locale catalog](../internal/site/locales).
+The [full-page layout](../internal/site/root/layout/full.tmpl) pins htmx and the
+daisyUI component stylesheets from jsDelivr with Subresource Integrity,
+following Web. Use the shared daisyUI controls with the Einblick theme in the
+[Logs stylesheet](../internal/site/static/logs.css). The theme, page layout and
+request-status script ship in the binary.
+
 ## 🪿 Schema migrations
 
 Application migrations live in `internal/migrate/migrations/`. Goose discovers
@@ -117,4 +133,4 @@ DuckDB needs CGO and a compatible C/C++ runtime in the container.
 The [requirements](requirements.md) define product behavior, and the
 [implementation plan](review-and-plan.md) contains the remaining work.
 The [initial design reference](requirements.md#87-service-catalog-and-standard-ux)
-covers the planned browser workflows.
+guides changes to the browser workflows.

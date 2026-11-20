@@ -1,0 +1,44 @@
+site.title: Registros · Einblick
+site.skip: Ir a los registros
+logs.heading: Registros
+logs.scope: Registros recientes del almacenamiento local
+logs.service: Servicio
+logs.all_services: Todos los servicios
+logs.start: Inicio (UTC)
+logs.end: Fin (UTC)
+logs.time_presets: Intervalos predefinidos
+logs.last_15_minutes: Últimos 15 minutos
+logs.last_hour: Última hora
+logs.last_24_hours: Últimas 24 horas
+logs.range_format: 02/01/2006, 15:04:05
+logs.event_format: 02/01, 15:04:05
+logs.level.debug: Depuración
+logs.level.info: Información
+logs.level.warn: Advertencia
+logs.level.error: Error
+logs.level.fatal: Fatal
+logs.text: Buscar en mensajes de texto
+logs.severity: Gravedad
+logs.all_severities: Todos los niveles
+logs.trace_id: ID de traza
+logs.query: Consultar registros
+logs.reset: Restablecer filtros e intervalo
+logs.loading: Cargando registros…
+logs.request_failed: Falló la solicitud de registros. Vuelve a intentarlo.
+logs.results: Resultados de la consulta de registros
+logs.order: Más recientes primero
+logs.timestamp: Hora del evento (UTC)
+logs.message: Mensaje
+logs.no_service: Sin nombre de servicio
+logs.no_body: Sin mensaje
+logs.structured_body: Mensaje estructurado
+logs.received: Recepción (UTC)
+logs.record: Entrada de registro
+logs.resource: Recurso
+logs.instrumentation: Ámbito de instrumentación
+logs.next: Página siguiente
+logs.empty: No hay registros que coincidan con estos filtros en el intervalo seleccionado.
+logs.invalid: Consulta de registros no válida. Revisa el intervalo, los filtros o el enlace de página y vuelve a intentarlo.
+logs.cancelled: Se canceló la consulta de registros.
+logs.timed_out: La consulta de registros agotó el tiempo de espera. Prueba con un intervalo más corto.
+logs.unavailable: El almacenamiento local de registros no está disponible. Vuelve a intentarlo.

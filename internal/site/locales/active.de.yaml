@@ -1,0 +1,44 @@
+site.title: Protokolle · Einblick
+site.skip: Zu den Protokollen
+logs.heading: Protokolle
+logs.scope: Aktuelle Protokolle aus dem lokalen Speicher
+logs.service: Dienst
+logs.all_services: Alle Dienste
+logs.start: Beginn (UTC)
+logs.end: Ende (UTC)
+logs.time_presets: Vordefinierte Zeiträume
+logs.last_15_minutes: Letzte 15 Minuten
+logs.last_hour: Letzte Stunde
+logs.last_24_hours: Letzte 24 Stunden
+logs.range_format: 02.01.2006, 15:04:05
+logs.event_format: 02.01., 15:04:05
+logs.level.debug: Debug
+logs.level.info: Info
+logs.level.warn: Warnung
+logs.level.error: Fehler
+logs.level.fatal: Fatal
+logs.text: Textmeldungen durchsuchen
+logs.severity: Schweregrad
+logs.all_severities: Alle Schweregrade
+logs.trace_id: Trace-ID
+logs.query: Protokolle abfragen
+logs.reset: Filter und Zeitraum zurücksetzen
+logs.loading: Protokolle werden geladen …
+logs.request_failed: Die Protokollanfrage ist fehlgeschlagen. Erneut versuchen.
+logs.results: Ergebnisse der Protokollabfrage
+logs.order: Neueste zuerst
+logs.timestamp: Ereigniszeit (UTC)
+logs.message: Meldung
+logs.no_service: Kein Dienstname
+logs.no_body: Keine Meldung
+logs.structured_body: Strukturierte Meldung
+logs.received: Empfangen (UTC)
+logs.record: Protokolleintrag
+logs.resource: Ressource
+logs.instrumentation: Instrumentierungsbereich
+logs.next: Nächste Seite
+logs.empty: Im gewählten Zeitraum gibt es keine Protokolle, die diesen Filtern entsprechen.
+logs.invalid: Ungültige Protokollabfrage. Zeitraum, Filter oder Seitenlink prüfen und erneut versuchen.
+logs.cancelled: Die Protokollabfrage wurde abgebrochen.
+logs.timed_out: Zeitlimit der Protokollabfrage überschritten. Einen kürzeren Zeitraum wählen.
+logs.unavailable: Der lokale Protokollspeicher ist nicht verfügbar. Erneut versuchen.

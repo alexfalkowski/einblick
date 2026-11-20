@@ -1,0 +1,132 @@
+{{define "content"}}
+{{$exactTime := "2006-01-02T15:04:05.999999999Z07:00"}}
+<div class="console">
+  <aside class="sidebar">
+    <a class="brand" href="/logs">Einblick</a>
+    <label for="service">{{.Localizer.Text "logs.service"}}</label>
+    <input id="service" class="input input-sm" name="service" form="log-filters" value="{{.Model.Filters.ServiceName}}"
+           placeholder="{{.Localizer.Text "logs.all_services"}}">
+  </aside>
+  <section class="workspace" aria-labelledby="logs-heading">
+    <header>
+      <h1 id="logs-heading">{{.Localizer.Text "logs.heading"}}</h1>
+      <p>{{.Localizer.Text "logs.scope"}}</p>
+    </header>
+    <form id="log-filters" action="/logs" method="get" hx-put="/logs" hx-target="#results" hx-swap="outerHTML"
+          hx-indicator="#query-progress" hx-sync="#main:drop">
+      <input id="start-time" type="hidden" name="start_time" value="{{.Model.Filters.StartTime.Format $exactTime}}">
+      <input id="end-time" type="hidden" name="end_time" value="{{.Model.Filters.EndTime.Format $exactTime}}">
+      <div class="filters">
+        <label for="start-utc">{{.Localizer.Text "logs.start"}}</label>
+        <input id="start-utc" class="input input-sm" type="datetime-local" step="1" name="start_utc"
+               required value="{{.Model.Filters.StartTime.Format "2006-01-02T15:04:05"}}">
+        <label for="end-utc">{{.Localizer.Text "logs.end"}}</label>
+        <input id="end-utc" class="input input-sm" type="datetime-local" step="1" name="end_utc"
+               required value="{{.Model.Filters.EndTime.Format "2006-01-02T15:04:05"}}">
+        <label for="text">{{.Localizer.Text "logs.text"}}</label>
+        <input id="text" class="input input-sm" name="text" type="search" value="{{.Model.Filters.MessageText}}">
+        <label for="severity">{{.Localizer.Text "logs.severity"}}</label>
+        <select id="severity" class="select select-sm" name="severity">
+          <option value="">{{.Localizer.Text "logs.all_severities"}}</option>
+          {{range .Model.Filters.SeverityOptions}}
+          <option value="{{.Value}}"{{if eq $.Model.Filters.Severity .Value}} selected{{end}}>{{$.Localizer.Text .Label}}</option>
+          {{end}}
+        </select>
+        <label for="trace-id">{{.Localizer.Text "logs.trace_id"}}</label>
+        <input id="trace-id" class="input input-sm" name="trace_id" value="{{.Model.Filters.TraceID}}" spellcheck="false">
+        {{if .Model.Filters.PageSize}}<input type="hidden" name="page_size" value="{{.Model.Filters.PageSize}}">{{end}}
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn btn-primary btn-sm">{{.Localizer.Text "logs.query"}}</button>
+        <a href="/logs">{{.Localizer.Text "logs.reset"}}</a>
+      </div>
+      {{if .Model.Filters.Windows}}
+      <div class="time-presets" role="group" aria-label="{{.Localizer.Text "logs.time_presets"}}">
+        {{range .Model.Filters.Windows}}
+        <button class="btn btn-sm" name="window" value="{{.Value}}" type="submit" formnovalidate>{{$.Localizer.Text .Label}}</button>
+        {{end}}
+      </div>
+      {{end}}
+    </form>
+    <div id="query-progress" role="status">
+      <span class="htmx-indicator">{{.Localizer.Text "logs.loading"}}</span>
+    </div>
+    <p id="query-failure" role="alert" hidden
+       data-request="{{.Localizer.Text "logs.request_failed"}}"
+       data-timeout="{{.Localizer.Text "logs.timed_out"}}"
+       data-cancelled="{{.Localizer.Text "logs.cancelled"}}"></p>
+    <div aria-live="polite">
+      {{template "results" .}}
+    </div>
+  </section>
+</div>
+{{end}}
+
+{{define "results"}}
+{{$exactTime := "2006-01-02T15:04:05.999999999Z07:00"}}
+{{$rangeFormat := .Localizer.Text "logs.range_format"}}
+{{$eventFormat := .Localizer.Text "logs.event_format"}}
+<section id="results" lang="{{.Localizer.Tag}}" aria-label="{{.Localizer.Text "logs.results"}}"
+         data-query-url="{{.Model.QueryURL}}"
+         data-start-time="{{.Model.Filters.StartTime.Format $exactTime}}"
+         data-end-time="{{.Model.Filters.EndTime.Format $exactTime}}">
+  <div class="result-header">
+    {{if .Model.Rows}}<span>{{.Localizer.Text "logs.order"}}</span>{{end}}
+    <span class="time-range"><time datetime="{{.Model.Filters.StartTime.Format $exactTime}}">{{.Model.Filters.StartTime.Format $rangeFormat}}</time>
+      – <time datetime="{{.Model.Filters.EndTime.Format $exactTime}}">{{.Model.Filters.EndTime.Format $rangeFormat}}</time> UTC</span>
+  </div>
+  {{if .Model.Rows}}
+  <div class="table-card" tabindex="0" role="region" aria-label="{{.Localizer.Text "logs.results"}}">
+    <table class="table table-sm">
+      <thead>
+        <tr>
+          <th scope="col">{{.Localizer.Text "logs.timestamp"}}</th>
+          <th scope="col">{{.Localizer.Text "logs.service"}}</th>
+          <th scope="col">{{.Localizer.Text "logs.severity"}}</th>
+          <th scope="col">{{.Localizer.Text "logs.message"}}</th>
+          <th scope="col">{{.Localizer.Text "logs.trace_id"}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Model.Rows}}
+        <tr>
+          <td><time datetime="{{.EventTime.Format $exactTime}}">{{.EventTime.Format $eventFormat}}</time></td>
+          <td class="service">{{if .ServiceName}}{{.ServiceName}}{{else}}{{$.Localizer.Text "logs.no_service"}}{{end}}</td>
+          <td class="severity" data-severity="{{.Severity}}">
+            {{if .Severity}}{{.Severity}}{{if and .ReportedSeverity (ne .Severity .ReportedSeverity)}} <small>({{.ReportedSeverity}})</small>{{end}}
+            {{else if .ReportedSeverity}}{{.ReportedSeverity}}{{else}}—{{end}}
+          </td>
+          <td>
+            <details>
+              <summary class="message">
+                {{if .MessageLabel}}{{$.Localizer.Text .MessageLabel}}{{else}}{{.Message}}{{end}}
+              </summary>
+              <div class="inspector">
+                <p>{{$.Localizer.Text "logs.timestamp"}} <time datetime="{{.EventTime.Format $exactTime}}">{{.EventTime.Format $exactTime}}</time></p>
+                <p>{{$.Localizer.Text "logs.received"}} <time datetime="{{.Details.ReceivedAt.Format $exactTime}}">{{.Details.ReceivedAt.Format $exactTime}}</time></p>
+                <h2>{{$.Localizer.Text "logs.record"}}</h2>
+                <pre class="record">{{.Details.Entry}}</pre>
+                <h2>{{$.Localizer.Text "logs.resource"}}</h2>
+                <pre class="resource">{{.Details.Source}}</pre>
+                <h2>{{$.Localizer.Text "logs.instrumentation"}}</h2>
+                <pre class="instrumentation">{{.Details.Instrumentation}}</pre>
+              </div>
+            </details>
+          </td>
+          <td class="trace"><code>{{if .TraceID}}{{.TraceID}}{{else}}—{{end}}</code></td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{if .Model.NextURL}}
+  <div class="pagination">
+    <a class="next btn btn-outline btn-primary btn-sm" href="{{.Model.NextURL}}" hx-put="{{.Model.NextURL}}" hx-target="#results" hx-swap="outerHTML"
+       hx-indicator="#query-progress" hx-sync="#main:drop">{{.Localizer.Text "logs.next"}}</a>
+  </div>
+  {{end}}
+  {{else}}
+  <p class="notice">{{.Localizer.Text "logs.empty"}}</p>
+  {{end}}
+</section>
+{{end}}

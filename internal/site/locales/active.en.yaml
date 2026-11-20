@@ -1,0 +1,44 @@
+site.title: Logs · Einblick
+site.skip: Skip to logs
+logs.heading: Logs
+logs.scope: Recent logs from local storage
+logs.service: Service
+logs.all_services: All services
+logs.start: Start (UTC)
+logs.end: End (UTC)
+logs.time_presets: Time presets
+logs.last_15_minutes: Last 15 minutes
+logs.last_hour: Last hour
+logs.last_24_hours: Last 24 hours
+logs.range_format: 02 Jan 2006, 15:04:05
+logs.event_format: 02 Jan, 15:04:05
+logs.level.debug: Debug
+logs.level.info: Info
+logs.level.warn: Warn
+logs.level.error: Error
+logs.level.fatal: Fatal
+logs.text: Search string messages
+logs.severity: Severity
+logs.all_severities: All severities
+logs.trace_id: Trace ID
+logs.query: Query logs
+logs.reset: Reset filters and time range
+logs.loading: Loading logs…
+logs.request_failed: The log request failed. Try again.
+logs.results: Log query results
+logs.order: Newest first
+logs.timestamp: Event time (UTC)
+logs.message: Message
+logs.no_service: No service name
+logs.no_body: No message
+logs.structured_body: Structured message
+logs.received: Received (UTC)
+logs.record: Log record
+logs.resource: Resource
+logs.instrumentation: Instrumentation scope
+logs.next: Next page
+logs.empty: No logs match these filters in the selected time range.
+logs.invalid: Invalid log query. Check the time range, filters, or page link and try again.
+logs.cancelled: The log query was cancelled.
+logs.timed_out: The log query timed out. Try a narrower time range.
+logs.unavailable: Local log storage is unavailable. Try again.

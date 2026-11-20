@@ -1,6 +1,6 @@
 # Telemetry service: first-version requirements
 
-**Status:** Implementation specification; local log persistence, recovery and [recent-log queries](queries.md) are implemented. Metrics/traces remain print-only; browser pages, trace/metric queries, historical queries and archives are planned.
+**Status:** Implementation specification. Local log persistence, recovery and [recent-log queries in the browser and API](queries.md) are implemented. Metrics and traces remain print-only. Trace and metric views, historical queries and archives are planned.
 
 **Revision:** 0.24
 
@@ -71,7 +71,7 @@ The service should remain understandable to a small engineering team. Prefer an 
 | D-007 | Recent queries | Prefer bounded memory and tunable query latency over keeping gigabytes of telemetry resident in RAM. | Agreed direction |
 | D-008 | Ingestion transport | Standard OTLP/gRPC on an internal cluster endpoint. OTLP/HTTP is not required for the first version. | Agreed direction |
 | D-009 | Frontend | Use go-service MVC and embedded assets; the web service is the reference implementation. | Agreed direction |
-| D-010 | Frontend libraries | Follow the web MVC/htmx/Pico pattern and render built-in charts with a small embedded plotting library. uPlot is the proposed chart library; Grafana is not a runtime dependency. | Built-in charts agreed; library proposed |
+| D-010 | Frontend libraries | Follow Web’s MVC/htmx full-page and partial-view pattern and render built-in charts with a small embedded plotting library. uPlot is the proposed chart library; Grafana is not a runtime dependency. | Built-in charts agreed; library proposed |
 | D-011 | Retention | Configurable; seven days is acceptable for normal operation. Use a shorter value while testing. | Agreed direction |
 | D-012 | UI authentication | Defer site authentication entirely for v1. A reusable go-service solution will be designed separately; no credential-file or session implementation is required here. | Agreed direction |
 | D-013 | Local persistence | A persistent volume holds DuckDB, its WAL, and pending exports. | Working design |
@@ -161,7 +161,7 @@ Use these capabilities when implementing the service:
   consumes the configured bucket and retention policy.
 - Storage-aware release tooling is available. DEP-006 requires verification of
   actual configuration-writing pipelines and storage preservation before activation.
-- `web` supplies the embedded MVC/htmx/Pico reference. The golden-signal dashboard
+- `web` supplies the MVC/htmx reference. The golden-signal dashboard
   in `docker/grafana/services.json` supplies panel vocabulary; verify native OTLP
   names and units against the supported go-service version.
 
@@ -184,7 +184,11 @@ flowchart LR
     Q -->|Historical Parquet reads| R
 ```
 
-All service components run in one executable. Templates, CSS, htmx, and the chart library are embedded release assets; serving the UI requires no external dashboard service or CDN. The persistent volume and R2 bucket are external storage resources, not additional application services.
+All service components run in one executable. Templates and first-party CSS
+and scripts are embedded release assets. The browser loads htmx and daisyUI
+component styles from jsDelivr. The UI runs without an external dashboard
+service. The persistent volume and R2 bucket are external storage resources,
+not additional application services.
 
 An illustrative local layout is:
 
@@ -282,7 +286,7 @@ Initial archive compaction and a remote manifest service are unnecessary for an 
 ### 8.6 Embedded frontend
 
 - **WEB-001 — Existing MVC pattern.** Use go-service MVC, embedded Go templates/assets, and the web service's full-page/partial-view conventions.
-- **WEB-002 — Small frontend.** Use a lightweight browser stack with built-in charts. htmx/Pico CSS and uPlot are the proposed baseline. Embed pinned assets and licenses; no frontend runtime server, CDN, or Grafana installation is required.
+- **WEB-002 — Small frontend.** Use a lightweight browser stack with built-in charts. Load pinned htmx and the daisyUI component styles from jsDelivr with Subresource Integrity, following Web. Use the Einblick theme for shared controls. Full-page queries work when the CDN is unavailable. uPlot is proposed for charts. Include the licenses for any third-party assets shipped with the service.
 - **WEB-003 — Connected investigation.** Provide navigation from a log's trace ID to the trace and from a trace to related logs. Preserve useful investigation context in shareable URLs and return navigation.
 - **WEB-004 — File-based credentials.** Reserved; site authentication is outside v1 under WEB-012.
 - **WEB-005 — Password verification.** Reserved; site authentication is outside v1 under WEB-012.
@@ -343,13 +347,13 @@ web
 
 | View or panel | Initial content and interpretation |
 | --- | --- |
-| Shared controls | Service, explicit time window, instance, refresh/pause; protocol filters where meaningful. Resolve relative ranges to absolute bounds for drill-down links. Do not issue overlapping automatic queries. |
+| Shared controls | Service, explicit time window, instance, refresh/pause; protocol filters where meaningful. The Logs page offers UTC date and time pickers and recent presets within the configured query range. Resolve relative ranges to absolute bounds for drill-down links. Do not issue overlapping automatic queries. |
 | Latency | p50/p95/p99 over time from compatible request-duration histograms, displayed in milliseconds. Aggregate histograms across selected instances before quantile calculation. |
 | Traffic | Incoming requests per second, separate HTTP and gRPC groups. Do not sum client and server measurements for the same request. |
 | Errors | HTTP 4xx and 5xx identified explicitly; gRPC non-OK identified explicitly. Prefer separate HTTP 4xx/5xx series if useful. A combined summary is labelled non-success, since 4xx/non-OK do not all imply a service fault. |
 | Latency spread | p99/p50 ratio, following docker/grafana/services.json. Label it a queueing proxy; it is not measured queue depth, resource utilization, or a saturation guarantee. If p50 is zero/missing, show unavailable rather than infinity. |
 | Runtime context | Go memory, goroutines, and allocation rate per instance using available runtime instruments. Host metrics, if shown, must not be labelled container/process-only measurements. |
-| Logs | Text/severity/protocol/trace filters, newest-first table, stable pagination; a drawer shows typed attributes and trace links. Protocol filtering must follow real instrumentation fields, not a guess from message text. |
+| Logs | Text/severity/protocol/trace filters, newest-first table and stable pagination. The browser severity choices match Debug, Info, Warn, Error and Fatal exactly, with an option for all severities. Detail views show typed attributes, exact timestamps and trace links. Protocol filtering must use instrumentation fields. |
 | Traces | Service/operation/duration/error selection, sampled trace list, waterfall drawer, selected-span attributes/events, related logs. Missing correlation or unavailable spans is explicit. |
 
 Service, protocol, and instance selectors are server-side query inputs. The protocol catalog controls which metric groups exist; it does not mean every log has a protocol attribute. Unclassified logs must remain visible in the all-protocol view. Do not invent an HTTP/gRPC assignment for unrelated worker logs.
@@ -563,7 +567,7 @@ their storage/query policies and full recovery/archive evidence follow in P7/P8.
 | O-010 | Required platform matrix and native runtime image | Retain Linux amd64/arm64 containers and native macOS arm64 development. Package the actual driver/engine/extensions accordingly. The owner will validate deployed platform/runtime behavior; it remains unavailable acceptance evidence until run. | Repository dependency checks as introduced; deployed runtime validation owned by the operator |
 | O-011 | Lean S3 client version | Start feasibility with go-micro-s3/client; pin only after R2 behavior, bounded-memory transfer, license, runtime dependencies, and linked binary cost are checked. | P4 |
 | O-012 | Catalog selectors and supported go-service metric profile | Use the transports field; begin with id for service identity; confirm actual server surfaces and native instruments/units. Optional resource filters must use attributes clients actually emit. | Metric profile in P8; catalog in P9 |
-| O-013 | Frontend library versions and visual refinement | MVC with embedded lightweight assets; uPlot is demonstrated by the static concept. Confirm htmx/Pico versions from the owning web pattern at implementation time. | Logs page in P2; full frontend in P9 |
+| O-013 | Frontend library versions and visual refinement | The [full-page layout](../internal/site/root/layout/full.tmpl) pins htmx and daisyUI. A local theme applies Einblick’s colors and density to the shared controls. Confirm the chart dependency and refine the working views as panels are added. | Full frontend in P9 |
 
 Open tuning values do not require new infrastructure or repeated approval requests. Material changes to durability, authentication boundaries, supported data, or deployment scope should be raised with their concrete consequences.
 

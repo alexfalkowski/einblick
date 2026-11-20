@@ -1,0 +1,21 @@
+{{define "content"}}
+<div class="console">
+  <aside class="sidebar"><a class="brand" href="/logs">Einblick</a></aside>
+  <section class="workspace" aria-labelledby="logs-heading">
+    <h1 id="logs-heading">{{.Localizer.Text "logs.heading"}}</h1>
+    {{template "results" .}}
+  </section>
+</div>
+{{end}}
+
+{{define "results"}}
+<section id="results" lang="{{.Localizer.Tag}}" aria-label="{{.Localizer.Text "logs.results"}}">
+  <p class="notice error" role="alert">
+    {{if eq .Model.Code 400}}{{.Localizer.Text "logs.invalid"}}
+    {{else if eq .Model.Code 499}}{{.Localizer.Text "logs.cancelled"}}
+    {{else if eq .Model.Code 504}}{{.Localizer.Text "logs.timed_out"}}
+    {{else}}{{.Localizer.Text "logs.unavailable"}}{{end}}
+  </p>
+  <a href="/logs">{{.Localizer.Text "logs.reset"}}</a>
+</section>
+{{end}}

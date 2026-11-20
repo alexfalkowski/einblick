@@ -29,8 +29,6 @@ type Repository interface {
 
 // NewRepository composes log persistence and diagnostic logging over the service-owned database.
 // The migrate package initializes the schema before the listeners start.
-//
-//nolint:ireturn // The constructor provides the composed Repository interface.
 func NewRepository(cfg *Config, db *sql.DB, pool *sync.BufferPool, log *logger.Logger) Repository {
 	return &loggingRepository{
 		Repository: &repository{
