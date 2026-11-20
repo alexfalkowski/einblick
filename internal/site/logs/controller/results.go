@@ -2,6 +2,7 @@ package controller
 
 import (
 	"encoding/hex"
+	"unicode/utf8"
 
 	"github.com/alexfalkowski/einblick/internal/logs/storage"
 	"github.com/alexfalkowski/einblick/internal/site/logs/model"
@@ -15,6 +16,8 @@ import (
 	logs "go.opentelemetry.io/proto/otlp/logs/v1"
 )
 
+const matchContextRunes = 12
+
 var severityOptions = []model.FilterOption{
 	{Value: "DEBUG", Label: "logs.level.debug"},
 	{Value: "INFO", Label: "logs.level.info"},
@@ -24,6 +27,7 @@ var severityOptions = []model.FilterOption{
 }
 
 func newLogsModel(ctx context.Context, query storage.Query, results *storage.Page, maxRange time.Duration) (*model.Logs, error) {
+	windows, selectedWindow := windowOptions(maxRange, time.Duration(query.EndTime.Sub(query.StartTime)))
 	viewModel := &model.Logs{
 		QueryURL: logsURL(query),
 		Filters: model.Filters{
@@ -34,20 +38,29 @@ func newLogsModel(ctx context.Context, query storage.Query, results *storage.Pag
 			Severity:        query.Severity,
 			TraceID:         query.TraceID,
 			SeverityOptions: severityOptions,
-			Windows:         windowOptions(maxRange),
+			Windows:         windows,
+			SelectedWindow:  selectedWindow,
 			PageSize:        query.PageSize,
 		},
 		Rows: make([]model.LogRow, 0, len(results.Logs)),
 	}
+
 	for _, stored := range results.Logs {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
 
-		row, err := newLogRow(stored)
+		row, err := newLogRow(stored, query.Text)
 		if err != nil {
 			return nil, err
 		}
+
+		if storage.ValidTraceID(row.TraceID) {
+			related := query
+			related.TraceID, related.PageToken = row.TraceID, strings.Empty
+			row.RelatedLogsURL = logsURL(related)
+		}
+
 		viewModel.Rows = append(viewModel.Rows, row)
 	}
 
@@ -58,9 +71,10 @@ func newLogsModel(ctx context.Context, query storage.Query, results *storage.Pag
 	return viewModel, nil
 }
 
-func newLogRow(stored *storage.Log) (model.LogRow, error) {
+func newLogRow(stored *storage.Log, search string) (model.LogRow, error) {
 	var entry logs.LogRecord
 	var source logs.ResourceLogs
+	var scope logs.ScopeLogs
 	decoder := proto.NewJSON()
 
 	if err := decoder.Decode(bytes.NewReader(stored.Record), &entry, codec.WithDiscardUnknown()); err != nil {
@@ -71,28 +85,54 @@ func newLogRow(stored *storage.Log) (model.LogRow, error) {
 		return model.LogRow{}, err
 	}
 
+	if err := decoder.Decode(bytes.NewReader(stored.Scope), &scope, codec.WithDiscardUnknown()); err != nil {
+		return model.LogRow{}, err
+	}
+
 	severity := strings.Empty
 	if level := entry.GetSeverityNumber(); level != logs.SeverityNumber_SEVERITY_NUMBER_UNSPECIFIED {
 		severity = strings.TrimPrefix(level.String(), "SEVERITY_NUMBER_")
 	}
 	message, messageLabel := logMessage(entry.GetBody())
 
-	// The inspector shows the stored text verbatim, including exact typed values.
 	return model.LogRow{
 		EventTime:        stored.EventTime.UTC(),
-		ServiceName:      serviceName(source.GetResource().GetAttributes()),
+		ServiceName:      stringAttribute(source.GetResource().GetAttributes(), "service.name"),
 		Severity:         severity,
 		ReportedSeverity: entry.GetSeverityText(),
 		Message:          message,
 		MessageLabel:     messageLabel,
+		Match:            messageMatch(message, search),
 		TraceID:          hex.EncodeToString(entry.GetTraceId()),
-		Details: model.LogDetails{
-			ReceivedAt:      stored.ReceiveTime.UTC(),
-			Entry:           string(stored.Record),
-			Source:          string(stored.Resource),
-			Instrumentation: string(stored.Scope),
-		},
+		Details:          logDetails(stored, &entry, &source, &scope),
 	}, nil
+}
+
+func messageMatch(message, search string) *model.MessageMatch {
+	if strings.IsEmpty(search) {
+		return nil
+	}
+	before, after, found := strings.Cut(message, search)
+	if !found {
+		return nil
+	}
+
+	start, end := len(before), 0
+	for range matchContextRunes {
+		_, left := utf8.DecodeLastRuneInString(before[:start])
+		_, right := utf8.DecodeRuneInString(after[end:])
+		start -= left
+		end += right
+	}
+
+	prefix, suffix := before[start:], after[:end]
+	if start > 0 {
+		prefix = "…" + prefix
+	}
+	if end < len(after) {
+		suffix += "…"
+	}
+	return &model.MessageMatch{Before: prefix, Text: search, After: suffix}
 }
 
 // logMessage returns the displayed text or a catalog key for its fallback.
@@ -111,13 +151,14 @@ func logMessage(body *common.AnyValue) (string, string) {
 	return text.StringValue, strings.Empty
 }
 
-func serviceName(attributes []*common.KeyValue) string {
+func stringAttribute(attributes []*common.KeyValue, key string) string {
 	for _, attribute := range attributes {
-		if attribute.GetKey() != "service.name" {
+		if attribute.GetKey() != key {
 			continue
 		}
-		if name, ok := attribute.GetValue().GetValue().(*common.AnyValue_StringValue); ok {
-			return name.StringValue
+
+		if value, ok := attribute.GetValue().GetValue().(*common.AnyValue_StringValue); ok {
+			return value.StringValue
 		}
 	}
 	return strings.Empty

@@ -65,7 +65,7 @@ Feature: Query recent logs
       | {"text":"_"}                                                                                          | 5           |
       | {"severity":"INFO","text":"same-time"}                                                                | 2           |
       | {"start_time":"2026-11-19T11:04:05.123456790Z","end_time":"2026-11-19T11:04:05.123456791Z"}           | 3,2         |
-      | {"end_time":"2026-11-20T11:04:05.123456789Z"}                                                         | 6,5,4,3,2,1 |
+      | {"end_time":"2026-11-26T11:04:05.123456789Z"}                                                         | 6,5,4,3,2,1 |
       | {"start_time":"2026-11-19T12:04:05.123456790+01:00","end_time":"2026-11-19T12:04:05.123456791+01:00"} | 3,2         |
 
   Scenario Outline: Empty results are successful and retain the documented search scope
@@ -113,7 +113,7 @@ Feature: Query recent logs
       | {"start_time":"2026-11-19T11:04:05"}            |
       | {"end_time":"2026-11-19T11:04:05.123456789Z"}   |
       | {"end_time":"2554-07-21T23:34:33.709551617Z"}   |
-      | {"end_time":"2026-11-20T11:04:05.123456790Z"}   |
+      | {"end_time":"2026-11-26T11:04:05.123456790Z"}   |
       | {"page_size":101}                               |
       | {"page_size":-1}                                |
       | {"page_size":"invalid"}                         |

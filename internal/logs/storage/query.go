@@ -1,9 +1,25 @@
 package storage
 
 import (
+	"encoding/hex"
+
 	"github.com/alexfalkowski/go-service/v3/encoding/json"
 	"github.com/alexfalkowski/go-service/v3/time"
 )
+
+const (
+	traceIDHexLength = 32
+)
+
+// ValidTraceID reports whether id can be used as an exact trace filter.
+func ValidTraceID(id string) bool {
+	if len(id) != traceIDHexLength {
+		return false
+	}
+
+	_, err := hex.DecodeString(id)
+	return err == nil
+}
 
 // Query selects one recent-log page. Filters are conjunctive and remain fixed
 // across pages; SQL text and arbitrary expressions are never accepted.

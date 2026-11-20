@@ -19,10 +19,10 @@ type Logs struct {
 
 // Filters holds the display values for the log search form.
 type Filters struct {
-	// StartTime is the inclusive UTC bound displayed in the form and results.
+	// StartTime is the inclusive UTC bound submitted with filters and pagination.
 	StartTime time.Time
 
-	// EndTime is the exclusive UTC bound displayed in the form and results.
+	// EndTime is the exclusive UTC bound submitted with filters and pagination.
 	EndTime time.Time
 
 	// ServiceName is the exact selected service. Empty selects all services.
@@ -36,6 +36,9 @@ type Filters struct {
 
 	// TraceID is the hexadecimal identifier selected for correlation.
 	TraceID string
+
+	// SelectedWindow is the preset matching the applied duration, or empty for another duration.
+	SelectedWindow string
 
 	// SeverityOptions lists the available levels in ascending severity order.
 	SeverityOptions []FilterOption
@@ -79,21 +82,105 @@ type LogRow struct {
 	// TraceID is the hexadecimal trace identifier, when present.
 	TraceID string
 
-	// Details contains the text shown when the row is expanded.
+	// RelatedLogsURL opens the current search with the row's trace as a filter.
+	RelatedLogsURL string
+
+	// Match holds a preview of the first literal message match, when present.
+	Match *MessageMatch
+
+	// Details contains the fields shown when the row is expanded.
 	Details LogDetails
+}
+
+// MessageMatch provides the parts of a message preview around the search text.
+type MessageMatch struct {
+	// Before is the visible context before the match.
+	Before string
+
+	// Text is the matching text as it appears in the original message.
+	Text string
+
+	// After is the visible context after the match.
+	After string
 }
 
 // LogDetails holds the supplemental values displayed for a log entry.
 type LogDetails struct {
+	// ObservedAt is the producer's observation time, or zero when absent.
+	ObservedAt time.Time
+
 	// ReceivedAt is the receipt timestamp in UTC, with its original precision.
 	ReceivedAt time.Time
 
-	// Entry contains the original entry data as text.
-	Entry string
+	// Body contains the original value, including structured and blank messages.
+	Body LogValue
 
-	// Source contains the original context about the source of the log.
-	Source string
+	// Environment is the deployment environment when supplied by the resource.
+	Environment string
 
-	// Instrumentation contains the original context about the logging library.
-	Instrumentation string
+	// EventTimeLabel identifies the timestamp used as the event time.
+	EventTimeLabel string
+
+	// ReceiptOffset is the formatted absolute difference between event and receipt.
+	ReceiptOffset string
+
+	// ReceiptLabel identifies the label for an earlier, later or simultaneous receipt.
+	ReceiptLabel string
+
+	// RequestStatus is the HTTP or gRPC status when identifiable from the attributes.
+	RequestStatus string
+
+	// RequestStatusLabel identifies the protocol-specific status label.
+	RequestStatusLabel string
+
+	// RequestDuration is a formatted duration from a request log, when available.
+	RequestDuration string
+
+	// SpanID is the hexadecimal span identifier, when present.
+	SpanID string
+
+	// EventName is the producer's optional event name.
+	EventName string
+
+	// Attributes contains the record's attributes in their original order.
+	Attributes []LogField
+
+	// Resource describes the source, including resource attributes and metadata.
+	Resource []LogField
+
+	// Scope describes the instrumentation scope and its attributes.
+	Scope []LogField
+
+	// DroppedAttributes is the number of attributes the producer dropped.
+	DroppedAttributes uint32
+
+	// Flags contains the original OTLP log flags.
+	Flags uint32
+}
+
+// LogField represents a named metadata field or an attribute with its original key.
+type LogField struct {
+	// Name is the original attribute key, when this field is an attribute.
+	Name string
+
+	// Label is the catalog key for a known field, or empty for a literal key.
+	Label string
+
+	// Value is the scalar or expandable value associated with the field.
+	Value LogValue
+}
+
+// LogValue presents an OTLP value as selectable text or as an expandable collection.
+type LogValue struct {
+	// Text is the display value for a scalar, with string whitespace preserved.
+	Text string
+
+	// Label identifies a collection type, an encoded value, or a blank value.
+	Label string
+
+	// Items contains the elements of a list in their original order.
+	Items []LogValue
+
+	// Fields contains the entries of a map in their original order.
+	Fields []LogField
 }

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'base64'
+require 'digest/sha2'
 require 'json'
 require 'open3'
 require 'securerandom'
@@ -45,3 +46,4 @@ require 'einblick/logs/query_load'
 require 'einblick/migrate/world'
 require 'einblick/site/http'
 require 'einblick/site/world'
+require 'einblick/site/fixtures'

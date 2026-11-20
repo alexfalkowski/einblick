@@ -35,6 +35,8 @@ make features feature=features/health
 ```
 
 Run groups one at a time because they share ports and the test database.
+The Logs page includes a content fingerprint in each embedded CSS and
+JavaScript URL. Rebuilding with changed assets gives browsers a fresh URL.
 Shared actions live in `test/lib`; [fixtures](../test/fixtures/README.md) provide
 synthetic OTLP payloads. Storage scenarios stop the server before inspecting its
 database. Some scenarios reset that database, so use only the disposable test
