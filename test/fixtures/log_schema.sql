@@ -1,4 +1,7 @@
 -- Reset the disposable feature database's application schema and history.
+DROP VIEW log_archive_rows;
+DROP TABLE log_archive_members;
+DROP TABLE log_archive_batches;
 DROP TABLE logs;
 DROP TABLE log_scopes;
 DROP TABLE log_resources;

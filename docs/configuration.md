@@ -23,8 +23,40 @@ DSN parameters are unsupported. Use a persistent mount for retained logs;
 for handling the database files across restarts.
 
 `memory_limit` includes a unit and limits DuckDB's managed memory, not total
-process memory. `threads` must be positive. The values above are development
-settings, not production sizing recommendations.
+process memory. `threads` must be positive. The optional `spill_limit` bounds
+DuckDB's temporary files on the database volume. Specify a size with a unit,
+such as `32MiB`, or omit it to use DuckDB's default. The values above are
+development settings, not production sizing recommendations.
+
+## 🗃️ Local Parquet export
+
+Add `archive` to enable the background exporter. Example development settings:
+
+```yaml
+duckdb:
+  path: /data/recent.duckdb
+  memory_limit: 64MiB
+  spill_limit: 32MiB
+  threads: 1
+archive:
+  workspace: /staging
+  interval: 1s
+  batch_size: 65536B
+```
+
+Mount `workspace` as an existing writable directory with its own filesystem
+capacity limit. After mounting it, create `v1` on that filesystem and give the
+service user ownership. Startup requires this directory so a missing mount
+with an empty mount point cannot silently redirect staging to the backing disk.
+Reserve write access for this instance and its operators.
+Begin with 1 GiB for testing and measure staged files and spill before sizing
+production.
+
+Each interval processes one batch, prioritizing interrupted work. `batch_size`
+requires a positive decimal size such as `65KB` (65,000 bytes) or `65536B`.
+It targets the uncompressed projected row bytes. An accepted row above that
+target gets its own batch. Size the workspace to fit the largest such file and
+the completed files it needs to hold. See [staging and recovery](operations.md#-local-parquet-staging).
 
 ## 🩺 Health checks
 

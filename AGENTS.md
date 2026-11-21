@@ -15,6 +15,14 @@ direction, module/constructor/registration pattern, configuration projections,
 lifecycle, transport and dominant test harness. Keep concrete reference paths
 and consumed revisions in review evidence.
 
+When a feature spans multiple concerns, sketch the call path and identify who
+owns each resource, state transition and lifecycle before editing. Let the
+feature service define the domain values and operations it needs from its
+adapters. Wire concrete adapters in the enclosing module. Check the import
+direction and call sites along with the file layout. For log export, archive
+owns batch identity and export policy, storage owns durable state, staging owns
+Parquet files and workspace recovery, and the worker owns scheduling.
+
 Keep each step to its agreed feature behavior. Reuse go-service and existing
 service patterns before adding anything new. Additional custom limits,
 thresholds, guards, settings, architectural layers or policies require an

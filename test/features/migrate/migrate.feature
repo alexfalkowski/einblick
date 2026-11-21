@@ -4,11 +4,22 @@ Feature: Versioned local schema migrations
   Restarts preserve records and failed migrations never advance the schema.
 
   Scenario: Starting again leaves the applied migration and records unchanged
-    Given a representative local log export
-    When the client exports logs using "gzip" compression
-    Then the log export should succeed without partial success
+    Given acknowledged logs in the current schema
     When the server reopens an up-to-date schema
     Then migration history and stored records should be unchanged
+
+  Scenario: Upgrade an existing log database to support archival
+    Given acknowledged logs in the previous schema
+    When the server upgrades the log database
+    Then migration history should record schema version 2
+    And the upgrade should preserve the acknowledged logs
+
+  Scenario: Retry the archival upgrade after a schema conflict is repaired
+    Given acknowledged logs in the previous schema
+    When a schema conflict interrupts the archival upgrade and is repaired
+    Then the failed archival upgrade should leave the previous schema and logs intact
+    And migration history should record schema version 2
+    And the upgrade should preserve the acknowledged logs
 
   Scenario: Reject a newer Goose schema without rewriting data or history
     When the server attempts to open a newer migration history
@@ -19,5 +30,5 @@ Feature: Versioned local schema migrations
     Then startup should fail without committing the migration's schema changes
     And migration history should record schema version 0 at the failure
     And the conflicting schema and unrelated data should remain intact
-    And migration history should record schema version 1
+    And migration history should record schema version 2
     And the server should accept and persist a new log export

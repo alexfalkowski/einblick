@@ -145,8 +145,8 @@ Use these capabilities when implementing the service:
   supplies the Ruby client's native library. Embedded Goose migrations version
   the application schema at startup through a single Goose history;
   [operations](operations.md#-log-storage-and-recovery) owns compatibility and
-  failure/rollback behavior. Parquet and remote dependencies
-  follow in E-06/E-07, with native-image validation as each is introduced.
+  failure/rollback behavior. Local Parquet staging uses DuckDB's bundled
+  writer. Remote dependencies follow in E-07, with native-image validation.
 - The Makefile uses `http.mak` for shared service tooling without local protobuf
   generation. Keep the gRPC transport configured for OTLP ingestion and consume
   upstream OpenTelemetry service definitions; no custom service API is needed.
@@ -196,8 +196,9 @@ An illustrative local layout is:
 /data/
   recent.duckdb
   recent.duckdb.wal
-  exports/
-  tmp/
+  recent.duckdb.tmp/
+/staging/
+  v1/signal=logs/day=2026-11-02/<batch-id>.parquet
 ```
 
 The WAL is managed by DuckDB. It may not exist after a clean checkpoint or shutdown. The application must not treat its absence as an error or manipulate it as an independent replication stream.
@@ -443,8 +444,9 @@ This is a logical configuration inventory, not a finalized YAML schema or comman
 | R2 endpoint and credentials | Explicit configuration and mounted secret/source references. | Required |
 | Archive format | Versioned Parquet | Agreed |
 | Archive partition | Signal plus UTC event day; application remains a column. | Working design |
-| Export interval | 60 seconds, with earlier closure at a configured size threshold. | Proposed |
-| Export size threshold | Choose from pilot measurements; not specified yet. | Open tuning |
+| Export interval | Explicit local log export cadence. | Interface implemented; production tuning open |
+| Export batch size | Target projected source bytes; large accepted rows can form singleton batches. | Interface implemented; production tuning open |
+| Export staging workspace | Separate quota-limited filesystem; 1 GiB starting point for testing. | Working design; production sizing open |
 | Recent local window | Target approximately 15 minutes, not a RAM residency guarantee. | Proposed |
 | Archive retention | Seven days normally. | Agreed direction |
 | Testing retention | 24 hours initially, or another explicitly configured shorter value. | Proposed |
@@ -558,11 +560,11 @@ their storage/query policies and full recovery/archive evidence follow in P7/P8.
 | O-001 | Installation ingress identity | Service and module are einblick. Choose the ingress domain and deployment references. | Before configuring ingress |
 | O-002 | Internal ingestion authentication, TLS, certificate provisioning, and client trust | Reuse go-service mechanisms. Header-bearing remote OTLP/gRPC requires TLS under the current exporter contract. | Before a deployed client connects |
 | O-003 | Public meaning of archive retention | Object-age expiration through R2 remains the simplest proposal; infraops provides it through optional `expiration`. Document asynchronous deletion, complete-rule ownership, and explicit remote-rule removal when disabling it. Strict event-age retention requires a different documented enforcement policy. The capability does not settle this choice. | P6 |
-| O-004 | Backend event-day selection, accepted lateness, missing timestamps, and future clock skew | Logs: preserve both original nanosecond timestamps and separate receipt time; select Timestamp, then ObservedTimestamp, then server receipt time. Accept late and future timestamps without cutoffs. These log policies are agreed. Archive-day selection remains for P3; do not redefine span/metric timestamp semantics. | Archive day in P3; traces in P7; metrics in P8 |
+| O-004 | Backend event-day selection, accepted lateness, missing timestamps, and future clock skew | Logs: preserve both original nanosecond timestamps and separate receipt time; select Timestamp, then ObservedTimestamp, then server receipt time. Use that selection's UTC day for archival. Accept late and future timestamps without cutoffs. | Traces in P7; metrics in P8 |
 | O-005 | Duplicate policy per signal | Logs: retain repeated exports as additional records, including identical messages; no deduplication index or horizon. This log policy is agreed. Candidate for later signals: identify duplicate spans by trace/span IDs and metric points by complete stream identity and point timestamps. Validate counter/histogram semantics before adoption. | Traces in P7; metrics in P8 |
 | O-006 | Supported OTLP subset and its database mapping | Logs: preserve complete content from the pinned OTLP protobuf, including typed bodies/attributes, resource/scope context, correlation and original nanosecond timestamps; this support policy is agreed. Derive physical schema from these contracts and verify representative go-service payloads. Trace/metric support and mapping remain open; document unsupported shapes/omissions explicitly. A handwritten copy of the OTel schema is unnecessary. | Log verification in P1; trace storage in P7; metric storage in P8 |
 | O-007 | R2 bucket and persistent-volume ownership/configuration | Reuse infraops' delivered protected-PVC and optional R2 expiration capabilities; choose capacity, path, provisioning profile, backing-volume reclaim policy and operational ownership. Verify the private bucket/reference. Verify actual release-tooling execution and storage preservation before activating storage; do not infer live provisioning from source support. | Local storage path in P1; test R2 access in P4; runtime settings before use |
-| O-008 | Concrete resource and query bounds | Measure one-application ingestion and representative historical queries. Set memory/native headroom, workspace limits, export thresholds, and disk outage capacity from evidence. | Bound each capability as introduced in P0–P8; refine with workload measurements |
+| O-008 | Concrete resource and query bounds | Log export uses one active batch and a separate quota-limited staging filesystem. DuckDB uses its default spill limit unless configured explicitly. Use 1 GiB as a starting point for testing the staging filesystem. Measure one-application ingestion and representative queries to size memory/native headroom, export batches, staging capacity and the persistent outage budget. | Bound each capability as introduced in P0–P8; refine with workload measurements |
 | O-009 | Reserved: site authentication | Outside v1 under D-012/WEB-012. | No v1 work |
 | O-010 | Required platform matrix and native runtime image | Retain Linux amd64/arm64 containers and native macOS arm64 development. Package the actual driver/engine/extensions accordingly. The owner will validate deployed platform/runtime behavior; it remains unavailable acceptance evidence until run. | Repository dependency checks as introduced; deployed runtime validation owned by the operator |
 | O-011 | Lean S3 client version | Start feasibility with go-micro-s3/client; pin only after R2 behavior, bounded-memory transfer, license, runtime dependencies, and linked binary cost are checked. | P4 |

@@ -23,7 +23,12 @@ func Open(lc signal.Lifecycle, cfg *Config) (*sql.DB, error) {
 		"memory_limit": {cfg.MemoryLimit},
 		"threads":      {strconv.Itoa(cfg.Threads)},
 	}
+	if !strings.IsEmpty(cfg.SpillLimit) {
+		settings.Set("max_temp_directory_size", cfg.SpillLimit)
+	}
+
 	options := []telemetry.Option{telemetry.WithAttributes(attributes.DBSystemNameKey.String("duckdb"))}
+
 	db, err := telemetry.Open("duckdb", strings.Concat(cfg.Path, "?", settings.Encode()), options...)
 	if err != nil {
 		return nil, err

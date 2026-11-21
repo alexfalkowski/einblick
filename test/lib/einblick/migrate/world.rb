@@ -23,13 +23,52 @@ module Einblick
 
       def attempt_future_migration
         Nonnative.stop
-        change_schema_version(1, 2)
+        change_schema_version(2, 3)
         log_database { |connection| @schema_data_before, @migration_history_before = migration_snapshot(connection) }
         attempt_database_start('server.yaml')
       ensure
         log_database { |connection| @schema_data_after, @migration_history_after = migration_snapshot(connection) }
-        change_schema_version(2, 1)
+        change_schema_version(3, 2)
         Nonnative.start
+      end
+
+      def prepare_previous_log_schema
+        prepare_acknowledged_log_export
+        Nonnative.stop
+        log_database do |connection|
+          connection.query(<<~SQL)
+            DROP VIEW log_archive_rows;
+            DROP TABLE log_archive_members; DROP TABLE log_archive_batches;
+            DELETE FROM goose_db_version WHERE version = 2;
+          SQL
+          @schema_data_before, @migration_history_before = migration_snapshot(connection)
+        end
+      end
+
+      def upgrade_log_schema
+        Nonnative.start
+        with_log_database do |connection|
+          @schema_data_after = schema_data(connection)
+          @migration_history = connection.query(HISTORY_SQL).to_a
+        end
+      end
+
+      def retry_archive_migration
+        log_database { |connection| connection.query("CREATE VIEW log_archive_rows AS SELECT 'preserved' AS marker") }
+        attempt_database_start('server.yaml')
+        inspect_failed_archive_migration
+      ensure
+        log_database { |connection| connection.query('DROP VIEW log_archive_rows') }
+        upgrade_log_schema
+      end
+
+      def inspect_failed_archive_migration
+        log_database do |connection|
+          @failed_schema_tables = connection.query(<<~SQL).to_a
+            SELECT table_name FROM information_schema.tables WHERE table_name IN ('log_archive_batches', 'log_archive_members')
+          SQL
+          @failed_archive_schema_data, @failed_archive_history = migration_snapshot(connection)
+        end
       end
 
       def change_schema_version(from, to)

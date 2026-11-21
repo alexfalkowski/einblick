@@ -48,7 +48,7 @@ module Einblick
       end
 
       def choose_configured_time_range(preset, minutes)
-        with_query_profile("query_range_#{minutes}m") do
+        with_server_profile("query_range_#{minutes}m") do
           @preset_page = open_logs
           choose_time_range(preset, page: @preset_page)
         end
@@ -105,7 +105,7 @@ module Einblick
       end
 
       def submit_logs_with_expired_budget
-        with_query_profile('query_timeout') { investigate_logs('partial', 'es') }
+        with_server_profile('query_timeout') { investigate_logs('partial', 'es') }
       end
 
       private
