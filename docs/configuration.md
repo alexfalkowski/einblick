@@ -44,11 +44,17 @@ archive:
   batch_size: 65536B
 ```
 
-Mount `workspace` as an existing writable directory with its own filesystem
-capacity limit. After mounting it, create `v1` on that filesystem and give the
-service user ownership. Startup requires this directory so a missing mount
-with an empty mount point cannot silently redirect staging to the backing disk.
-Reserve write access for this instance and its operators.
+Mount a separate, quota-limited filesystem at `workspace` before starting
+Einblick. Keep the backing path absent or unwritable to the service user when
+the volume is unmounted. A writable backing path can receive Parquet files
+outside the staging quota. In the container deployment, mount the staging
+claim at `/staging` and keep the container root filesystem read-only. On a
+host, restrict write access to the mount point before mounting the volume.
+
+Einblick requires a writable workspace and creates `v1` there with access
+restricted to the service user. Startup fails if the workspace is missing or
+unwritable. Reserve write access on the mounted workspace for this instance
+and its operators.
 Begin with 1 GiB for testing and measure staged files and spill before sizing
 production.
 

@@ -8,20 +8,11 @@ module Einblick
       ARCHIVE_DIRECTORY = File.join(WORKSPACE, 'v1')
       PENDING = File.join(ARCHIVE_DIRECTORY, '.pending')
 
-      def prepare_archive_storage
+      def prepare_archive_storage(create_export_directory: true)
         prepare_log_database
         initialize_log_database
         FileUtils.rm_rf(WORKSPACE)
-        FileUtils.mkdir_p(ARCHIVE_DIRECTORY)
-      end
-
-      def prepare_public_archive_directory
-        prepare_archive_storage
-        File.chmod(0o755, ARCHIVE_DIRECTORY)
-      end
-
-      def inspect_archive_directory_at_startup
-        with_server_profile('archive') { @archive_directory_mode = File.stat(ARCHIVE_DIRECTORY).mode & 0o777 }
+        FileUtils.mkdir_p(create_export_directory ? ARCHIVE_DIRECTORY : WORKSPACE)
       end
 
       def acknowledge_archive_logs(request)
@@ -57,16 +48,6 @@ module Einblick
           wait_for_archive(2, 0)
         end
         inspect_archive
-      end
-
-      def start_without_archive_directory(workspace_state)
-        FileUtils.rm_rf(WORKSPACE)
-        path = workspace_state == 'empty' ? WORKSPACE : File.dirname(WORKSPACE)
-        FileUtils.mkdir_p(path)
-        Nonnative.stop
-        attempt_database_start('archive.yaml')
-      ensure
-        Nonnative.start
       end
 
       def stage_after_workspace_returns

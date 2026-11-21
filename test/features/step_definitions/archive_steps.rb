@@ -21,6 +21,18 @@ Given('an archive workspace with a publicly accessible export directory') do
   prepare_public_archive_directory
 end
 
+Given('an empty archive workspace') do
+  prepare_archive_storage(create_export_directory: false)
+end
+
+Given('the configured archive workspace is missing') do
+  prepare_missing_archive_workspace
+end
+
+Given('an empty archive workspace without write access') do
+  prepare_unwritable_archive_workspace
+end
+
 Given('an acknowledged log export staged in Parquet') do
   prepare_archive_storage
   @archive_request = representative_export('logs')
@@ -49,8 +61,8 @@ When('the logs arrive twice with the same worker running and the first batch alr
   stage_late_log_archive
 end
 
-When('the service starts with local archival enabled and the workspace is {string}') do |state|
-  start_without_archive_directory(state)
+When('the service attempts to start with local archival enabled') do
+  attempt_archive_start
 end
 
 When('the service accepts that export while the destination day is unwritable and write access returns') do

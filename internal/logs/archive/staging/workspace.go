@@ -1,16 +1,15 @@
 package staging
 
 import (
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
-	"os"
-	"path/filepath"
 
 	"github.com/alexfalkowski/einblick/internal/logs/archive"
 	"github.com/alexfalkowski/go-service/v3/context"
+	"github.com/alexfalkowski/go-service/v3/crypto/rand"
 	"github.com/alexfalkowski/go-service/v3/errors"
 	"github.com/alexfalkowski/go-service/v3/io"
+	"github.com/alexfalkowski/go-service/v3/os"
 	"github.com/alexfalkowski/go-service/v3/strings"
 )
 
@@ -22,24 +21,33 @@ const (
 	directoryMode  = 0o700
 )
 
+// Keep at least 128 bits of randomness when the filesystem folds case.
+const attemptNameLength = 26
+
 // NewWorkspace manages local archive files under the configured workspace.
 // A nil cfg disables staging.
-func NewWorkspace(cfg *archive.Config, writer archive.BatchWriter) archive.StagedFiles {
+func NewWorkspace(cfg *archive.Config, writer archive.BatchWriter, fs *os.FS, generator *rand.Generator) archive.StagedFiles {
 	if cfg == nil {
 		return nil
 	}
 
-	return &workspace{path: filepath.Join(cfg.Workspace, archiveVersion), writer: writer}
+	return &workspace{path: fs.Join(cfg.Workspace, archiveVersion), writer: writer, fs: fs, generator: generator}
 }
 
 type workspace struct {
-	writer   archive.BatchWriter
-	prepared os.FileInfo
-	path     string
+	writer    archive.BatchWriter
+	prepared  os.FileInfo
+	fs        *os.FS
+	generator *rand.Generator
+	path      string
 }
 
-// Prepare opens the provisioned export directory and clears interrupted output.
+// Prepare opens or initializes the export directory and clears interrupted output.
 func (w *workspace) Prepare() error {
+	if err := w.fs.Mkdir(w.path, directoryMode); err != nil && !errors.Is(err, io.ErrExist) {
+		return errors.Prefix("log archive workspace", err)
+	}
+
 	root, info, err := w.openWorkspace()
 	if err != nil {
 		return err
@@ -51,12 +59,15 @@ func (w *workspace) Prepare() error {
 			return err
 		}
 	}
+
 	if err := root.RemoveAll(pendingDir); err != nil {
 		return err
 	}
+
 	if err := root.Mkdir(pendingDir, directoryMode); err != nil {
 		return err
 	}
+
 	w.prepared = info
 	return w.checkWorkspace(info)
 }
@@ -70,7 +81,7 @@ func (w *workspace) Verify(ctx context.Context, b archive.StagedBatch) (bool, er
 	}
 	defer root.Close()
 
-	checksum, err := fileChecksum(ctx, root, batchPath(b.Batch))
+	checksum, err := fileChecksum(ctx, root, w.batchPath(b.Batch))
 	if workspaceErr := w.checkWorkspace(info); workspaceErr != nil {
 		return false, workspaceErr
 	}
@@ -89,20 +100,27 @@ func (w *workspace) Stage(ctx context.Context, b archive.Batch) (_ string, err e
 	}
 	defer root.Close()
 
-	destination := batchPath(b)
-	day := filepath.Dir(destination)
+	name, err := w.generator.GenerateText(attemptNameLength)
+	if err != nil {
+		return strings.Empty, err
+	}
+
+	destination := w.batchPath(b)
+	day := w.fs.Dir(destination)
+
 	// A pending batch can have a final filename after an interrupted rename
 	// or a checksum mismatch. Its retained rows remain authoritative.
 	if err := root.Remove(destination); err != nil && !errors.Is(err, io.ErrNotExist) {
 		return strings.Empty, err
 	}
+
 	if err := root.MkdirAll(day, directoryMode); err != nil {
 		return strings.Empty, err
 	}
 
 	// DuckDB opens its own pathname. Only the verified workspace has this
 	// attempt's private directory, and COPY cannot create the parent directory.
-	attempt := filepath.Join(pendingDir, rand.Text())
+	attempt := w.fs.Join(pendingDir, name)
 	if err := root.Mkdir(attempt, directoryMode); err != nil {
 		return strings.Empty, err
 	}
@@ -110,11 +128,12 @@ func (w *workspace) Stage(ctx context.Context, b archive.Batch) (_ string, err e
 		err = errors.Join(err, root.RemoveAll(attempt))
 	}()
 
-	partial := filepath.Join(attempt, partialName)
-	if err := w.writer.WriteParquet(ctx, b, filepath.Join(w.path, partial)); err != nil {
+	partial := w.fs.Join(attempt, partialName)
+	if err := w.writer.WriteParquet(ctx, b, w.fs.Join(w.path, partial)); err != nil {
 		return strings.Empty, err
 	}
-	checksum, err := publishFile(ctx, root, partial, destination)
+
+	checksum, err := w.publishFile(ctx, root, partial, destination)
 	if err != nil {
 		return strings.Empty, err
 	}
@@ -138,21 +157,23 @@ func (w *workspace) openWorkspace() (*os.Root, os.FileInfo, error) {
 }
 
 func (w *workspace) checkWorkspace(opened os.FileInfo) error {
-	current, err := os.Lstat(w.path)
+	current, err := w.fs.Lstat(w.path)
 	if err != nil {
 		return errors.Prefix("log archive workspace", err)
 	}
-	if !os.SameFile(current, opened) || (w.prepared != nil && !os.SameFile(current, w.prepared)) {
+
+	if !w.fs.SameFile(current, opened) || (w.prepared != nil && !w.fs.SameFile(current, w.prepared)) {
 		return errors.New("log archive workspace changed since startup")
 	}
+
 	return nil
 }
 
-func batchPath(b archive.Batch) string {
-	return filepath.Join(logPartition, "day="+b.Day, b.ID+".parquet")
+func (w *workspace) batchPath(b archive.Batch) string {
+	return w.fs.Join(logPartition, "day="+b.Day, b.ID+".parquet")
 }
 
-func publishFile(ctx context.Context, root *os.Root, partial, destination string) (string, error) {
+func (w *workspace) publishFile(ctx context.Context, root *os.Root, partial, destination string) (string, error) {
 	checksum, err := fileChecksum(ctx, root, partial)
 	if err != nil {
 		return strings.Empty, err
@@ -166,7 +187,7 @@ func publishFile(ctx context.Context, root *os.Root, partial, destination string
 		return strings.Empty, err
 	}
 
-	return checksum, syncPath(root, filepath.Dir(destination))
+	return checksum, syncPath(root, w.fs.Dir(destination))
 }
 
 func fileChecksum(ctx context.Context, root *os.Root, path string) (string, error) {
@@ -180,6 +201,7 @@ func fileChecksum(ctx context.Context, root *os.Root, path string) (string, erro
 	if _, err := io.Copy(hash, contextReader{ctx: ctx, reader: file}); err != nil {
 		return strings.Empty, err
 	}
+
 	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 

@@ -71,9 +71,10 @@ workspace capacity. Increase or restore writable capacity and allow the next
 export attempt to run. Keep the database and staging mount accessible at startup
 when export is enabled. If the worker reports that the prepared workspace is
 missing or changed, restore the original mount and its `v1` directory so the
-worker can retry. After intentionally replacing the workspace, provision `v1`
-on the mounted replacement and restart Einblick to regenerate missing files
-from retained logs. Transfer to R2 and source eviction are planned.
+worker can retry. After intentionally replacing the workspace, mount the
+replacement and restart Einblick. Startup initializes the export directory on
+the new filesystem so the worker can regenerate missing files from retained logs.
+Transfer to R2 and source eviction are planned.
 
 ## 🚢 Deployment
 

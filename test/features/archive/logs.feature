@@ -38,14 +38,20 @@ Feature: Stage closed local log archives
     Then the UTC day should have two distinct complete batches
     And the first completed Parquet file should be unchanged
 
-  Scenario Outline: Refuse to start without the provisioned export directory
-    When the service starts with local archival enabled and the workspace is "<state>"
+  Scenario: Initialize an empty archive workspace
+    Given an empty archive workspace
+    When the service starts with local archival enabled
+    Then the export directory should be accessible only to the service user
+
+  Scenario: Refuse to start without the configured archive workspace
+    Given the configured archive workspace is missing
+    When the service attempts to start with local archival enabled
     Then startup should fail without creating an export directory
 
-    Examples:
-      | state   |
-      | missing |
-      | empty   |
+  Scenario: Refuse to start with an unwritable archive workspace
+    Given an empty archive workspace without write access
+    When the service attempts to start with local archival enabled
+    Then startup should fail without creating an export directory
 
   Scenario: Retry publication after permissions are restored
     Given a log export for an earlier UTC day
