@@ -23,19 +23,28 @@ The gem detects Homebrew without extra build flags. The configured
 
 Run commands from the repository root. The Cucumber/Nonnative harness starts
 the server with [test/.config/server.yaml](../test/.config/server.yaml).
-Choose the feature group you are changing:
+Choose the feature group you are changing.
 
 ```sh
-make features tags=@storage
-make features tags=@archive
-make features tags=@queries
-make features tags=@site
-make features tags=@printing
-make features feature=features/migrate
-make features feature=features/health
+make features-storage
+make features-archive
+make features-queries
+make features-site
+make features-service
 ```
 
-Run groups one at a time because they share ports and the test database.
+The storage group includes migrations. The service group covers health, metric
+and trace receipt, and scenarios outside the four tagged groups. Put each new
+scenario in at most one tagged group. `make features` runs all feature scenarios.
+Use `make features tags=@printing` or `make features feature=features/migrate`
+to narrow a local run. Run groups one at a time locally because they share ports
+and the test database. Run `make coverage` to merge the profiles in `test/reports/`
+and write `coverage.html` in that directory.
+
+In [CircleCI](../.circleci/config.yml) the groups run in separate jobs. Each job
+stores its test reports and passes its raw Go coverage profiles to the coverage
+job. The coverage job merges the profiles for a single Codecov upload.
+
 The Logs page includes a content fingerprint in each embedded CSS and
 JavaScript URL. Rebuilding with changed assets gives browsers a fresh URL.
 Shared actions live in `test/lib`; [fixtures](../test/fixtures/README.md) provide

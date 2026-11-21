@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Give each CircleCI partition its own filenames so coverage profiles can be merged.
+
+set -eo pipefail
+
+readonly reports_directory="test/reports"
+readonly workspace_directory="/tmp/einblick-reports"
+
+case "${1:-}" in
+  stage)
+    case "${2:-}" in
+      storage | archive | queries | site | service) ;;
+      *)
+        printf '%s\n' 'partition must be storage, archive, queries, site, or service' >&2
+        exit 1
+        ;;
+    esac
+
+    readonly partition="$2"
+    readonly destination="${workspace_directory}/${partition}"
+    mkdir -p "$destination"
+
+    staged=false
+    for profile in "$reports_directory"/*.cov; do
+      [[ -s "$profile" && -f "$profile" && ! -L "$profile" && "${profile##*/}" != final.cov ]] || continue
+      cp "$profile" "${destination}/${partition}-${profile##*/}"
+      staged=true
+    done
+
+    if ! "$staged"; then
+      printf 'no coverage profiles to stage for %s\n' "$partition" >&2
+      exit 1
+    fi
+    ;;
+  restore)
+    profiles=("$workspace_directory"/*/*.cov)
+    if [[ ! -f "${profiles[0]}" ]]; then
+      printf '%s\n' 'no coverage profiles to restore' >&2
+      exit 1
+    fi
+
+    mkdir -p "$reports_directory"
+    cp "${profiles[@]}" "$reports_directory/"
+    ;;
+  *)
+    printf '%s\n' 'unknown coverage workspace action' >&2
+    exit 1
+    ;;
+esac

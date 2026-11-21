@@ -10,6 +10,27 @@ commands:
       - checkout:
           method: blobless
       - sync-submodules
+  prepare-service:
+    steps:
+      - checkout-submodules
+      - run: make source-key
+      - restore_cache:
+          name: restore go cache
+          keys:
+            - einblick-go-cache-{{ checksum "go.sum" }}-{{ checksum "~/.go-version" }}
+            - einblick-go-cache-
+      - restore_cache:
+          name: restore ruby cache
+          keys:
+            - einblick-ruby-cache-{{ checksum "test/Gemfile.lock" }}-{{ checksum "~/.ruby-version" }}
+            - einblick-ruby-cache-
+      - run: make clean
+      - run: make dep
+      - restore_cache:
+          name: restore go build cache
+          keys:
+            - einblick-go-build-cache-{{ checksum "go.sum" }}-{{ checksum "~/.go-version" }}-{{ checksum ".source-key" }}
+            - einblick-go-build-cache-
 
 executors:
   go:
@@ -27,20 +48,7 @@ jobs:
     executor: go
     working_directory: ~/einblick
     steps:
-      - checkout-submodules
-      - run: make source-key
-      - restore_cache:
-          name: restore go cache
-          keys:
-            - einblick-go-cache-{{ checksum "go.sum" }}-{{ checksum "~/.go-version" }}
-            - einblick-go-cache-
-      - restore_cache:
-          name: restore ruby cache
-          keys:
-            - einblick-ruby-cache-{{ checksum "test/Gemfile.lock" }}-{{ checksum "~/.ruby-version" }}
-            - einblick-ruby-cache-
-      - run: make clean
-      - run: make dep
+      - prepare-service
       - save_cache:
           name: save go cache
           key: einblick-go-cache-{{ checksum "go.sum" }}-{{ checksum "~/.go-version" }}
@@ -51,11 +59,6 @@ jobs:
           key: einblick-ruby-cache-{{ checksum "test/Gemfile.lock" }}-{{ checksum "~/.ruby-version" }}
           paths:
             - test/vendor
-      - restore_cache:
-          name: restore go build cache
-          keys:
-            - einblick-go-build-cache-{{ checksum "go.sum" }}-{{ checksum "~/.go-version" }}-{{ checksum ".source-key" }}
-            - einblick-go-build-cache-
       - restore_cache:
           name: restore go lint cache
           keys:
@@ -69,17 +72,54 @@ jobs:
           paths:
             - ~/.cache/golangci-lint
       - run: make sec
-      - run: make features
-      - run: make benchmarks
-      - run: make analyse
+    resource_class: arm.large
+  build-features:
+    executor: go
+    working_directory: ~/einblick
+    steps:
+      - prepare-service
+      - run: make build-test
       - save_cache:
           name: save go build cache
           key: einblick-go-build-cache-{{ checksum "go.sum" }}-{{ checksum "~/.go-version" }}-{{ checksum ".source-key" }}
           paths:
             - ~/.cache/go-build
-      - run: make coverage
+    resource_class: arm.large
+  features:
+    parameters:
+      partition:
+        type: enum
+        enum: [storage, archive, queries, site, service]
+    executor: go
+    working_directory: ~/einblick
+    steps:
+      - prepare-service
+      - run: make features-<< parameters.partition >>
+      - when:
+          condition:
+            equal: [service, << parameters.partition >>]
+          steps:
+            - run: make benchmarks
+            - run: make analyse
       - store_test_results:
           path: test/reports
+      - store_artifacts:
+          path: test/reports
+      - run: make coverage-workspace-stage partition=<< parameters.partition >>
+      - persist_to_workspace:
+          root: /tmp/einblick-reports
+          paths:
+            - << parameters.partition >>
+    resource_class: arm.large
+  coverage:
+    executor: go
+    working_directory: ~/einblick
+    steps:
+      - checkout-submodules
+      - attach_workspace:
+          at: /tmp/einblick-reports
+      - run: make coverage-workspace-restore
+      - run: make coverage
       - store_artifacts:
           path: test/reports
       - run: make codecov-upload
@@ -201,6 +241,19 @@ workflows:
   einblick:
     jobs:
       - build-service
+      - build-features
+      - features:
+          name: features-<< matrix.partition >>
+          matrix:
+            alias: feature-groups
+            parameters:
+              partition: [storage, archive, queries, site, service]
+          requires:
+            - build-features
+      - coverage:
+          requires:
+            - build-service
+            - feature-groups
       - test-docker-amd64:
           filters:
             branches:
@@ -211,7 +264,7 @@ workflows:
               ignore: master
       - sync:
           requires:
-            - build-service
+            - coverage
             - test-docker-amd64
             - test-docker-arm64
           filters:
@@ -221,7 +274,7 @@ workflows:
           context: gh
           serial-group: << pipeline.project.slug >>/version
           requires:
-            - build-service
+            - coverage
           filters:
             branches:
               only: master
@@ -265,7 +318,7 @@ workflows:
               only: master
       - wait-all:
           requires:
-            - build-service
+            - coverage
             - sync
             - test-docker-amd64
             - test-docker-arm64
