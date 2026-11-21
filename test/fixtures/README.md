@@ -1,21 +1,22 @@
 # 📥 OTLP source fixtures
 
-`logs.json`, `metrics.json` and `traces.json` are synthetic, not captures of
-deployed telemetry. The Ruby feature client sends them through upstream
-generated OTLP messages over the existing gRPC listener, both uncompressed
-and with gzip. RSpec matchers compare complete stored log resource/scope/record
-messages and reconstruct printed metric/trace requests. A fresh marker isolates
-each export; storage inspection also selects its server receipt range.
+The Ruby feature client sends synthetic OTLP fixtures over gRPC, both
+uncompressed and with gzip. A fresh marker isolates each export. Storage
+checks also select the server receipt range.
+
+| Fixture | What the test reads back |
+| --- | --- |
+| `logs.json` | Complete stored resource, scope and log messages from DuckDB. |
+| `metrics.json` | The complete metric export printed by the service logger. |
+| `traces.json` | The complete trace export printed by the service logger. |
 
 ## 🔎 Sources and identity
 
-The consumed source is go-service/v3 `v3.2.0`, pinned by `go.mod` and vendored
-locally. It uses OTel API/SDK `v1.47.0` and OTLP protobuf `v1.11.1`.
+The fixtures model the producer output from go-service/v3 `v3.2.0`. Its
 `telemetry/attributes.NewResource` attaches `host.id`, `service.instance.id`,
-`service.name`, `service.version` and `deployment.environment.name` under the
-`1.43.0` semantic-convention schema. Arbitrary configured resource attributes
-may also be present; these fixtures do not assume a namespace or Kubernetes
-identity.
+`service.name`, `service.version` and `deployment.environment.name`. Producers
+can add configured resource attributes. The fixtures omit namespace and
+Kubernetes identity. See [go.mod](../../go.mod) for the versions Einblick uses today.
 
 The fixed identities, nanosecond timestamps, trace/span IDs, typed nested
 values and large integers are manufactured edge cases. Protobuf JSON uses
@@ -125,24 +126,6 @@ The native `duckdb` Ruby gem is pinned to `2.0.0.1`, uses the MIT license and
 needs DuckDB 2.0.0 from Homebrew locally or the prepared CI image. The existing
 Cucumber/Nonnative lifecycle and configuration are reused.
 
-Implementation conventions were checked against Bezeichner's
-`internal/api/v1/transport/grpc/grpc.go` and Migrieren's module composition.
-Einblick uses `internal/logs`, `internal/metrics` and `internal/traces`, with
-direct `Register` functions and the shared transport lifecycle. Metric/trace
-constructors remain logger-only; the log receiver consumes the composed local
-`Repository`, whose logging decorator emits diagnostics. The upstream protobuf
-packages remain v1. See [development](../../docs/development.md#-storage) for
-the storage layout and migration workflow.
-
-The local go-service checkout at `04f25241e9fe5390d0d51e88faf70c99e592582e`
-was inspected alongside the consumed `v3.2.0` source; Bezeichner was at
-`70bdb32ed3243aec8842b6107ed4de0de8a6da0b` and shared bin at
-`00a890b21a01cfa4907262dfe19f9f2812b9e560`. Relevant framework paths include
-`transport/grpc/module.go`, `transport/grpc/server.go`, `net/grpc/registrar.go`,
-`telemetry/logger/module.go`, `telemetry/metrics/provider.go`,
-`telemetry/tracer/tracer.go`, `telemetry/attributes/attributes.go` and
-`encoding/proto/json.go`. The receivers reuse registrar, gzip, message-size
-limit, rate limiter, logger and protobuf JSON encoder. They add no custom
-record-count, output-size or concurrency limits. Larger log-batch/body cases
-exercise requests previously rejected by the removed receiver thresholds;
-message-size rejection remains owned by the shared transport.
+The larger log-batch and body cases exercise accepted request sizes. The shared
+gRPC transport enforces the message size limit. See [ingestion responses](../../docs/ingestion.md#-responses)
+and [storage layout](../../docs/development.md#-storage).

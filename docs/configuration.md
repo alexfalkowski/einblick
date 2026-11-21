@@ -44,28 +44,28 @@ archive:
   batch_size: 65536B
 ```
 
-Mount a separate, quota-limited filesystem at `workspace` before starting
-Einblick. When the volume is unmounted, the workspace path must be absent,
-deny traversal to the service user, or be on a read-only filesystem. Removing
-write permission from a traversable mount point still allows Einblick to
-stage files in an existing writable `v1` outside the staging quota.
+| Example location | Mount | Holds |
+| --- | --- | --- |
+| `/data` | Writable persistent volume | DuckDB database, adjacent WAL and spill files. |
+| `/staging` | Separate quota-limited filesystem, mounted before startup | Temporary and completed Parquet files under `v1/`. |
 
-In the container deployment, mount the staging claim at `/staging` and keep
-the container root filesystem read-only. On a host, use a mount point that
-the service user cannot traverse until the staging volume is mounted.
+Keep the container root filesystem read-only. On a host, use a mount point the
+service user cannot traverse before mounting the staging volume. When unmounted,
+the workspace path must be absent, inaccessible to the service user, or on a
+read-only filesystem. A traversable mount point with an existing writable `v1`
+lets files bypass the staging quota even if the mount point itself has no write
+permission.
 
-Einblick creates `v1` if needed and restricts access to the service user.
-Startup fails if Einblick cannot create or prepare the export directory.
-Reserve write access on the mounted workspace for this instance and its
-operators.
-Begin with 1 GiB for testing and measure staged files and spill before sizing
-production.
+Einblick prepares `v1` for access by the service user and fails startup if
+preparation fails. Reserve workspace write access for this instance and its
+operators. Begin with 1 GiB for testing and measure staged files and spill
+before sizing production.
 
-Each interval processes one batch, prioritizing interrupted work. `batch_size`
-requires a positive decimal size such as `65KB` (65,000 bytes) or `65536B`.
-It targets the uncompressed projected row bytes. An accepted row above that
-target gets its own batch. Size the workspace to fit the largest such file and
-the completed files it needs to hold. See [staging and recovery](operations.md#-local-parquet-staging).
+The worker attempts one batch per interval after recovery, prioritizing
+interrupted work. Set `batch_size` to a positive decimal size such as `65KB`
+(65,000 bytes) or `65536B`. It targets uncompressed projected row bytes.
+A larger accepted row gets its own batch. Allow room for the largest such file
+and the completed files retained on the workspace. See [staging and recovery](operations.md#-local-parquet-staging).
 
 ## 🩺 Health checks
 

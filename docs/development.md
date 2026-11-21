@@ -68,26 +68,40 @@ transactional `Add` operation live in `repository.go`; the diagnostic decorator
 lives in `logging.go`. SQL files live in `queries/` and are embedded as strings
 declared in `queries.go`.
 
-`Repository.List` supplies the versioned query operation in `internal/api/v1/logs`.
-Both API transports use that typed adapter. The Logs MVC controller calls the
-unversioned `Repository.List` operation directly.
-Query validation, queueing and SQL execution share one
-deadline. One go-sync semaphore bounds concurrent queries and allows waiting requests
-to cancel; intake does not acquire it. Continuation pages use strict
-event-time/ID keysets within fixed absolute bounds. New arrivals behind the
-cursor can enter later pages; refresh to see arrivals ahead of it.
+```mermaid
+flowchart TD
+    accTitle: Recent-log query paths
+    accDescr: The browser controller and the typed API adapter share the same repository and read the same local database.
+    Browser[Browser] -->|GET or PUT /logs| MVC[Logs MVC controller]
+    Client[API client] -->|gRPC or HTTP RPC| API[Versioned ListLogs adapter]
+    MVC --> List[Repository.List]
+    API --> List
+    List --> DB[(DuckDB)]
+```
+
+The [typed API adapter](../internal/api/v1/logs/list.go) converts request and
+response messages. The [MVC controller](../internal/site/logs/controller/controller.go)
+handles form inputs and renders the page or fragment. `Repository.List` owns a
+shared deadline for validation, queueing and SQL work. A go-sync semaphore
+bounds active queries and lets waiting requests cancel. Log ingestion writes
+through `Repository.Add` independently of that semaphore.
+See [pagination](queries.md#-results-and-pagination) for cursor behavior.
 
 Keep timestamps as unsigned nanoseconds. Writes bind decimal strings to
 `UBIGINT` to preserve the full unsigned range; conversions through floating-point
 values or lower-precision timestamp types can lose data.
 
-`internal/logs/archive` defines batches and coordinates recovery and export
-through its batch repository and staged file interfaces. The Logs module
-wires `internal/logs/storage` for durable state and native DuckDB
-Parquet writes. `internal/logs/archive/staging` uses that writer to produce
-verified Parquet and manages temporary paths, file checksums, and the final
-rename. Startup prepares the workspace and clears partial output. The worker
-checks recorded files before it begins staging batches on its ticks.
+The [Logs module](../internal/logs/module.go) wires local export. Keep changes
+in the package that owns the behavior.
+
+| Package | Owns |
+| --- | --- |
+| [archive](../internal/logs/archive) | Batch identity and export policy. |
+| [storage](../internal/logs/storage) | Durable batch state and native DuckDB Parquet writes. |
+| [staging](../internal/logs/archive/staging) | Workspace recovery, temporary files, checksums and final rename. |
+| [worker](../internal/logs/archive/worker) | Workspace preparation at startup and scheduling of recovery and exports. |
+
+See [local Parquet staging](operations.md#-local-parquet-staging) for the recovery flow.
 
 The v1 Parquet projection includes `log_id`, the four unsigned nanosecond
 columns, and the stored protobuf JSON for `resource`, `scope` and `record`.

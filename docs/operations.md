@@ -26,10 +26,9 @@ spill files together across restarts. Stop the service before moving them.
 A locked database file fails startup; the previous process must close it before
 a replacement can open it for writing.
 
-Successful OTLP log responses mean the records committed locally. Restart
-recovery uses the intact data path before accepting traffic. Metrics and traces
-are currently printed and discarded. Accepted logs continue to use space on
-the database volume even after the service stages their Parquet files.
+On restart, Einblick recovers DuckDB and applies pending migrations before
+accepting traffic. Keep the volume to recover acknowledged logs. Staging
+Parquet files leaves the source rows in DuckDB, where they continue to use space.
 
 Disk write failures return retryable `UNAVAILABLE`. Restore writable capacity
 and allow clients to retry. Repeated exports can produce duplicate records.
@@ -56,14 +55,22 @@ completed log batches under `v1/signal=logs/day=YYYY-MM-DD/<batch-id>.parquet`
 on its own quota-limited workspace. It uses the UTC day of the selected event
 time. A late record can create another batch for the same day.
 
-The database retains every accepted row and records the exact membership and
-logical digest of each batch. The service checks the written rows before
-renaming the file and recording its byte checksum. Startup discards interrupted
-temporary output. After startup, the worker checks recorded files and requeues
-missing or corrupt files before staging more batches. It can regenerate them
-from DuckDB using the same batch ID. If verification encounters a read error,
-the worker logs it and retries on the next tick while intake and recent queries
-stay available. Preserve the database volume to recover these jobs.
+```mermaid
+flowchart TD
+    accTitle: Local Parquet recovery after restart
+    accDescr: Clear partial files, check completed files, requeue missing or damaged files, then resume staging one batch per tick.
+    Start["Startup: clear partial output"] --> Verify[Check completed files]
+    Verify -->|Missing or damaged| Requeue[Requeue with same batch ID]
+    Requeue -->|Continue scan| Verify
+    Verify -->|Recovery error| Retry[Log error and retry next tick]
+    Retry --> Verify
+    Verify -->|Recovery complete| Stage[Stage one batch per tick]
+```
+
+DuckDB retains the batch's exact members and logical digest. The exporter
+verifies the written rows, renames the file, and records its byte checksum.
+Recovery uses the retained rows to regenerate files while ingestion and recent
+queries stay available.
 
 When the staging mount fills, new export attempts fail and are retried at the
 configured interval. Inspect `component=log_archive` diagnostics and available

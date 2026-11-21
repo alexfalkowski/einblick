@@ -8,15 +8,7 @@
 
 Einblick is an OpenTelemetry service for applications built on go-service.
 It receives logs, metrics and traces over gRPC. Logs commit to local DuckDB
-storage before acknowledgement; metrics and traces print through the service
-logger and are discarded.
-
-The service recovers its local log database before serving requests and provides
-bounded recent-log queries in the browser and over gRPC and HTTP RPC. It can
-[stage local Parquet batches](docs/configuration.md#-local-parquet-export) for logs.
-Trace and metric persistence and views and Cloudflare R2 archival are planned.
-See the [product requirements](docs/requirements.md) and
-[implementation plan](docs/review-and-plan.md) for the remaining work.
+before acknowledgement. Metrics and traces are printed and discarded.
 
 ## 🚀 Quickstart
 
@@ -45,10 +37,19 @@ disposable; use a persistent mount to retain accepted logs.
 
 ## 📥 Telemetry ingestion
 
-Send standard OTLP/gRPC log, metric and trace exports to the gRPC listener, including with gzip.
-See [telemetry ingestion](docs/ingestion.md) for receipt behavior, responses and a local
-client example. Successful log exports acknowledge local commit. Successful
-metric and trace exports acknowledge receipt only.
+```mermaid
+flowchart LR
+    accTitle: Telemetry in Einblick today
+    accDescr: OTLP logs are stored in DuckDB for recent-log queries and optional Parquet staging. Metrics and traces are printed and discarded.
+    OTLP["OTLP/gRPC"] -->|Logs| DB[(DuckDB)]
+    OTLP -->|Metrics and traces| Logger[Service logger]
+    DB --> Queries[Browser and query API]
+    DB -->|Optional| Parquet[Local Parquet files]
+```
+
+See [telemetry ingestion](docs/ingestion.md) for OTLP/gRPC methods, gzip,
+responses and local examples, and [local Parquet export](docs/configuration.md#-local-parquet-export)
+to enable staging.
 
 ## 🔎 Log queries
 
@@ -73,3 +74,9 @@ See [development](docs/development.md) for the Cucumber harness, test output and
 validation. Go API documentation is available on
 [pkg.go.dev](https://pkg.go.dev/github.com/alexfalkowski/einblick), and release
 history is available in [GitHub releases](https://github.com/alexfalkowski/einblick/releases).
+
+## 🧭 Roadmap
+
+R2 archival, historical queries, and persistence and views for metrics and
+traces are planned. See the [product requirements](docs/requirements.md) and
+[implementation plan](docs/review-and-plan.md).
