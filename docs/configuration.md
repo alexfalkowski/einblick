@@ -44,11 +44,20 @@ archive:
   batch_size: 65536B
 ```
 
-Mount `workspace` as an existing writable directory with its own filesystem
-capacity limit. After mounting it, create `v1` on that filesystem and give the
-service user ownership. Startup requires this directory so a missing mount
-with an empty mount point cannot silently redirect staging to the backing disk.
-Reserve write access for this instance and its operators.
+Mount a separate, quota-limited filesystem at `workspace` before starting
+Einblick. When the volume is unmounted, the workspace path must be absent,
+deny traversal to the service user, or be on a read-only filesystem. Removing
+write permission from a traversable mount point still allows Einblick to
+stage files in an existing writable `v1` outside the staging quota.
+
+In the container deployment, mount the staging claim at `/staging` and keep
+the container root filesystem read-only. On a host, use a mount point that
+the service user cannot traverse until the staging volume is mounted.
+
+Einblick creates `v1` if needed and restricts access to the service user.
+Startup fails if Einblick cannot create or prepare the export directory.
+Reserve write access on the mounted workspace for this instance and its
+operators.
 Begin with 1 GiB for testing and measure staged files and spill before sizing
 production.
 
