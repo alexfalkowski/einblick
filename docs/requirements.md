@@ -152,9 +152,9 @@ Use these capabilities when implementing the service:
   failure/rollback behavior. Local Parquet staging uses DuckDB's bundled
   writer. E-07 adds the S3 transfer client. E-08 packages and verifies DuckDB
   remote reads in the required service images.
-- The Makefile uses `http.mak` for shared service tooling without local protobuf
-  generation. Keep the gRPC transport configured for OTLP ingestion and consume
-  upstream OpenTelemetry service definitions; no custom service API is needed.
+- Ingestion uses the upstream OTLP/gRPC service definitions. The versioned
+  query API has its own protobuf contract and generation workflow.
+  [Query API development](development.md#-query-api)
 - Infraops provides `storage.capacity`, `storage.path`, and optional
   `storage.profile` for a protected `<app>-data` filesystem PVC and writable mount.
   Omitted profile uses the cluster default; empty requests no StorageClass; a named
@@ -178,23 +178,28 @@ cardinality, retained sizes, or production capacity.
 
 ## 7. Working architecture
 
+This is the first-version target. The [README](../README.md#-telemetry-ingestion)
+shows the current data flow.
+
 ```mermaid
-flowchart LR
-    C[Existing services] -->|OTLP/gRPC| I[Ingestion]
-    I --> D[DuckDB on persistent volume]
-    D --> E[Parquet batch exporter]
-    E --> R[Private Cloudflare R2 bucket]
+flowchart TD
+    accTitle: First-version target architecture
+    accDescr: All three signals commit to local DuckDB. Background export publishes Parquet to R2, and browser and API queries use local or archived data.
+    C[Application services] -->|OTLP/gRPC| I[Ingestion for all three signals]
+    I -->|Commit before acknowledgement| D[(DuckDB on persistent volume)]
+    D -->|Background export| E[Local Parquet staging]
+    E -->|Planned publication| R[(Private Cloudflare R2)]
     B[Browser] --> M[Embedded MVC views and charts]
-    M --> Q[Query service]
-    Q --> D
-    Q -->|Historical Parquet reads| R
+    M --> Q[Bounded queries]
+    A[API clients] --> Q
+    Q -->|Recent| D
+    Q -->|Planned historical reads| R
 ```
 
 All service components run in one executable. Templates and first-party CSS
 and scripts are embedded release assets. The browser loads htmx and daisyUI
 component styles from jsDelivr. The UI runs without an external dashboard
-service. The persistent volume and R2 bucket are external storage resources,
-not additional application services.
+service. The persistent volume and R2 bucket provide storage outside the executable.
 
 An illustrative local layout is:
 

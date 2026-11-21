@@ -5,68 +5,44 @@
 ## 🖥️ Investigate recent logs in the browser
 
 Open `http://localhost:11000/logs` with the development configuration.
-The page opens on local logs over the configured maximum range ending now.
-Choose **15 min**, **1 hour**, **24 hours**, **3 days**, or **7 days** to run a
-search ending now with the filters in the form. The page shows the presets that
-fit the configured search limit and highlights the applied duration. A limit
-shorter than 15 minutes offers **Recent**, which uses the configured duration.
-Enter the exact service name in the sidebar and narrow the results with
-**Search messages**, a hexadecimal trace ID, or severity. The severity choices
-are Debug, Info, Warn, Error, and Fatal. Each matches its exact level. **All severities**
-includes any other levels in the stored data. An empty service filter includes
-logs from all services, including records without a service name.
+The page starts with the configured maximum range ending now. Use the exact
+service name, **Search messages**, a hexadecimal **Trace ID**, or severity to
+narrow the results. An empty service filter includes unnamed services. A severity
+choice matches one exact level (Debug, Info, Warn, Error, or Fatal), while
+**All severities** includes every level. Matching message text is highlighted.
 
-Choose **Search** or press Enter to apply filter edits. The default recent
-window and any preset you choose advance to now with each search. Search from
-an absolute-range bookmark to keep its exact bounds. During an in-place query,
-**Loading logs…** appears below the filters.
-The page temporarily disables Search, time presets, Clear search and Next page.
-You can edit the filters and submit them when the query finishes.
+| Goal | Action |
+| --- | --- |
+| Search up to now | Choose a time preset. To apply filter edits, select **Search** or press Enter. The default window and presets advance to now on each search. |
+| Keep the exact interval | Choose **Next page**, clear the message search with **×** or **Clear search**, or search from an absolute-range bookmark. Clearing or paging retains the preset for the next **Search**. |
+| Share or revisit a query | Copy the address bar URL to share the exact bounds, including fractional seconds, filters and page. Use Back for the previous query or **Reset** to clear the filters and return to the latest window. |
+| Inspect a log | Select a row or focus its message and press Enter. Use Escape or Close to return to it. On wide screens you can also click the backdrop. |
+| Follow a trace ID | Open **Timing and IDs** and choose **Find related logs**. The search keeps the current range and other filters. |
 
-Matching text is highlighted in the message preview. Clear the message search
-with **×** or **Clear search** in the empty state to rerun with the same time
-window and other filters. Clearing the message search or choosing **Next page**
-keeps the current bounds for that action and the preset for your next **Search**.
+The page offers **15 min**, **1 hour**, **24 hours**, **3 days**, and **7 days**
+as allowed by the query limit. Below 15 minutes, **Recent** uses the configured
+duration. A bookmarked range outside the presets is labeled **Current range**.
+For a custom interval within the limit, supply both `start_time` and `end_time`
+in the `/logs` URL as RFC 3339 timestamps.
 
-Select a row or focus its message and press Enter to open **Log details**.
-The inspector slides over the results from the right and fills the screen on
-narrow displays. Use the close button or press Escape to return to the selected
-message. On wide screens, clicking the dimmed backdrop also closes the inspector.
+The table shows UTC time to the second. When the producer omits event time,
+the **Log details** summary labels the observation or receipt time used in its
+place. The inspector fills the screen on narrow displays. It shows the full
+message, available service, environment and time to receipt, and reported status
+and duration for HTTP and gRPC request logs.
+Expand **Attributes**, **Source**, or **Timing and IDs** for typed values,
+resource and instrumentation details, exact timestamps, and copyable IDs.
+Use the API for the original typed OTLP fields.
 
-The inspector shows the full message, service, environment and time to receipt
-when available. HTTP and gRPC request logs also show the reported status and
-request duration. Expand **Attributes** for individual values and nested
-lists, **Source** for resource and instrumentation details, or
-**Timing and IDs** for exact timestamps and copyable trace and span IDs.
-Use the query API to retrieve the original typed OTLP fields.
+While **Loading logs…** is visible, you can edit filters and submit after the
+query finishes. If htmx is unavailable, searches and pagination open full pages.
+For no matches, try a longer preset or clear a filter. If a saved link fails,
+choose **Open Logs**. When offered after a network or gateway error, **Try again**
+resends the same inputs. A transport timeout appears in in-place updates and can
+return an empty HTTP 504 on direct navigation.
 
-Follow **Next page** to continue the same query. The address bar captures the
-submitted absolute range, filters and page position. Use Back to return to the
-previous query. **Reset** clears the filters and opens the latest local
-window. The table shows event time in UTC to the second. When the producer
-omits event time, the summary labels the observation or receipt time used in its
-place. Shared links retain the exact bounds, including fractional seconds. A
-duration outside the presets is marked **Current range**. Presets replace the
-UTC date and time pickers. Existing absolute-range bookmarks still open within
-the configured query limit. To construct a custom interval, supply both
-`start_time` and `end_time` as RFC 3339 timestamps in the `/logs` URL or use
-the [query API](#-query-recent-logs-through-the-api).
-Open **Timing and IDs** on a log and choose **Find related logs** to search for
-its trace in the current time range with the other filters still applied. You
-can also paste an ID from another tool into **Trace ID**. In-place updates use
-htmx from jsDelivr. When the browser cannot load it, searches and pagination
-open full pages.
-
-The browser negotiates English, German or Spanish with English fallback.
-If there are no matches, select a longer preset or clear a filter. If a saved
-search link fails, choose **Open Logs** to start a fresh search.
-If the shared HTTP deadline expires first, in-place queries show
-a timeout and direct navigation can return an empty HTTP 504 response. When
-offered after a network or gateway error, **Try again** sends the failed search
-with the same inputs. The page reads local storage and uses the same query
-bounds and ordering as the API.
-Anyone who can reach the route through the HTTP listener can query it without
-a site login.
+The page supports English, German and Spanish with English fallback. Anyone who
+can reach the HTTP route can query the same local data as the API without a site login.
 
 ## 🔌 Query recent logs through the API
 
@@ -133,18 +109,28 @@ Trace/span IDs inside the original record also use protobuf JSON's base64 form;
 the query filter accepts hexadecimal IDs.
 
 Results sort by event time descending, then local ID descending. Duplicate
-exports remain separate records. Each page reads the committed records visible
-to that query. Continuation pages select records strictly after the last result
-in that descending order, using its event time and ID.
+exports remain separate records. Pass the returned token as `page_token` with
+the same bounds, filters and effective page size.
 
-Newly committed records behind the cursor can appear on later pages. Records
-ahead of the cursor, including equal-time arrivals with higher IDs, require a
-fresh query. Existing records do not repeat across pages. Pagination does not
-freeze membership or coordinate with ingestion.
+```mermaid
+sequenceDiagram
+    accTitle: Continue a recent-log query
+    accDescr: Keep the query parameters fixed and pass the returned token to read rows after the last result in descending order.
+    participant C as Client
+    participant E as Einblick
+    C->>E: ListLogs with bounds, filters and page size
+    E-->>C: First page and token if more rows exist
+    C->>E: Same query plus token
+    E-->>C: Rows strictly after the token's event time and ID
+```
 
-Copy the returned token to `page_token` and repeat the same query. An empty token
-means exhaustion. Token size is independent of filter length. No logs and an
-empty token means no matches. Protobuf JSON omits default-valued fields, so
+Each page reads the committed records visible to that request. New records
+behind the cursor can appear on later pages. Records ahead of it, including
+equal-time arrivals with higher IDs, require a fresh query. Existing records
+appear once across pages.
+
+An empty token means exhaustion. Token size is independent of filter length.
+An empty first page means no matches. Protobuf JSON omits default-valued fields, so
 `logs` and `nextPageToken` can be absent; generated
 clients expose an empty collection and empty string respectively.
 There is no total-count query. Tokens survive service restarts and have no

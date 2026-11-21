@@ -16,18 +16,36 @@ OpenTelemetry definitions, including gzip:
 The [development configuration](configuration.md) exposes all three on gRPC
 port `12000`.
 
-Successful log exports commit all records and their resource/scope context in
-one local DuckDB transaction before returning. Empty log requests are successful
-no-ops. There is no background intake queue or dependency on R2. Successful
-metric and trace exports still acknowledge receipt only and discard records.
+## ✅ What success means
 
-Each metric or trace export prints one entry through the service logger. Its message
-is the complete request as Protobuf JSON, including resource and scope context;
-the `signal` field identifies `metrics` or `traces`. The payload is not
-duplicated in a separate field. Empty requests print `{}`. Records are
-discarded after printing. Logs emit a `component=logs` diagnostic with the
-committed-record count, or a failure, without printing the incoming payload.
-Acknowledged logs are available through the [recent-log query API](queries.md).
+```mermaid
+sequenceDiagram
+    accTitle: Successful OTLP exports
+    accDescr: Log exports acknowledge local commit. Metric and trace exports acknowledge receipt after printing the request.
+    participant C as OTLP client
+    participant E as Einblick
+    participant D as DuckDB
+    C->>E: Export over gRPC
+    alt Logs with records
+        E->>D: Write records and context<br/>in one transaction
+        D-->>E: Commit succeeded
+        E-->>C: Success after local commit
+    else Empty log export
+        E-->>C: Success without a write
+    else Metrics or traces
+        E->>E: Log request as Protobuf JSON
+        E-->>C: Receipt only
+    end
+```
+
+Use [recent-log queries](queries.md) to read acknowledged logs. Look for
+`component=logs` diagnostics for committed-record counts and write failures.
+These diagnostics omit the incoming log payload. The request writes directly to
+local storage and succeeds independently of background Parquet staging.
+
+Metric and trace records are discarded after printing. Each request appears as one
+logger message with its complete Protobuf JSON, including resource and scope
+context. The `signal` field is `metrics` or `traces`. Empty requests print `{}`.
 
 ## 📝 Log support and delivery
 
@@ -41,12 +59,13 @@ are outside this support boundary.
 
 The database stores typed Protobuf JSON, whose type tags and decimal-string
 64-bit integers preserve the original values. Nanoseconds also have exact
-`UBIGINT` columns. Timestamp selection follows
-[the OTel log model](https://opentelemetry.io/docs/specs/otel/logs/data-model/):
-use Timestamp, then ObservedTimestamp, then server receipt time if both are zero.
-Both original timestamps remain unchanged; receipt time is stored separately.
+`UBIGINT` columns. For event time, prefer a nonzero `Timestamp`, then a nonzero
+`ObservedTimestamp`, then server receipt time. Both original timestamps remain
+unchanged, and receipt time is stored separately. [OTel log data model](https://opentelemetry.io/docs/specs/otel/logs/data-model/)
+
 Late and future timestamps are accepted without cutoffs, including the full
-OTLP unsigned range. Archive-day selection is still planned.
+OTLP unsigned range. Local Parquet staging partitions logs by the UTC day of
+the selected time. [Local Parquet staging](operations.md#-local-parquet-staging)
 
 Repeated exports create additional records, including identical logs. There is
 no deduplication index or time horizon. A lost response or ambiguous commit may
@@ -71,12 +90,9 @@ Use `info` or `debug` logging to see receipts.
 | Message larger than the configured wire or decompressed limit | `RESOURCE_EXHAUSTED`; split or reduce the request. |
 | Malformed protobuf | `INTERNAL` from the shared gRPC decoder. |
 
-Log writes are atomic, so this implementation does not produce non-retried
-partial-success responses. Storage backpressure uses retryable `UNAVAILABLE`,
-following [OTLP retry guidance](https://opentelemetry.io/docs/specs/otlp/).
-Size rejection remains the transport's non-retryable `RESOURCE_EXHAUSTED`.
-No custom count, concurrency or free-space threshold is added. Existing records
-are retained when new writes fail; disk backlog/retention policies remain later work.
+Each log write succeeds or fails as a whole. Retry `UNAVAILABLE`. For
+`RESOURCE_EXHAUSTED`, reduce the request size before resending. Failed writes
+preserve existing records. [OTLP retry guidance](https://opentelemetry.io/docs/specs/otlp/)
 
 ## 🧪 Local client example
 
