@@ -1,10 +1,14 @@
 # Telemetry service: first-version requirements
 
-**Status:** Implementation specification. Local log persistence, recovery and [recent-log queries in the browser and API](queries.md) are implemented. Metrics and traces remain print-only. Trace and metric views, historical queries and archives are planned.
+**Status:** Implementation specification. Local log persistence, recovery,
+[recent-log queries in the browser and API](queries.md) and
+[local Parquet staging](operations.md#-local-parquet-staging) are implemented.
+Metrics and traces remain print-only. R2 publication, historical queries, and
+trace and metric views are planned.
 
-**Revision:** 0.24
+**Revision:** 0.25
 
-**Last updated:** 2026-11-19
+**Last updated:** 2026-11-21
 
 **Audience:** Implementing agents, reviewers, product owner, and operators.
 
@@ -78,7 +82,7 @@ The service should remain understandable to a small engineering team. Prefer an 
 | D-014 | Acknowledgement | Durable v1 acknowledges accepted telemetry after a successful local DuckDB commit; R2 upload is asynchronous. The early P0 printer acknowledges receipt only and discards records. | Working design; durability consequence documented below |
 | D-015 | Implementation order | Print all three signals first, then add persistence, queries, archival and the frontend through feature steps. | Agreed direction |
 | D-016 | Service dashboards | A small service catalog selects ready-made HTTP and/or gRPC panels plus Logs and Traces views, using our shared go-service instrumentation. | Agreed direction |
-| D-017 | R2 transfer library | Use a lean existing Go S3 library. Do not use either AWS Go SDK directly or through a runtime wrapper; evaluate actual runtime dependencies and binary cost. | Agreed constraint; client selection open |
+| D-017 | R2 transfer library | Use a lean Go S3 client without either AWS Go SDK in its runtime path. Prefer go-micro-s3/client. Before pinning, test with Floci, review R2 API compatibility, and check runtime dependencies and binary cost. | Agreed constraint, preferred client pending validation |
 | D-018 | Upgrade strategy | Use existing rolling updates with graceful DuckDB shutdown, one active writer and bounded startup/recovery. Do not add Recreate or a strategy selector. | Agreed direction |
 
 Revisit DuckDB only if feasibility work supplies a concrete blocker.
@@ -146,7 +150,8 @@ Use these capabilities when implementing the service:
   the application schema at startup through a single Goose history;
   [operations](operations.md#-log-storage-and-recovery) owns compatibility and
   failure/rollback behavior. Local Parquet staging uses DuckDB's bundled
-  writer. Remote dependencies follow in E-07, with native-image validation.
+  writer. E-07 adds the S3 transfer client. E-08 packages and verifies DuckDB
+  remote reads in the required service images.
 - The Makefile uses `http.mak` for shared service tooling without local protobuf
   generation. Keep the gRPC transport configured for OTLP ingestion and consume
   upstream OpenTelemetry service definitions; no custom service API is needed.
@@ -156,9 +161,10 @@ Use these capabilities when implementing the service:
   profile selects an existing class. Protection does not establish backups, backing
   PV reclaim policy, or exclusive-writer enforcement. DEP-004/DEP-005 define the
   persistent-volume and single-writer contract.
-- Infraops provides private R2 buckets and optional object-age `expiration`.
-  LIF-002 defines the lifecycle change/removal constraints. The archival feature
-  consumes the configured bucket and retention policy.
+- Infraops declares the private [`einblick` R2 bucket](https://github.com/alexfalkowski/infraops/blob/master/area/cf/cf.hjson).
+  To enable publication in production, configure that bucket and its R2 S3
+  endpoint and mount bucket-scoped credentials read-only through the existing
+  Infraops Secret mechanism. LIF-002 governs changes to object-age expiration.
 - Storage-aware release tooling is available. DEP-006 requires verification of
   actual configuration-writing pipelines and storage preservation before activation.
 - `web` supplies the MVC/htmx reference. The golden-signal dashboard
@@ -272,7 +278,7 @@ The exact SQL schema and typed-attribute representation are implementation desig
 - **STO-012 — Standard remote access.** Use DuckDB's supported remote-Parquet access for queries and a lean existing Go S3 client for archive transfer/discovery/deletion where required. Keep those responsibilities explicit. Do not implement a custom S3 signer/client or copy the live DuckDB file periodically and call that a consistent backup.
 - **STO-013 — No AWS Go SDK.** The service's R2 runtime path must not import aws-sdk-go or aws-sdk-go-v2, including through a wrapper. Use of the S3 API and SigV4 is expected and is separate from an SDK dependency. Record the selected version, runtime dependency graph, and linked binary delta; do not count test/tool-only modules as linked code. Keep any reusable storage package opt-in.
 - **STO-014 — Bounded object transfers.** Upload closed files without reading the whole object into Go memory. Support cancellation/deadlines, streaming downloads, bounded/tunable multipart concurrency and buffers, paginated listing, metadata/HEAD reconciliation, and deletion. Configure endpoint, region, and addressing for R2. Retry through the durable job policy with bounded work; avoid multiplying unbounded client and job retries.
-- **STO-015 — R2 client feasibility.** Before selecting the client, exercise the operations used by this design against R2, including multipart completion/abort, interrupted and ambiguous uploads, metadata/checksum verification, pagination, cancellation, and not-found/error classification. Verify DuckDB remote reads separately; success with another S3-compatible server alone is not R2 evidence.
+- **STO-015 — R2 client validation.** Before pinning the client, review its requests and error handling against [Cloudflare's documented R2 S3 API](https://developers.cloudflare.com/r2/api/s3/api/). Exercise the transfer and recovery contract with Floci, including conditional creation, multipart completion/abort, interrupted and ambiguous uploads, metadata/checksum verification, pagination, cancellation, and not-found/error classification. Verify DuckDB remote reads independently when introducing historical queries.
 
 Initial archive compaction and a remote manifest service are unnecessary for an append-only collection of independently committed objects. If future compaction replaces objects, its publication and reader-consistency protocol must be designed before enabling deletion of old objects.
 
@@ -379,15 +385,18 @@ The interaction draws inspiration from the existing golden-signal dashboard, Gra
 
 ### 8.8 R2 client selection
 
-Start feasibility with **github.com/termermc/go-micro-s3/client**, a candidate
-rather than an approved production dependency. Verify the selected revision's
-streaming, cancellation, multipart controls, R2 signing/integrity behavior, and
-operations required by STO-014/STO-015. Its size or compatibility with another
-S3 server does not establish suitability for R2.
+Prefer **github.com/termermc/go-micro-s3/client** for E-07. It streams file
+uploads and downloads, exposes multipart controls, and declares no external
+module dependencies. Verify the candidate revision's operations, including
+signing and integrity checks, through Floci tests and R2 API review under
+STO-014 and STO-015. Check that multipart cleanup fits the service shutdown
+budget after cancellation. Review the license and maintenance, inspect the
+runtime dependency graph, and measure the linked binary delta before pinning
+an immutable revision.
 
-Pin an immutable version/commit, review license and maintenance, inspect runtime
-dependencies, and measure the linked binary delta. DuckDB remote-Parquet support
-has a separate packaging/dependency cost and needs independent validation.
+Use a pinned [Floci image](https://github.com/floci-io/floci#readme)
+(`docker.io/floci/floci`) and a disposable bucket for local development and CI.
+The normal deployment uses the private `einblick` R2 bucket for archive publication.
 
 ## 9. Durability and recovery contract
 
@@ -440,7 +449,7 @@ This is a logical configuration inventory, not a finalized YAML schema or comman
 | UI HTTP listener | Existing go-service HTTP/MVC conventions behind HTTPS ingress. | Working design |
 | Ingestion authentication and TLS | Reuse go-service capabilities; exact auth mode/certificate provisioning to select. | Open |
 | Persistent local path | Explicit database filename; `/data/recent.duckdb` on a persistent mount, `reports/recent.duckdb` from `test/` for development. | Interface implemented; installation values owned by the operator |
-| R2 bucket | Private installation-specific bucket; identify existing or provisioned owner. | Open wiring |
+| R2 bucket | Production uses the private `einblick` bucket declared in Infraops. Local development and CI use a disposable Floci bucket. | Production bucket declared |
 | R2 endpoint and credentials | Explicit configuration and mounted secret/source references. | Required |
 | Archive format | Versioned Parquet | Agreed |
 | Archive partition | Signal plus UTC event day; application remains a column. | Working design |
@@ -460,7 +469,7 @@ This is a logical configuration inventory, not a finalized YAML schema or comman
 | Service catalog | Service ID plus transports list; optional display label/resource narrowing. | `transports` name agreed; optional selectors proposed |
 | Chart profile | Built-in go-service panel/query profile; no user-authored dashboards. | Agreed direction |
 | Site authentication | Deferred; no v1 site credential/session settings. | Agreed |
-| R2 Go client | Lean existing client, excluding both AWS Go SDKs; go-micro-s3/client first to validate. | Selection open |
+| R2 Go client | Prefer go-micro-s3/client with neither AWS Go SDK in the runtime path. | Pin pending Floci tests, R2 API review, and resource validation |
 | Multipart part size / concurrency | Tunable bounded values, measured with export sizes and process memory. | Open tuning |
 | Late arrival / future skew | Define explicitly; no silently invented cutoff. | Open |
 | Duplicate policy | Signal-specific; candidates in the open-decision register. | Open |
@@ -513,7 +522,7 @@ These are service-boundary scenarios for future implementation, not claims that 
 | AC-023 | Add one HTTP-only, one gRPC-only, one dual-protocol, and one worker catalog entry. Each receives the appropriate ready-made views without panel/query authoring. Duplicate IDs, malformed selectors, and unknown/duplicate protocols fail config validation. Supported uncatalogued telemetry is still retained and queryable. | CAT-001, CAT-002, CAT-003, CAT-004, CAT-005, CAT-006, WEB-013 |
 | AC-024 | Real representative go-service metric fixtures populate the standard charts with correct units, histogram percentiles, rates, and non-success labels. Missing/zero/stale/partial data remain distinct. Chart data is bounded for long ranges. | QRY-013, WEB-014, WEB-016 |
 | AC-025 | In Logs, apply a recent preset or open a saved time range, inspect a result, and find logs with its trace ID while keeping the exact time bounds and other filters. For chart and trace views, select a chart time window and instance/protocol, open logs, follow a trace ID, inspect a span, and return to related logs. Shared links reproduce the selection, and sampled traces are labelled accordingly. | QRY-001, QRY-014, WEB-003, WEB-015, WEB-016 |
-| AC-026 | Source/dependency review and linked-binary measurements confirm the selected storage runtime path excludes the AWS Go SDKs. Actual R2 upload/download/list/HEAD/delete, multipart failures, cancellation, ambiguous completion, and checksum reconciliation meet the bounded-memory/recovery contract. | STO-013, STO-014, STO-015 |
+| AC-026 | Source/dependency review and linked-binary measurements confirm the selected storage runtime path excludes the AWS Go SDKs. Against Floci, upload/download/list/HEAD/delete, multipart failures, cancellation, ambiguous completion, and checksum reconciliation meet the bounded-memory/recovery contract. Review the requests used by those paths against the documented R2 S3 API. | STO-013, STO-014, STO-015 |
 | AC-027 | Full pages, partial views and visible error/status states render in English, German and Spanish from browser language preferences, including regional/weighted preferences and English fallback for unsupported or invalid preferences. Language/cache metadata matches the rendered language; telemetry and service identities remain unchanged. | WEB-001, WEB-017 |
 
 The acceptance matrix should be updated when a requirement changes. Tests should assert user-visible data, errors, recovery, ordering, and resource behavior rather than internal method sequences.
@@ -533,7 +542,7 @@ P0 responses demonstrated receipt only; records were discarded after printing,
 without stored history or queries. That release did not satisfy ING-002 or
 AC-001. E-03 replaces log printing with local commit acknowledgement.
 Traces and metrics continue printing
-until E-11 and E-14 replace their respective paths with
+until E-10 and E-13 replace their respective paths with
 commit-backed ingestion. Durable v1 requires all three signals to meet ING-002;
 no permanent discard mode or second backend is planned.
 
@@ -543,15 +552,15 @@ no permanent discard mode or second backend is planned.
 | P1 | Add DuckDB log persistence, commit acknowledgement, restart recovery and versioned local migrations. | E-03: typed/nanosecond write/read round-trip, timestamp binding, committed-record reopen, log response/support portions of AC-002/AC-003 and committed-record AC-008; migration initialization, restart/failure recovery and newer-schema rejection for local AC-017. Deployed native/platform validation remains with the owner. Queries and R2 remain later work. |
 | P2 | Query recent logs, then add a thin MVC Logs page. | E-04 then E-05: log AC-001/AC-004, local query bounds in AC-013 and log rendering in AC-015. |
 | P3 | Export immutable log batches to local Parquet files. | E-06: log archive-format AC-003, interrupted local export in AC-009, pending-job AC-008 and derivative cleanup in AC-019. No R2 dependency. |
-| P4 | Verify the lean R2 client, then upload completed log batches asynchronously. | E-07 then E-08: actual-R2/dependency/resource AC-026 and remote publication/recovery in AC-008/AC-009. Keep local source rows. |
-| P5 | Read archived logs with DuckDB and safely evict published local batches. | E-09: log AC-007/AC-011/AC-019 and historical query bounds/failures in AC-013/AC-016. |
-| P6 | Add log retention and verify R2 outage, capacity and backlog recovery. | E-10: log AC-010/AC-012 and repeated disk/workspace cycles in AC-019. |
-| P7 | Replace trace printing with durable intake, then add trace query/view and archive support. | E-11/E-12/E-13: trace portions of AC-001–AC-003/AC-005 and the existing recovery/archive scenarios. |
-| P8 | Replace metric printing with durable intake, then add numerical queries and archives. | E-14/E-15/E-16: metric portions of AC-001–AC-003/AC-006/AC-024 and recovery/archive scenarios. All-signal backend evidence closes here. |
-| P9 | Complete catalog-driven Overview panels and linked investigation across the MVC views. | E-17 then E-18: full AC-013/AC-015/AC-016/AC-022–AC-025 and operator docs. |
+| P4 | Publish completed log batches to R2 in the background and retain local source rows. | E-07: Floci scenarios for OTLP log read back from the Parquet object, retry and restart recovery in AC-008/AC-009, and staging cleanup in AC-019. Client validation and R2 API compatibility review in AC-026. |
+| P5 | Read archived logs with packaged DuckDB remote extensions and safely evict published local batches. | E-08: log AC-007/AC-011/AC-019, packaged remote reads in AC-018, and historical query bounds and failures in AC-013/AC-016. |
+| P6 | Add log retention and verify R2 outage, capacity and backlog recovery. | E-09: log AC-010/AC-012 and repeated disk/workspace cycles in AC-019. |
+| P7 | Replace trace printing with durable intake, then add trace query/view and archive support. | E-10/E-11/E-12: trace portions of AC-001–AC-003/AC-005 and the existing recovery/archive scenarios. |
+| P8 | Replace metric printing with durable intake, then add numerical queries and archives. | E-13/E-14/E-15: metric portions of AC-001–AC-003/AC-006/AC-024 and recovery/archive scenarios. All-signal backend evidence closes here. |
+| P9 | Complete catalog-driven Overview panels and linked investigation across the MVC views. | E-16 then E-17: full AC-013/AC-015/AC-016/AC-022–AC-025 and operator docs. |
 
-R2 access is first needed in P4. Trace and metric receipt is verified in P0;
-their storage/query policies and full recovery/archive evidence follow in P7/P8.
+Trace and metric receipt is verified in P0. Their storage/query policies and
+full recovery/archive evidence follow in P7/P8.
 
 ## 15. Open-decision register
 
@@ -563,11 +572,11 @@ their storage/query policies and full recovery/archive evidence follow in P7/P8.
 | O-004 | Backend event-day selection, accepted lateness, missing timestamps, and future clock skew | Logs: preserve both original nanosecond timestamps and separate receipt time; select Timestamp, then ObservedTimestamp, then server receipt time. Use that selection's UTC day for archival. Accept late and future timestamps without cutoffs. | Traces in P7; metrics in P8 |
 | O-005 | Duplicate policy per signal | Logs: retain repeated exports as additional records, including identical messages; no deduplication index or horizon. This log policy is agreed. Candidate for later signals: identify duplicate spans by trace/span IDs and metric points by complete stream identity and point timestamps. Validate counter/histogram semantics before adoption. | Traces in P7; metrics in P8 |
 | O-006 | Supported OTLP subset and its database mapping | Logs: preserve complete content from the pinned OTLP protobuf, including typed bodies/attributes, resource/scope context, correlation and original nanosecond timestamps; this support policy is agreed. Derive physical schema from these contracts and verify representative go-service payloads. Trace/metric support and mapping remain open; document unsupported shapes/omissions explicitly. A handwritten copy of the OTel schema is unnecessary. | Log verification in P1; trace storage in P7; metric storage in P8 |
-| O-007 | R2 bucket and persistent-volume ownership/configuration | Reuse infraops' delivered protected-PVC and optional R2 expiration capabilities; choose capacity, path, provisioning profile, backing-volume reclaim policy and operational ownership. Verify the private bucket/reference. Verify actual release-tooling execution and storage preservation before activating storage; do not infer live provisioning from source support. | Local storage path in P1; test R2 access in P4; runtime settings before use |
+| O-007 | R2 bucket and persistent-volume ownership/configuration | Reuse infraops' delivered protected-PVC and optional R2 expiration capabilities; choose capacity, path, provisioning profile, backing-volume reclaim policy and operational ownership. Verify actual release-tooling execution and storage preservation before activating storage. | Local storage path in P1; runtime settings before use |
 | O-008 | Concrete resource and query bounds | Log export uses one active batch and a separate quota-limited staging filesystem. DuckDB uses its default spill limit unless configured explicitly. Use 1 GiB as a starting point for testing the staging filesystem. Measure one-application ingestion and representative queries to size memory/native headroom, export batches, staging capacity and the persistent outage budget. | Bound each capability as introduced in P0–P8; refine with workload measurements |
 | O-009 | Reserved: site authentication | Outside v1 under D-012/WEB-012. | No v1 work |
 | O-010 | Required platform matrix and native runtime image | Retain Linux amd64/arm64 containers and native macOS arm64 development. Package the actual driver/engine/extensions accordingly. The owner will validate deployed platform/runtime behavior; it remains unavailable acceptance evidence until run. | Repository dependency checks as introduced; deployed runtime validation owned by the operator |
-| O-011 | Lean S3 client version | Start feasibility with go-micro-s3/client; pin only after R2 behavior, bounded-memory transfer, license, runtime dependencies, and linked binary cost are checked. | P4 |
+| O-011 | Lean S3 client version | Prefer go-micro-s3/client. Pin after tests with Floci and review of R2 API compatibility, bounded-memory transfer, license, runtime dependencies and linked binary cost. | P4 |
 | O-012 | Catalog selectors and supported go-service metric profile | Use the transports field; begin with id for service identity; confirm actual server surfaces and native instruments/units. Optional resource filters must use attributes clients actually emit. | Metric profile in P8; catalog in P9 |
 | O-013 | Frontend library versions and visual refinement | The [full-page layout](../internal/site/root/layout/full.tmpl) pins htmx and daisyUI. A local theme applies Einblick’s colors and density to the shared controls. Confirm the chart dependency and refine the working views as panels are added. | Full frontend in P9 |
 
@@ -584,7 +593,7 @@ The durable first version is ready for its measured one-application pilot when:
 - Ready-made service charts, logs, and trace views work through the embedded frontend without Grafana or dashboard authoring.
 - Full and partial pages support the English/German/Spanish language and fallback contract in WEB-017.
 - Site authentication remains deferred; internal ingestion has its documented transport/authentication boundary.
-- The selected lean S3 client has actual R2 operation and resource evidence, with no AWS Go SDK in its runtime path.
+- The selected lean S3 client meets AC-026, with Floci transfer and recovery evidence, documented R2 API compatibility, and no AWS Go SDK in its runtime path.
 - Resource and query work are bounded and operational state is visible.
 - Required container/platform builds work with CGO, packaged extensions, read-only root, and persistent storage.
 - Applicable active acceptance scenarios have actually run through the supported harness, with failures and limitations reported.
