@@ -27,6 +27,7 @@ Choose the feature group you are changing:
 
 ```sh
 make features tags=@storage
+make features tags=@archive
 make features tags=@queries
 make features tags=@site
 make features tags=@printing
@@ -70,6 +71,21 @@ cursor can enter later pages; refresh to see arrivals ahead of it.
 Keep timestamps as unsigned nanoseconds. Writes bind decimal strings to
 `UBIGINT` to preserve the full unsigned range; conversions through floating-point
 values or lower-precision timestamp types can lose data.
+
+`internal/logs/archive` defines batches and coordinates recovery and export
+through its batch repository and staged file interfaces. The Logs module
+wires `internal/logs/storage` for durable state and native DuckDB
+Parquet writes. `internal/logs/archive/staging` uses that writer to produce
+verified Parquet and manages temporary paths, file checksums, and the final
+rename. Startup prepares the workspace and clears partial output. The worker
+checks recorded files before it begins staging batches on its ticks.
+
+The v1 Parquet projection includes `log_id`, the four unsigned nanosecond
+columns, and the stored protobuf JSON for `resource`, `scope` and `record`.
+Readers can use DuckDB's `read_parquet` with `hive_partitioning = false` to read
+the columns stored in completed files. The batch's logical digest covers these
+columns in log-ID order. The staged file checksum covers the current Parquet
+bytes.
 
 ## 🔌 Query API
 

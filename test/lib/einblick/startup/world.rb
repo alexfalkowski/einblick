@@ -4,6 +4,19 @@ module Einblick
   module Startup
     # Runs the failing startup independently of the suite's healthy server.
     module World
+      def with_server_profile(profile)
+        process = Nonnative.configuration.process_by_name('server')
+        original = process.command
+        Nonnative.stop
+        process.command = -> { Nonnative.go_argv([], 'reports', '../einblick', 'server', "-config file:.config/#{profile}.yaml") }
+        Nonnative.start
+        yield
+      ensure
+        Nonnative.stop
+        process.command = original
+        Nonnative.start
+      end
+
       # Captures the CLI failure, bounding the attempt with the harness timeout.
       def attempt_database_start(config)
         timeout = Nonnative.configuration.process_by_name('server').timeout

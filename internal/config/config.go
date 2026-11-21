@@ -3,12 +3,16 @@ package config
 import (
 	"github.com/alexfalkowski/einblick/internal/duckdb"
 	"github.com/alexfalkowski/einblick/internal/health"
+	"github.com/alexfalkowski/einblick/internal/logs/archive"
 	"github.com/alexfalkowski/einblick/internal/logs/storage"
 	"github.com/alexfalkowski/go-service/v3/config"
 )
 
 // Config for the service.
 type Config struct {
+	// Archive enables local Parquet staging when present.
+	Archive *archive.Config `yaml:"archive,omitempty" json:"archive,omitempty" toml:"archive,omitempty"`
+
 	// Queries configures required server-side limits for recent-log reads.
 	Queries *storage.Config `yaml:"queries,omitempty" json:"queries,omitempty" toml:"queries,omitempty" validate:"required"`
 
@@ -36,4 +40,8 @@ func duckdbConfig(cfg *Config) *duckdb.Config {
 
 func queryConfig(cfg *Config) *storage.Config {
 	return cfg.Queries
+}
+
+func archiveConfig(cfg *Config) *archive.Config {
+	return cfg.Archive
 }

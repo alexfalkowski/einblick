@@ -1,14 +1,16 @@
 package logs
 
 import (
+	"github.com/alexfalkowski/einblick/internal/logs/archive"
+	"github.com/alexfalkowski/einblick/internal/logs/archive/staging"
+	"github.com/alexfalkowski/einblick/internal/logs/archive/worker"
 	"github.com/alexfalkowski/einblick/internal/logs/storage"
-	"github.com/alexfalkowski/einblick/internal/logs/transport/grpc"
 	"github.com/alexfalkowski/go-signal/v2"
 )
 
-// Module registers the commit-backed OTLP log receiver with the shared transport.
+// Module wires log storage and optional local archival.
 var Module = signal.Module(
 	storage.Module,
-	signal.Constructor(grpc.NewServer),
-	signal.Register(grpc.Register),
+	signal.Constructor(staging.NewWorkspace, archive.NewService),
+	worker.Module,
 )

@@ -4,21 +4,8 @@ module Einblick
   module Logs
     # Additional query actions share the established World and process lifecycle.
     module World
-      def with_query_profile(profile)
-        process = Nonnative.configuration.process_by_name('server')
-        original = process.command
-        Nonnative.stop
-        process.command = -> { ['../einblick', 'server', '-config', "file:.config/#{profile}.yaml"] }
-        Nonnative.start
-        yield
-      ensure
-        Nonnative.stop
-        process.command = original
-        Nonnative.start
-      end
-
       def query_with_expired_budget
-        with_query_profile('query_timeout') do
+        with_server_profile('query_timeout') do
           capture_query_timeout
         end
         query_logs
@@ -42,7 +29,7 @@ module Einblick
       end
 
       def query_with_native_cancellation
-        with_query_profile('query_work') do
+        with_server_profile('query_work') do
           capture_concurrent_query_timeouts
           collect_log_pages(@first_log_page)
         end
@@ -71,7 +58,7 @@ module Einblick
       end
 
       def query_with_caller_cancellation
-        with_query_profile('query_cancellation') do
+        with_server_profile('query_cancellation') do
           cancel_active_grpc_query
           collect_log_pages(@first_log_page)
         end

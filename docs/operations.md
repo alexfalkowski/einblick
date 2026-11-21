@@ -26,10 +26,10 @@ spill files together across restarts. Stop the service before moving them.
 A locked database file fails startup; the previous process must close it before
 a replacement can open it for writing.
 
-Successful log exports mean the records committed locally. Restart recovery
-uses the intact data path before accepting traffic. Metrics and traces are
-currently printed and discarded. There is no retention or archive yet, so
-monitor free space: accepted logs continue to consume the local volume.
+Successful OTLP log responses mean the records committed locally. Restart
+recovery uses the intact data path before accepting traffic. Metrics and traces
+are currently printed and discarded. Accepted logs continue to use space on
+the database volume even after the service stages their Parquet files.
 
 Disk write failures return retryable `UNAVAILABLE`. Restore writable capacity
 and allow clients to retry. Repeated exports can produce duplicate records.
@@ -48,6 +48,32 @@ versions to bypass an error.
 An older binary refuses a database with a newer schema. There is no automatic
 schema downgrade, so use a binary that supports the stored schema. Deleting the
 database to bypass this check loses the retained logs.
+
+## 🗃️ Local Parquet staging
+
+When [enabled](configuration.md#-local-parquet-export), the exporter stages
+completed log batches under `v1/signal=logs/day=YYYY-MM-DD/<batch-id>.parquet`
+on its own quota-limited workspace. It uses the UTC day of the selected event
+time. A late record can create another batch for the same day.
+
+The database retains every accepted row and records the exact membership and
+logical digest of each batch. The service checks the written rows before
+renaming the file and recording its byte checksum. Startup discards interrupted
+temporary output. After startup, the worker checks recorded files and requeues
+missing or corrupt files before staging more batches. It can regenerate them
+from DuckDB using the same batch ID. If verification encounters a read error,
+the worker logs it and retries on the next tick while intake and recent queries
+stay available. Preserve the database volume to recover these jobs.
+
+When the staging mount fills, new export attempts fail and are retried at the
+configured interval. Inspect `component=log_archive` diagnostics and available
+workspace capacity. Increase or restore writable capacity and allow the next
+export attempt to run. Keep the database and staging mount accessible at startup
+when export is enabled. If the worker reports that the prepared workspace is
+missing or changed, restore the original mount and its `v1` directory so the
+worker can retry. After intentionally replacing the workspace, provision `v1`
+on the mounted replacement and restart Einblick to regenerate missing files
+from retained logs. Transfer to R2 and source eviction are planned.
 
 ## 🚢 Deployment
 

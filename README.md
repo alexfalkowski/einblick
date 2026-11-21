@@ -12,9 +12,9 @@ storage before acknowledgement; metrics and traces print through the service
 logger and are discarded.
 
 The service recovers its local log database before serving requests and provides
-bounded recent-log queries in the browser and over gRPC and HTTP RPC.
-Trace and metric persistence and views are planned, along with Parquet
-archives in Cloudflare R2.
+bounded recent-log queries in the browser and over gRPC and HTTP RPC. It can
+[stage local Parquet batches](docs/configuration.md#-local-parquet-export) for logs.
+Trace and metric persistence and views and Cloudflare R2 archival are planned.
 See the [product requirements](docs/requirements.md) and
 [implementation plan](docs/review-and-plan.md) for the remaining work.
 

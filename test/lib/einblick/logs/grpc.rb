@@ -57,7 +57,7 @@ module Einblick
       end
 
       def query_grpc_with_expired_budget
-        with_query_profile('query_timeout') { query_grpc_logs }
+        with_server_profile('query_timeout') { query_grpc_logs }
       end
 
       def cancel_active_grpc_query
