@@ -15,12 +15,13 @@ type worker struct {
 	interval time.Duration
 }
 
-func (w *worker) start(_ context.Context) error {
+func (w *worker) start(ctx context.Context) error {
 	if err := w.service.Prepare(); err != nil {
 		return err
 	}
 
-	runCtx, cancel := context.WithCancel(context.Background())
+	// go-signal cancels the startup context after the start hooks finish.
+	runCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	w.cancel = cancel
 	w.task = sync.Go(runCtx, w.run)
 	return nil
@@ -36,8 +37,10 @@ func (w *worker) run(ctx context.Context) error {
 	return signal.Timer(ctx, w.interval.Duration(), func(ctx context.Context) error {
 		recovered = recovered || w.service.Recover(ctx) == nil
 		if recovered {
-			// A failed attempt leaves the durable job pending for the next tick.
 			_, _ = w.service.Export(ctx)
+			_, _ = w.service.Publish(ctx)
+		} else {
+			_, _ = w.service.ReconcilePublication(ctx)
 		}
 		return nil
 	})

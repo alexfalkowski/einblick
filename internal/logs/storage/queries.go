@@ -38,6 +38,24 @@ var completedBatchesQuery string
 //go:embed queries/archive/requeue_batch.sql
 var requeueBatchQuery string
 
+//go:embed queries/archive/next_publication.sql
+var nextPublicationQuery string
+
+//go:embed queries/archive/record_upload.sql
+var recordUploadQuery string
+
+//go:embed queries/archive/has_upload.sql
+var hasUploadQuery string
+
+//go:embed queries/archive/confirm_publication.sql
+var confirmPublicationQuery string
+
+//go:embed queries/archive/clear_uploads.sql
+var clearUploadsQuery string
+
+//go:embed queries/archive/finish_cleanup.sql
+var finishCleanupQuery string
+
 //go:embed queries/parquet/copy_batch.sql
 var copyBatchQuery string
 

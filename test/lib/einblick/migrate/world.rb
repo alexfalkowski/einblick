@@ -23,12 +23,12 @@ module Einblick
 
       def attempt_future_migration
         Nonnative.stop
-        change_schema_version(2, 3)
+        change_schema_version(3, 4)
         log_database { |connection| @schema_data_before, @migration_history_before = migration_snapshot(connection) }
         attempt_database_start('server.yaml')
       ensure
         log_database { |connection| @schema_data_after, @migration_history_after = migration_snapshot(connection) }
-        change_schema_version(3, 2)
+        change_schema_version(4, 3)
         Nonnative.start
       end
 
@@ -36,11 +36,8 @@ module Einblick
         prepare_acknowledged_log_export
         Nonnative.stop
         log_database do |connection|
-          connection.query(<<~SQL)
-            DROP VIEW log_archive_rows;
-            DROP TABLE log_archive_members; DROP TABLE log_archive_batches;
-            DELETE FROM goose_db_version WHERE version = 2;
-          SQL
+          connection.query(File.read('fixtures/drop_publication_schema.sql'))
+          connection.query(File.read('fixtures/drop_archive_schema.sql'))
           @schema_data_before, @migration_history_before = migration_snapshot(connection)
         end
       end

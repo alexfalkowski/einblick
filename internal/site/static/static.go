@@ -13,11 +13,12 @@ import (
 
 var assetNames = []string{"logs.css", "logs.js"}
 
-// Register serves the embedded Logs stylesheet and request-status script to browsers.
+// Register serves the embedded Logs assets and browser favicon.
 func Register(server *mvc.Server) {
 	for _, name := range assetNames {
 		server.StaticFile("/assets/"+name, "static/"+name, mvc.WithStaticUnauthenticated())
 	}
+	server.StaticFile("/favicon.ico", "static/favicon.png", mvc.WithStaticUnauthenticated())
 }
 
 func assetFunctions(functions template.FuncMap, fs io.FS) (template.FuncMap, error) {

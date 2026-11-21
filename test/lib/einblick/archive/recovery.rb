@@ -102,13 +102,18 @@ module Einblick
         @archive_query_response = @response
       end
 
-      def with_unreadable_archive_file
-        path = archive_files.fetch(0)
+      def with_unreadable_archive_file(path = archive_files.fetch(0))
         permissions = File.stat(path).mode & 0o777
         File.chmod(0o000, path)
         yield path, permissions
       ensure
-        File.chmod(permissions, path) if permissions
+        File.chmod(permissions, path) if permissions && File.exist?(path)
+      end
+
+      def corrupt_staged_file
+        path = archive_files.fetch(0)
+        File.binwrite(path, 'corrupt staged Parquet')
+        path
       end
     end
   end

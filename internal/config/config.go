@@ -4,14 +4,15 @@ import (
 	"github.com/alexfalkowski/einblick/internal/duckdb"
 	"github.com/alexfalkowski/einblick/internal/health"
 	"github.com/alexfalkowski/einblick/internal/logs/archive"
+	"github.com/alexfalkowski/einblick/internal/logs/archive/r2"
 	"github.com/alexfalkowski/einblick/internal/logs/storage"
 	"github.com/alexfalkowski/go-service/v3/config"
 )
 
 // Config for the service.
 type Config struct {
-	// Archive enables local Parquet staging when present.
-	Archive *archive.Config `yaml:"archive,omitempty" json:"archive,omitempty" toml:"archive,omitempty"`
+	// Archive enables local Parquet staging and optional publication.
+	Archive *ArchiveConfig `yaml:"archive,omitempty" json:"archive,omitempty" toml:"archive,omitempty"`
 
 	// Queries configures required server-side limits for recent-log reads.
 	Queries *storage.Config `yaml:"queries,omitempty" json:"queries,omitempty" toml:"queries,omitempty" validate:"required"`
@@ -24,6 +25,15 @@ type Config struct {
 
 	// Config contains the required shared transport and telemetry configuration.
 	*config.Config `yaml:",inline" json:",inline" toml:",inline" validate:"required"`
+}
+
+// ArchiveConfig composes staging and publication settings under archive.
+type ArchiveConfig struct {
+	// R2 enables publication of completed files when present.
+	R2 *r2.Config `yaml:"r2,omitempty" json:"r2,omitempty" toml:"r2,omitempty"`
+
+	// Config is required when the archive section enables local staging.
+	archive.Config `yaml:",inline" json:",inline" toml:",inline"`
 }
 
 func decorateConfig(cfg *Config) *config.Config {
@@ -43,5 +53,15 @@ func queryConfig(cfg *Config) *storage.Config {
 }
 
 func archiveConfig(cfg *Config) *archive.Config {
-	return cfg.Archive
+	if cfg.Archive == nil {
+		return nil
+	}
+	return &cfg.Archive.Config
+}
+
+func r2Config(cfg *Config) *r2.Config {
+	if cfg.Archive == nil {
+		return nil
+	}
+	return cfg.Archive.R2
 }

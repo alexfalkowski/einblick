@@ -1,10 +1,11 @@
 # Telemetry service: first-version requirements
 
 **Status:** Implementation specification. Local log persistence, recovery,
-[recent-log queries in the browser and API](queries.md) and
-[local Parquet staging](operations.md#-local-parquet-staging) are implemented.
-Metrics and traces remain print-only. R2 publication, historical queries, and
-trace and metric views are planned.
+[recent-log queries in the browser and API](queries.md),
+[local Parquet staging](operations.md#-local-parquet-staging) and
+[R2 publication](operations.md#-r2-publication-and-recovery) are implemented.
+Metrics and traces remain print-only. Historical queries and trace and metric
+views are planned.
 
 **Revision:** 0.25
 
@@ -82,7 +83,7 @@ The service should remain understandable to a small engineering team. Prefer an 
 | D-014 | Acknowledgement | Durable v1 acknowledges accepted telemetry after a successful local DuckDB commit; R2 upload is asynchronous. The early P0 printer acknowledges receipt only and discards records. | Working design; durability consequence documented below |
 | D-015 | Implementation order | Print all three signals first, then add persistence, queries, archival and the frontend through feature steps. | Agreed direction |
 | D-016 | Service dashboards | A small service catalog selects ready-made HTTP and/or gRPC panels plus Logs and Traces views, using our shared go-service instrumentation. | Agreed direction |
-| D-017 | R2 transfer library | Use a lean Go S3 client without either AWS Go SDK in its runtime path. Prefer go-micro-s3/client. Before pinning, test with Floci, review R2 API compatibility, and check runtime dependencies and binary cost. | Agreed constraint, preferred client pending validation |
+| D-017 | R2 transfer library | Use go-micro-s3/client without either AWS Go SDK in its runtime path. Validate against Floci and the R2 API, and check runtime dependencies and binary cost. | Selected, see [client selection](#88-r2-client-selection) |
 | D-018 | Upgrade strategy | Use existing rolling updates with graceful DuckDB shutdown, one active writer and bounded startup/recovery. Do not add Recreate or a strategy selector. | Agreed direction |
 
 Revisit DuckDB only if feasibility work supplies a concrete blocker.
@@ -390,17 +391,17 @@ The interaction draws inspiration from the existing golden-signal dashboard, Gra
 
 ### 8.8 R2 client selection
 
-Prefer **github.com/termermc/go-micro-s3/client** for E-07. It streams file
-uploads and downloads, exposes multipart controls, and declares no external
-module dependencies. Verify the candidate revision's operations, including
-signing and integrity checks, through Floci tests and R2 API review under
-STO-014 and STO-015. Check that multipart cleanup fits the service shutdown
-budget after cancellation. Review the license and maintenance, inspect the
-runtime dependency graph, and measure the linked binary delta before pinning
-an immutable revision.
+Einblick uses the [pinned go-micro-s3/client module](../go.mod) for transfers.
+It streams uploads and downloads, exposes multipart controls, and declares no
+external module dependencies. R2 publication uses conditional writes, HEAD
+metadata, and a streamed SHA-256 verification of the stored file. The
+[request timeout](configuration.md#-r2-log-archives) also bounds multipart
+cleanup after cancellation. STO-014 and STO-015 define the transfer and recovery
+checks, including a review against [R2 conditional operations](https://developers.cloudflare.com/r2/api/s3/conditional-operations/).
 
-Use a pinned [Floci image](https://github.com/floci-io/floci#readme)
-(`docker.io/floci/floci`) and a disposable bucket for local development and CI.
+Use a disposable [Floci](https://github.com/floci-io/floci#readme) bucket for
+local development and CI. The [archive executor](../.circleci/config.yml)
+pins the CI image.
 The normal deployment uses the private `einblick` R2 bucket for archive publication.
 
 ## 9. Durability and recovery contract
@@ -474,7 +475,7 @@ This is a logical configuration inventory, not a finalized YAML schema or comman
 | Service catalog | Service ID plus transports list; optional display label/resource narrowing. | `transports` name agreed; optional selectors proposed |
 | Chart profile | Built-in go-service panel/query profile; no user-authored dashboards. | Agreed direction |
 | Site authentication | Deferred; no v1 site credential/session settings. | Agreed |
-| R2 Go client | Prefer go-micro-s3/client with neither AWS Go SDK in the runtime path. | Pin pending Floci tests, R2 API review, and resource validation |
+| R2 Go client | Use go-micro-s3/client with neither AWS Go SDK in the runtime path. | Pinned in [go.mod](../go.mod) |
 | Multipart part size / concurrency | Tunable bounded values, measured with export sizes and process memory. | Open tuning |
 | Late arrival / future skew | Define explicitly; no silently invented cutoff. | Open |
 | Duplicate policy | Signal-specific; candidates in the open-decision register. | Open |
@@ -581,7 +582,6 @@ full recovery/archive evidence follow in P7/P8.
 | O-008 | Concrete resource and query bounds | Log export uses one active batch and a separate quota-limited staging filesystem. DuckDB uses its default spill limit unless configured explicitly. Use 1 GiB as a starting point for testing the staging filesystem. Measure one-application ingestion and representative queries to size memory/native headroom, export batches, staging capacity and the persistent outage budget. | Bound each capability as introduced in P0–P8; refine with workload measurements |
 | O-009 | Reserved: site authentication | Outside v1 under D-012/WEB-012. | No v1 work |
 | O-010 | Required platform matrix and native runtime image | Retain Linux amd64/arm64 containers and native macOS arm64 development. Package the actual driver/engine/extensions accordingly. The owner will validate deployed platform/runtime behavior; it remains unavailable acceptance evidence until run. | Repository dependency checks as introduced; deployed runtime validation owned by the operator |
-| O-011 | Lean S3 client version | Prefer go-micro-s3/client. Pin after tests with Floci and review of R2 API compatibility, bounded-memory transfer, license, runtime dependencies and linked binary cost. | P4 |
 | O-012 | Catalog selectors and supported go-service metric profile | Use the transports field; begin with id for service identity; confirm actual server surfaces and native instruments/units. Optional resource filters must use attributes clients actually emit. | Metric profile in P8; catalog in P9 |
 | O-013 | Frontend library versions and visual refinement | The [full-page layout](../internal/site/root/layout/full.tmpl) pins htmx and daisyUI. A local theme applies Einblick’s colors and density to the shared controls. Confirm the chart dependency and refine the working views as panels are added. | Full frontend in P9 |
 

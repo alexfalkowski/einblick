@@ -9,26 +9,25 @@ coverage and saved progress. Agent workflow and engineering guidance live in
 
 Say `Continue docs/review-and-plan.md`. Each continuation handles one step.
 
-**Current step:** E-07 — Publish staged log batches to R2.
+**Current step:** E-08 — Read archived logs and safely evict published batches.
 
-**Status:** ready, pending owner review of E-06.
+**Status:** ready, pending owner review of E-07.
 
-**Next action:** After E-06 review, implement background publication from the
-existing archive worker. Exercise the log workflow against Floci and review
-the preferred S3 client's R2 API compatibility before pinning it.
+**Next action:** After E-07 review, design per-query source ownership and reader
+cleanup before implementing historical reads and local source eviction.
 
 ### Resume context
 
-- Use [completed local Parquet batches](operations.md#-local-parquet-staging)
-  and their stable batch keys for publication. Persist the checksum of the
-  actual attempted upload before sending it. Regeneration preserves batch ID,
-  member IDs and logical digest while Parquet bytes can change. When recovery
-  finds an ambiguous attempt, reconcile the stored upload identity before
-  retrying a regenerated file. Transfer waits for the archive worker's
-  completed-file verification after restart. See the [v1 projection](development.md#-storage).
-- Follow the [client selection criteria](requirements.md#88-r2-client-selection)
-  for Floci tests, R2 API review and resource checks.
-  E-08 owns DuckDB remote extension packaging and source eviction.
+- E-07 accepts the S3 client's stalled multipart abort as a
+  [shutdown limitation](operations.md#-r2-publication-and-recovery).
+- Use the [v1 Parquet projection](development.md#-storage) and stable keys for
+  selected-day discovery. `log_archive_batches.published_at` and
+  `published_sha256` record confirmed remote publication. The local staging
+  checksum may already be cleared. `log_archive_members` still identifies the
+  local source rows. See [R2 publication and recovery](operations.md#-r2-publication-and-recovery).
+- Exercise DuckDB's remote reads against Floci from the required-platform
+  service images. Use the [archive test setup](development.md#-tests-and-checks)
+  for the emulator configuration.
 - [Recent-log queries](queries.md) rely on strict event-time/ID cursors.
   Arrivals behind a cursor can enter later pages and arrivals ahead require a
   fresh query. E-08 must define continued cursor ownership or explicit expiry
@@ -50,9 +49,8 @@ the preferred S3 client's R2 API compatibility before pinning it.
 
 | Unit | Phase / entry | Remaining deliverable | Evidence to close |
 | --- | --- | --- | --- |
-| E-07 | P4; E-06 reviewed | Publish completed log batches in the background with bounded uploads, content verification, retry and durable publication state. Reclaim confirmed staging files and retain local source rows. Intake acknowledges local commit. | Send a log over OTLP, read it from the Parquet object, and verify that restarting after an ambiguous upload leaves one correct object and the log stays locally queryable. Run the service scenarios against Floci for log AC-008/AC-009 and staging cleanup in AC-019. Record R2 API compatibility, dependency, binary and resource evidence for AC-026. |
 | E-08 | P5; E-07 reviewed and source/reader ownership designed | Add selected-day discovery, historical log reads with packaged DuckDB remote extensions, local/archive source selection, safe eviction and fresh-volume discovery. | Log AC-007/AC-011, source eviction in AC-019, archived log AC-003 and historical failure/cancellation in AC-013/AC-016. Exercise remote reads against Floci from the required-platform service images for AC-018. |
-| E-09 | P6; E-08 reviewed and O-003 retention meaning selected | Add log retention and verify late/skew/retry policies, R2 outage/backpressure/backlog recovery and repeated concurrent resource/disk cycles. | Log AC-010/AC-012/AC-019 and measured bounds/health/recovery. Measure idle archive scans over retained rows and staging amplification from shared OTLP context. |
+| E-09 | P6; E-08 reviewed and O-003 retention meaning selected | Add log retention and verify late/skew/retry policies, R2 outage/backpressure/backlog recovery and repeated concurrent resource/disk cycles. | Log AC-010/AC-012/AC-019 and measured bounds/health/recovery. Measure idle archive scans and how shared OTLP context affects staged bytes, R2 object count, upload bytes, and verification bytes. |
 | E-10 | P7; E-09 reviewed and trace fixtures/time/support/duplicate policies recorded | Replace trace printing with bounded local persistence, preserving events/links and commit-backed responses. | Trace ingestion portions of AC-001–AC-003 and local-record AC-008; typed/nanosecond round-trip, restart and bounds. Query portions remain open until E-11. |
 | E-11 | P7; E-10 reviewed | Add fixed trace search/lookup, bounded waterfall/details and log correlation in the existing multilingual MVC application (WEB-017). | Local cross-service/midnight AC-005, trace query portions of AC-001/AC-013/AC-015, trace AC-027 and explicit incomplete/large-trace/context outcomes. |
 | E-12 | P7; E-11 reviewed | Extend the existing Parquet/R2 pipeline, historical queries, eviction and retention to traces. | Archived trace AC-003/AC-005 and trace portions of AC-007–AC-012/AC-019, including interruption, outage, duplicate/conflict and mixed log/trace resource scenarios. |
@@ -87,8 +85,8 @@ These are the feature-specific decisions and scenarios for each packet.
 | Local schema changes at introduction | Extend the existing Goose history through numbered embedded migrations. Reject unsupported newer schemas; verify data-preserving upgrades, failed-migration recovery and the supported rollback behavior for each actual change under AC-017. |
 | E-08 stable pagination | Preserve the fixed RFC 3339 query contract, strict event-time/ID keysets and agreed arrival policy across local/archive transitions. Define continued cursor ownership or explicit expiry before eviction. Keep string-body text-search scope labelled consistently. |
 | E-14/E-15 metric correctness | Hand-check rates and histogram results for two instances, resets/start times, gaps, temporality, duplicate points and incompatible buckets in E-14. Aggregate compatible distributions before quantiles; verify lookback across midnight and local/archive boundaries in E-15. |
-| E-07/E-08 archive ownership | Define durable publication transitions, expected content identity, per-query source ownership and reader cleanup lifetime. Cover upload success before local marking and derivative regeneration whose Parquet bytes may differ. Preserve a usable source through publication and eviction with single-source query ownership. Extend and repeat for traces and metrics in E-12/E-15. |
-| Resource bounds at introduction | Bound upload in E-07 and remote reads in E-08. Exercise ingestion, query, export and upload together in E-09 and repeat when adding traces and metrics. Measure database/WAL, spill and completed-file allocation through repeated eviction and checkpoint cycles. Reserve space for metadata commits and backlog recovery. |
+| E-08 archive ownership | Define per-query source ownership and reader cleanup lifetime. Preserve a usable source through publication and eviction with single-source query ownership. Extend and repeat for traces and metrics in E-12/E-15. |
+| Resource bounds at introduction | Bound remote reads in E-08. Exercise ingestion, query, export and upload together in E-09 and repeat when adding traces and metrics. Measure database/WAL, spill and completed-file allocation through repeated eviction and checkpoint cycles. Reserve space for metadata commits and backlog recovery. |
 | E-16/E-17 browser acceptance | Verify URL round-trip/return navigation, keyboard row/span access, bounded large traces, missing correlation and stale/partial/error/cancelled outcomes. Filter Overview traces to active instance/time scope; preserve search focus/caret/selection on refresh. The synthetic prototype leaves these behaviors unproven. |
 
 ## 4. Acceptance coverage
@@ -105,8 +103,8 @@ Partial local/signal evidence is not full archive/all-signal acceptance.
 | AC-005 | E-11 local distributed trace; E-12 archived/midnight lookup. |
 | AC-006 | E-14 numerical metric semantics; E-15 historical/lookback continuity. |
 | AC-007 | E-08 actual log overlap/publication/eviction queries; repeat for traces/metrics in E-12/E-15. |
-| AC-008 | E-07 pending log publication recovery; E-10/E-13 trace and metric committed-record recovery; extend export and publication recovery in E-12/E-15. |
-| AC-009 | E-07 ambiguous remote publication; extend local export and remote publication recovery for traces and metrics in E-12/E-15. |
+| AC-008 | E-10/E-13 trace and metric committed-record recovery; extend export and publication recovery in E-12/E-15. |
+| AC-009 | Extend local export and remote publication recovery for traces and metrics in E-12/E-15. |
 | AC-010 | E-09 log outage, visibility, backpressure and backlog recovery; repeat for traces/metrics in E-12/E-15. |
 | AC-011 | E-08 fresh-volume log archive discovery and reads; repeat for traces/metrics in E-12/E-15. |
 | AC-012 | E-09 log policy, retry and expiration scenarios; extend with trace and metric policies in E-12/E-15. |
@@ -116,11 +114,11 @@ Partial local/signal evidence is not full archive/all-signal acceptance.
 | AC-016 | E-08/E-09 log backend coverage, failure and recovery, extended in E-12/E-15; E-17 completes visible frontend outcomes. |
 | AC-017 | E-08 archived log compatibility and schema evidence for trace and metric additions. Check supported schema and runtime upgrade and rollback paths with each persistence and archive change. |
 | AC-018 | E-08 remote-extension packaging and E-10/E-13 trace and metric recovery, shutdown and database reopen. Deployed runtime validation is owned by the operator. |
-| AC-019 | E-07 confirmed staging-file cleanup, E-08 safe complete-batch log eviction and E-09 expiration and workspace cycles; repeat for traces and metrics in E-12/E-15. |
-| AC-021 | E-08/E-11/E-12/E-14/E-15 DuckDB query review; E-07/E-12/E-15 immutable export review. Preserve the shared CGO build default with each change. |
+| AC-019 | E-08 safe complete-batch log eviction and E-09 expiration and workspace cycles; repeat for traces and metrics in E-12/E-15. |
+| AC-021 | E-08/E-11/E-12/E-14/E-15 DuckDB query review; E-12/E-15 immutable export review. Preserve the shared CGO build default with each change. |
 | AC-022 | E-17 full browser-workflow evidence without site credentials or sessions. |
 | AC-023 | E-16 catalog behavior and uncatalogued queries, completed frontend evidence in E-17. |
 | AC-024 | E-14 verified profile/numerical fixtures, E-15 historical continuity, E-16 charts and bounded states. |
 | AC-025 | E-17 connected investigation, links, selections, keyboard details and explicit trace scope. |
-| AC-026 | E-07 Floci transfer and recovery evidence, R2 API compatibility review, and dependency, binary and resource checks. Repeat resource checks with trace and metric archive support. |
+| AC-026 | Repeat resource checks with trace and metric archive support in E-12/E-15. |
 | AC-027 | E-11 trace views; E-16 Overview; E-17 complete navigation, accessibility and error/status language coverage. Follow WEB-017 and reuse the Logs page full and partial language scenarios. |

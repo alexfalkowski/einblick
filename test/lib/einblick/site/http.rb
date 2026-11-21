@@ -15,6 +15,11 @@ module Einblick
         [stylesheet, script].to_h { |url| [url, get(url)] }
       end
 
+      def load_favicon(page)
+        icon = Nokogiri::HTML5(page.body).at_css('head link[rel="icon"][type="image/png"]')
+        get(icon['href'])
+      end
+
       def submit(path, form, languages)
         opts = options(languages)
         opts[:headers].merge!(content_type: 'application/x-www-form-urlencoded', hx_request: 'true')

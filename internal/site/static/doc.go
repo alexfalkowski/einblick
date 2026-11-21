@@ -1,2 +1,2 @@
-// Package static serves the site's embedded CSS and JavaScript through MVC.
+// Package static serves the site's embedded assets through MVC.
 package static

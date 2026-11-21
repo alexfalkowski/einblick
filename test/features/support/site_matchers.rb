@@ -132,6 +132,14 @@ RSpec::Matchers.define :serve_fingerprinted_log_assets do
   end
 end
 
+RSpec::Matchers.define :serve_png_icon do
+  match(notify_expectation_failures: true) do |response|
+    expect(response.code).to eq(200)
+    expect(response.headers[:content_type]).to eq('image/png')
+    expect(response.body.bytes.first(8)).to eq([137, 80, 78, 71, 13, 10, 26, 10])
+  end
+end
+
 RSpec::Matchers.define :show_selected_logs do |service, records, receipt_windows|
   match(notify_expectation_failures: true) do |response|
     rows = LogView.rows(response)

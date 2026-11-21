@@ -81,7 +81,46 @@ missing or changed, restore the original mount and its `v1` directory so the
 worker can retry. After intentionally replacing the workspace, mount the
 replacement and restart Einblick. Startup initializes the export directory on
 the new filesystem so the worker can regenerate missing files from retained logs.
-Transfer to R2 and source eviction are planned.
+
+## ☁️ R2 publication and recovery
+
+With [R2 configured](configuration.md#-r2-log-archives), the archive worker
+publishes each closed batch to the same versioned key as its staged path.
+OTLP acknowledges the local DuckDB commit. Publication and staging cleanup run
+in the background, and recent-log queries continue reading the local source rows.
+
+Before sending a file, the worker records its SHA-256 in DuckDB. R2 writes are
+conditional on the key being absent. After upload or on retry, the worker
+checks the object's metadata and streams its bytes to verify a recorded
+checksum. This also recognizes a successful upload after restart, even if
+staging is missing, cannot be regenerated, or has been regenerated with
+different Parquet bytes. The worker can reconcile recorded upload attempts and
+retry cleanup while local recovery is blocked by unreadable staging. New
+exports and uploads resume after local recovery succeeds. Cleanup remains
+pending after confirmation until the staged file has been removed or is absent.
+
+For publication failures, inspect `component=log_archive` diagnostics, the
+configured endpoint and bucket permissions, and the remaining staging
+capacity. Unconfirmed batches retain their source rows. On each tick the worker
+selects the eligible batch that has waited longest since creation or the last
+attempt, so another batch can proceed while a failed upload, reconciliation, or
+cleanup remains pending. The worker retries damaged staging in the same
+publication rotation. A blocked repair leaves the export slot available for
+new logs on other days. If the key contains conflicting bytes, investigate the
+bucket and key ownership before changing the object. The worker preserves an
+existing object and leaves the batch pending when verification fails. If
+verification repeatedly times out, check that `request_timeout` covers the full
+download of the object. If publication succeeds but workspace cleanup fails,
+restore staging access so the worker can reclaim the file.
+
+The S3 client can continue a multipart abort after worker cancellation. A
+stalled abort shares `request_timeout` with transfers, subject to the client's
+one-minute abort cap. If it uses the remaining time in the application's
+15-second shutdown budget, the process may exit before DuckDB closes cleanly.
+Incomplete multipart uploads follow the bucket's incomplete-upload lifecycle
+policy.
+
+Historical reads and eviction of local source rows are planned.
 
 ## 🚢 Deployment
 

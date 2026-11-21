@@ -38,3 +38,32 @@ func (s *loggingService) Export(ctx context.Context) (string, error) {
 	)
 	return id, err
 }
+
+func (s *loggingService) Publish(ctx context.Context) (string, error) {
+	id, err := s.Service.Publish(ctx)
+	s.logPublication(ctx, id, err)
+	return id, err
+}
+
+func (s *loggingService) ReconcilePublication(ctx context.Context) (string, error) {
+	id, err := s.Service.ReconcilePublication(ctx)
+	s.logPublication(ctx, id, err)
+	return id, err
+}
+
+func (s *loggingService) logPublication(ctx context.Context, id string, err error) {
+	var message logger.Message
+	switch {
+	case err != nil && ctx.Err() == nil:
+		message = logger.NewMessage("remote log archive publication failed", err)
+	case err == nil && !strings.IsEmpty(id):
+		message = logger.NewText("remote log archive publication completed")
+	default:
+		return
+	}
+
+	s.logger.Log(ctx, message,
+		logger.String("component", "log_archive"),
+		logger.String("batch_id", id),
+	)
+}

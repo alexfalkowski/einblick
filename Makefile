@@ -16,7 +16,7 @@ override export partition := $(value partition)
 features-storage:
 	@$(MAKE) features tags="@storage"
 
-# Run local log archive features.
+# Run log staging and R2 publication features with Floci.
 features-archive:
 	@$(MAKE) features tags="@archive"
 

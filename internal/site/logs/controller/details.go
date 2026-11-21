@@ -19,38 +19,50 @@ const (
 	requestDurationPrecision = 2
 )
 
+var resourceLabels = map[string]string{
+	"service.name":                "logs.service",
+	"service.version":             "logs.service_version",
+	"service.instance.id":         "logs.instance_id",
+	"host.id":                     "logs.host_id",
+	"deployment.environment.name": "logs.environment",
+}
+
 func logDetails(stored *storage.Log, entry *logs.LogRecord, source *logs.ResourceLogs, scope *logs.ScopeLogs) model.LogDetails {
-	status, statusLabel, duration := requestSummary(entry.GetAttributes())
-	details := model.LogDetails{
-		Body:               logValue(entry.GetBody()),
-		Attributes:         logFields(entry.GetAttributes()),
-		Resource:           resourceFields(source),
-		Scope:              scopeFields(scope),
-		Environment:        stringAttribute(source.GetResource().GetAttributes(), "deployment.environment.name"),
-		RequestStatus:      status,
-		RequestStatusLabel: statusLabel,
-		RequestDuration:    duration,
-		SpanID:             hex.EncodeToString(entry.GetSpanId()),
-		EventName:          entry.GetEventName(),
-		DroppedAttributes:  entry.GetDroppedAttributesCount(),
-		Flags:              entry.GetFlags(),
-		ReceivedAt:         stored.ReceiveTime.UTC(),
-		EventTimeLabel:     "logs.timestamp",
+	return model.LogDetails{
+		Body:              logValue(entry.GetBody()),
+		Attributes:        logFields(entry.GetAttributes()),
+		Resource:          resourceFields(source),
+		Scope:             scopeFields(scope),
+		Environment:       stringAttribute(source.GetResource().GetAttributes(), "deployment.environment.name"),
+		Request:           requestDetails(entry.GetAttributes()),
+		Timing:            logTiming(stored.EventTime, stored.ReceiveTime, entry),
+		SpanID:            hex.EncodeToString(entry.GetSpanId()),
+		EventName:         entry.GetEventName(),
+		DroppedAttributes: entry.GetDroppedAttributesCount(),
+		Flags:             entry.GetFlags(),
 	}
+}
+
+func logTiming(event, received time.Time, entry *logs.LogRecord) model.LogTiming {
+	timing := model.LogTiming{ReceivedAt: received.UTC()}
 	if observed := entry.GetObservedTimeUnixNano(); observed != 0 {
 		// Split the unsigned value before converting to preserve times after 2262.
 		//nolint:gosec // Each quotient and remainder fits in int64.
-		details.ObservedAt = time.Unix(int64(observed / uint64(time.Second))).Add(time.Duration(observed % uint64(time.Second)).Duration()).UTC()
+		timing.ObservedAt = time.Unix(int64(observed / uint64(time.Second))).Add(time.Duration(observed % uint64(time.Second)).Duration()).UTC()
 	}
-	if entry.GetTimeUnixNano() == 0 {
-		details.EventTimeLabel = "logs.observed"
-		if details.ObservedAt.IsZero() {
-			details.EventTimeLabel = "logs.received"
-			return details
-		}
+
+	switch {
+	case entry.GetTimeUnixNano() != 0:
+		timing.EventTimeLabel = "logs.timestamp"
+	case !timing.ObservedAt.IsZero():
+		timing.EventTimeLabel = "logs.observed"
+	default:
+		timing.EventTimeLabel = "logs.received"
+		return timing
 	}
-	details.ReceiptOffset, details.ReceiptLabel = receiptOffset(stored.EventTime, details.ReceivedAt)
-	return details
+
+	timing.ReceiptOffset, timing.ReceiptLabel = receiptOffset(event, timing.ReceivedAt)
+	return timing
 }
 
 func receiptOffset(event, received time.Time) (string, string) {
@@ -67,37 +79,38 @@ func receiptOffset(event, received time.Time) (string, string) {
 	return durationText(math.Abs(seconds), 0), label
 }
 
-func requestSummary(attributes []*common.KeyValue) (string, string, string) {
-	status, duration := strings.Empty, strings.Empty
-
-	var label string
+func requestDetails(attributes []*common.KeyValue) model.RequestDetails {
+	var details model.RequestDetails
 	switch stringAttribute(attributes, "system") {
 	case "http":
-		label = "logs.http_status"
+		details.StatusLabel = "logs.http_status"
 		for _, attribute := range attributes {
 			if code, ok := attribute.GetValue().GetValue().(*common.AnyValue_IntValue); attribute.GetKey() == "code" && ok {
-				status = strconv.FormatInt(code.IntValue, 10)
+				details.Status = strconv.FormatInt(code.IntValue, 10)
 				break
 			}
 		}
 	case "grpc":
-		label = "logs.grpc_status"
-		status = stringAttribute(attributes, "code")
+		details.StatusLabel = "logs.grpc_status"
+		details.Status = stringAttribute(attributes, "code")
 	default:
-		return strings.Empty, strings.Empty, strings.Empty
+		return details
 	}
 
 	if elapsed, err := time.ParseDuration(stringAttribute(attributes, "duration")); err == nil && elapsed >= 0 {
-		duration = durationText(elapsed.Duration().Seconds(), requestDurationPrecision)
+		details.Duration = durationText(elapsed.Duration().Seconds(), requestDurationPrecision)
 	}
-	return status, label, duration
+	return details
 }
 
 func durationText(seconds float64, precision int) string {
 	minute, hour := time.Minute.Duration().Seconds(), time.Hour.Duration().Seconds()
 	day := hoursPerDay * hour
 
-	value, unit := seconds, "s"
+	var (
+		value float64
+		unit  string
+	)
 	switch {
 	case seconds >= day:
 		value, unit = seconds/day, "d"
@@ -107,11 +120,13 @@ func durationText(seconds float64, precision int) string {
 		value, unit = seconds/minute, "min"
 	case seconds < 1:
 		value, unit = seconds/time.Millisecond.Duration().Seconds(), "ms"
+	default:
+		value, unit = seconds, "s"
 	}
 	if value > 0 && value < 1 && unit == "ms" {
 		return "<1 ms"
 	}
-	return strconv.FormatFloat(value, 'f', precision, 64) + " " + unit
+	return strings.Concat(strconv.FormatFloat(value, 'f', precision, 64), " ", unit)
 }
 
 func logFields(attributes []*common.KeyValue) []model.LogField {
@@ -162,14 +177,6 @@ func logList(values []*common.AnyValue) model.LogValue {
 		items = append(items, logValue(value))
 	}
 	return model.LogValue{Items: items, Label: "logs.list"}
-}
-
-var resourceLabels = map[string]string{
-	"service.name":                "logs.service",
-	"service.version":             "logs.service_version",
-	"service.instance.id":         "logs.instance_id",
-	"host.id":                     "logs.host_id",
-	"deployment.environment.name": "logs.environment",
 }
 
 func resourceFields(source *logs.ResourceLogs) []model.LogField {
