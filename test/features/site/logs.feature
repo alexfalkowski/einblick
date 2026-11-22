@@ -42,7 +42,7 @@ Feature: Investigate recent logs in the browser
 
     Examples:
       | range   | layout  | preset | hours |
-      | default | partial | 7 days | 168   |
+      | default | partial | 1 hour | 1     |
       | 1 hour  | partial | 1 hour | 1     |
       | 1 hour  | full    | 1 hour | 1     |
 
@@ -175,7 +175,7 @@ Feature: Investigate recent logs in the browser
   Scenario: Storage unavailability is visible and a later query succeeds
     Given acknowledged searchable logs
     When I submit a query while local log storage is unavailable and try again after recovery
-    Then the failed query should show that local storage is unavailable in German
+    Then the failed query should show that log storage is unavailable in German
     And the later query should show the selected service's log messages and exact event times
 
   Scenario: An expired query shows a timeout without displaying a partial result

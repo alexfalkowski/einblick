@@ -8,7 +8,7 @@ import "opentelemetry/proto/logs/v1/logs.proto";
 option go_package = "github.com/alexfalkowski/einblick/api/einblick/v1";
 option ruby_package = "Einblick::V1";
 
-// ListLogsRequest selects a bounded page of locally committed logs.
+// ListLogsRequest selects a bounded page of committed logs.
 // Filters are conjunctive and remain fixed across continuation requests.
 message ListLogsRequest {
   // start_time is the required inclusive absolute event-time boundary.
@@ -42,7 +42,7 @@ message ListLogsRequest {
 
 // Log contains a committed record with its complete typed OTLP context.
 message Log {
-  // id is the stable local record identity and descending timestamp tie-breaker.
+  // id is the stable record identity within its original database volume.
   int64 id = 1;
 
   // event_time selects the original Timestamp, then ObservedTimestamp, then receipt.
@@ -67,20 +67,24 @@ message ListLogsResponse {
   map<string, string> meta = 1;
 
   // logs orders records by event_time descending, then id descending.
+  // Archive records with identical time and ID from different volumes have a
+  // stable additional tie-breaker carried by the opaque page token.
   repeated Log logs = 2;
 
   // next_page_token is empty at exhaustion. Membership is not frozen: newly
   // committed records behind the cursor may enter later pages; refresh for
-  // arrivals ahead. Existing records do not repeat. Tokens survive restart
-  // while local source rows are retained.
+  // arrivals ahead. Existing records do not repeat. Tokens survive restart and
+  // local eviction on the same database volume.
   string next_page_token = 3;
 }
 
 // Service provides fixed telemetry query operations.
 service Service {
-  // ListLogs reads acknowledged local logs within explicit absolute bounds.
+  // ListLogs reads acknowledged logs within explicit absolute bounds. When an
+  // archive is configured, it includes matching archived logs.
   // InvalidArgument identifies invalid bounds, filters or tokens. Cancellation
-  // and deadlines propagate through queueing and database work; storage failures
-  // return Unavailable. Failed queries never return partial pages.
+  // and deadlines propagate through queueing and database work. An active
+  // remote read may finish after cancellation. Storage failures return
+  // Unavailable. Failed queries never return partial pages.
   rpc ListLogs(ListLogsRequest) returns (ListLogsResponse) {}
 }

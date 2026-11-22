@@ -1,7 +1,7 @@
 site.title: Logs · Einblick
 site.skip: Skip to logs
 logs.heading: Logs
-logs.scope: Recent logs from local storage
+logs.scope: Search logs in local storage and any configured archive
 logs.service: Service
 logs.all_services: All services
 logs.time_range: Time range
@@ -85,4 +85,4 @@ logs.date_range_too_wide: This time range exceeds the search limit.
 logs.invalid_dates: Enter a valid start and end time in UTC.
 logs.cancelled: The log query was cancelled.
 logs.timed_out: The log query timed out. Try a narrower time range.
-logs.unavailable: Local log storage is unavailable. Try again.
+logs.unavailable: Log storage is unavailable. Try again.

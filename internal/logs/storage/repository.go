@@ -3,6 +3,7 @@ package storage
 import (
 	"strconv"
 
+	"github.com/alexfalkowski/einblick/internal/logs/archive"
 	"github.com/alexfalkowski/go-service/v3/context"
 	"github.com/alexfalkowski/go-service/v3/database/sql"
 	"github.com/alexfalkowski/go-service/v3/encoding/proto"
@@ -21,6 +22,7 @@ type repository struct {
 	db      *sql.DB
 	pool    *sync.BufferPool
 	queries *sync.Semaphore
+	store   archive.ObjectStore
 }
 
 // Add commits all records and their resource/scope context before returning

@@ -1,10 +1,13 @@
 package archive
 
 import (
+	"iter"
+
 	"github.com/alexfalkowski/go-service/v3/context"
 	"github.com/alexfalkowski/go-service/v3/errors"
 	"github.com/alexfalkowski/go-service/v3/io"
 	"github.com/alexfalkowski/go-service/v3/strings"
+	"github.com/alexfalkowski/go-service/v3/time"
 )
 
 // Publication is a batch whose remote object or local cleanup needs work.
@@ -15,7 +18,7 @@ type Publication struct {
 	PublishedChecksum string
 }
 
-// ObjectStore provides the immutable object operations needed by publication.
+// ObjectStore provides immutable archive objects for publication and queries.
 type ObjectStore interface {
 	// Checksum verifies the stored object's contents and returns its SHA-256.
 	// An absent object returns an empty checksum.
@@ -23,6 +26,32 @@ type ObjectStore interface {
 
 	// Create streams a file under key, failing if the key already exists.
 	Create(ctx context.Context, key, checksum string, file io.Reader, size int64) error
+
+	// List yields object keys in a selected prefix and stops on the first error.
+	List(ctx context.Context, prefix string) iter.Seq2[string, error]
+
+	// URI returns the DuckDB location for a validated object key.
+	URI(key string) string
+
+	// CheckPublication verifies that the stored bytes match the published checksum.
+	CheckPublication(ctx context.Context, key, checksum string) error
+}
+
+func (s *service) Evict(ctx context.Context) (string, error) {
+	if s.objects == nil || s.localRetention == 0 {
+		return strings.Empty, nil
+	}
+
+	batch, err := s.eviction.NextEviction(ctx, time.Now().Add(-s.localRetention.Duration()))
+	if err != nil || strings.IsEmpty(batch.ID) {
+		return strings.Empty, err
+	}
+
+	if err := s.objects.CheckPublication(ctx, batch.Key(), batch.PublishedChecksum); err != nil {
+		return batch.ID, err
+	}
+
+	return batch.ID, s.eviction.Evict(ctx, batch.ID)
 }
 
 func (s *service) Publish(ctx context.Context) (string, error) {
@@ -64,7 +93,7 @@ func (s *service) processPublication(ctx context.Context, allowUpload bool) (str
 }
 
 func (s *service) publish(ctx context.Context, batch StagedBatch, allowUpload bool) (bool, error) {
-	key := strings.Concat(Version, "/", batch.Path())
+	key := batch.Key()
 
 	checksum, err := s.objects.Checksum(ctx, key)
 	if err != nil {
@@ -93,6 +122,7 @@ func (s *service) publish(ctx context.Context, batch StagedBatch, allowUpload bo
 	if err := s.batches.RecordUpload(ctx, batch.ID, batch.Checksum); err != nil {
 		return false, err
 	}
+
 	if err := s.objects.Create(ctx, key, batch.Checksum, file, size); err != nil {
 		return false, err
 	}
@@ -101,6 +131,7 @@ func (s *service) publish(ctx context.Context, batch StagedBatch, allowUpload bo
 	if err != nil {
 		return false, err
 	}
+
 	return s.confirm(ctx, batch.ID, checksum)
 }
 

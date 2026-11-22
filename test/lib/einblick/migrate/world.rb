@@ -23,12 +23,12 @@ module Einblick
 
       def attempt_future_migration
         Nonnative.stop
-        change_schema_version(3, 4)
+        change_schema_version(4, 5)
         log_database { |connection| @schema_data_before, @migration_history_before = migration_snapshot(connection) }
         attempt_database_start('server.yaml')
       ensure
         log_database { |connection| @schema_data_after, @migration_history_after = migration_snapshot(connection) }
-        change_schema_version(4, 3)
+        change_schema_version(5, 4)
         Nonnative.start
       end
 

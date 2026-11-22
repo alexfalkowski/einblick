@@ -5,6 +5,7 @@ module Einblick
     # Relays S3 requests to the disposable Floci bucket and simulates interruptions.
     class Floci
       include FlociFaults
+      include FlociReads
 
       BUCKET = '/einblick-publication-feature'
 
@@ -53,6 +54,21 @@ module Einblick
         response.body
       end
 
+      def delete_archive(key)
+        response = request('DELETE', "#{BUCKET}/#{key}")
+        raise "Could not delete Floci object: #{response.code}" unless response.is_a?(Net::HTTPSuccess)
+      end
+
+      def replace_archive(key, keep_checksum: false)
+        bytes = download(key)
+        original_checksum = Digest::SHA256.hexdigest(bytes)
+        # Corrupt the Parquet footer so any attempt to read the replacement fails.
+        changed_bytes(bytes, index: -1)
+        checksum = keep_checksum ? original_checksum : Digest::SHA256.hexdigest(bytes)
+        response = request('PUT', "#{BUCKET}/#{key}", bytes, 'x-amz-meta-sha256' => checksum)
+        raise "Could not replace Floci object: #{response.code}" unless response.is_a?(Net::HTTPSuccess)
+      end
+
       def upload_fixture(key, path, checksum)
         response = request('PUT', "#{BUCKET}/#{key}", File.binread(path), 'x-amz-meta-sha256' => checksum)
         raise "Could not seed Floci object: #{response.code}" unless response.is_a?(Net::HTTPSuccess)
@@ -79,12 +95,16 @@ module Einblick
         intercepted = intercept(incoming, env)
         return intercepted if intercepted
 
+        listing = archive_listing?(incoming)
+        @archive_listings = archive_listings + 1 if listing
         response = request(incoming.request_method, incoming.fullpath, payload(incoming), forward_headers(env))
+        wait_on_archive_listing(incoming) if listing && response.is_a?(Net::HTTPSuccess)
         respond(incoming, response)
       end
 
       def rack_response(response, body)
-        headers = response.to_hash.slice('content-type', 'content-length', 'etag', 'x-amz-meta-sha256')
+        headers = response.to_hash.slice('content-type', 'content-length', 'content-range',
+                                         'last-modified', 'etag', 'x-amz-meta-sha256')
         [response.code.to_i, headers.transform_values(&:first), [body]]
       end
 
@@ -93,7 +113,8 @@ module Einblick
       end
 
       def forward_headers(env)
-        names = %w[HOST AUTHORIZATION IF_NONE_MATCH IF_MATCH X_AMZ_CONTENT_SHA256 X_AMZ_DATE X_AMZ_META_SHA256]
+        names = %w[HOST AUTHORIZATION IF_NONE_MATCH IF_MATCH RANGE
+                   X_AMZ_CONTENT_SHA256 X_AMZ_DATE X_AMZ_META_SHA256 X_AMZ_SECURITY_TOKEN]
         names.to_h { |name| [name.tr('_', '-'), env["HTTP_#{name}"]] }
              .merge('Content-Type' => env['CONTENT_TYPE']).compact
       end

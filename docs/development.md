@@ -40,19 +40,27 @@ make features-site
 make features-service
 ```
 
-`make features-archive` runs both archive groups. Use `make features-archive-staging`
-for local Parquet staging and `make features-archive-publication` for R2 publication.
-The publication group uses Floci from the shared stack on port `4566`, with the
+`make features-archive` runs every archive scenario. Use `make features-archive-staging`
+for local Parquet staging and `make features-archive-publication` for all R2 scenarios.
+`make features-archive-upload` runs upload and publication recovery scenarios.
+`make features-archive-history` runs historical search and eviction scenarios.
+Both R2 groups use Floci from the shared stack on port `4566`, with the
 test relay on port `4567`. Set `EINBLICK_FLOCI_PORT` if your local emulator
 listens on a different port. The scenarios create and delete objects in a
 disposable test bucket. CI pins its Floci image in the
 [archive executor](../.circleci/config.yml).
 
+The publication scenarios use Einblick's R2 startup to install and load
+`httpfs`. The test user needs a writable home and access to DuckDB's extension
+repository when the extension is absent.
+[R2 configuration](configuration.md#-r2-log-archives)
+
 The storage group includes migrations. The service group covers health, metric
 and trace receipt, and scenarios outside the four tagged groups. Put each new
 scenario in at most one of `@storage`, `@archive`, `@queries`, and `@site`.
-Add `@publication` to archive scenarios that require Floci. `make features` runs
-all feature scenarios.
+Add `@publication` to archive scenarios that require Floci. Add `@archive_history`
+when the scenario covers historical searches or local eviction. `make features`
+runs all feature scenarios.
 Use `make features tags=@printing` or `make features feature=features/migrate`
 to narrow a local run. Run groups one at a time locally because they share ports
 and the test database. Run `make coverage` to merge the profiles in `test/reports/`
@@ -116,7 +124,7 @@ in the package that owns the behavior.
 | [archive](../internal/logs/archive) | Batch identity, export and publication policy. |
 | [storage](../internal/logs/storage) | Durable batch and upload state and native DuckDB Parquet writes. |
 | [staging](../internal/logs/archive/staging) | Workspace recovery, temporary files, checksums, final rename and file cleanup. |
-| [r2](../internal/logs/archive/r2) | Conditional S3 writes and streamed content verification. |
+| [r2](../internal/r2) | R2 connection settings, conditional S3 writes and streamed content verification. |
 | [worker](../internal/logs/archive/worker) | Workspace preparation and scheduling of recovery, exports and publication. |
 
 See [local Parquet staging](operations.md#-local-parquet-staging) for the recovery flow.
@@ -186,6 +194,12 @@ make build-docker platform=arm64
 
 Use `platform=amd64` for that target. Keep `static=0` in the [Makefile](../Makefile):
 DuckDB needs CGO and a compatible C/C++ runtime in the container.
+
+For an R2-enabled container, set `HOME=/data` in Infraops so DuckDB stores
+`httpfs` on the existing writable data volume. DuckDB creates the version and
+platform subdirectories under `/data/.duckdb/extensions` and reuses the files
+after restart. The container root can stay read-only.
+[DuckDB extension installation](https://duckdb.org/docs/2.0/extensions/installing_extensions)
 
 ## 📚 Product and design
 

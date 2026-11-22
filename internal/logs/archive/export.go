@@ -4,6 +4,8 @@ import (
 	"github.com/alexfalkowski/go-service/v3/context"
 	"github.com/alexfalkowski/go-service/v3/strings"
 	"github.com/alexfalkowski/go-service/v3/telemetry/logger"
+	"github.com/alexfalkowski/go-service/v3/time"
+	"github.com/alexfalkowski/go-signal/v2"
 )
 
 // Service recovers recorded batches and stages one batch per export attempt.
@@ -25,26 +27,50 @@ type Service interface {
 	// ReconcilePublication checks one recorded upload or retries pending cleanup.
 	// It leaves absent remote objects pending for Publish and reports IDs as Publish does.
 	ReconcilePublication(ctx context.Context) (string, error)
+
+	// Evict releases one batch eligible for local eviction.
+	Evict(ctx context.Context) (string, error)
+}
+
+// ServiceParams supplies the injected dependencies for archive export.
+type ServiceParams struct {
+	signal.In
+	Config   *Config
+	Batches  BatchRepository
+	Eviction EvictionRepository
+	Files    StagedFiles
+	Objects  ObjectStore
+	Logger   *logger.Logger
 }
 
 // NewService composes durable batch state, local staging, publication and diagnostics.
-// A nil cfg disables archive export.
-func NewService(cfg *Config, batches BatchRepository, files StagedFiles, objects ObjectStore, log *logger.Logger) Service {
+// A nil configuration disables archive export.
+func NewService(params ServiceParams) Service {
+	cfg := params.Config
 	if cfg == nil {
 		return nil
 	}
 
 	return &loggingService{
-		Service: &service{batches: batches, files: files, objects: objects, batchBytes: cfg.BatchSize.Bytes()},
-		logger:  log,
+		Service: &service{
+			batches:        params.Batches,
+			eviction:       params.Eviction,
+			files:          params.Files,
+			objects:        params.Objects,
+			batchBytes:     cfg.BatchSize.Bytes(),
+			localRetention: cfg.LocalRetention,
+		},
+		logger: params.Logger,
 	}
 }
 
 type service struct {
-	batches    BatchRepository
-	files      StagedFiles
-	objects    ObjectStore
-	batchBytes int64
+	batches        BatchRepository
+	eviction       EvictionRepository
+	files          StagedFiles
+	objects        ObjectStore
+	batchBytes     int64
+	localRetention time.Duration
 }
 
 func (s *service) Prepare() error {

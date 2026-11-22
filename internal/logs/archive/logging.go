@@ -21,43 +21,35 @@ func (s *loggingService) Recover(ctx context.Context) error {
 
 func (s *loggingService) Export(ctx context.Context) (string, error) {
 	id, err := s.Service.Export(ctx)
-
-	var message logger.Message
-	switch {
-	case err != nil && ctx.Err() == nil:
-		message = logger.NewMessage("local log archive export failed", err)
-	case err == nil && !strings.IsEmpty(id):
-		message = logger.NewText("local log archive export completed")
-	default:
-		return id, err
-	}
-
-	s.logger.Log(ctx, message,
-		logger.String("component", "log_archive"),
-		logger.String("batch_id", id),
-	)
+	s.logBatchOutcome(ctx, "local log archive export", id, err)
 	return id, err
 }
 
 func (s *loggingService) Publish(ctx context.Context) (string, error) {
 	id, err := s.Service.Publish(ctx)
-	s.logPublication(ctx, id, err)
+	s.logBatchOutcome(ctx, "remote log archive publication", id, err)
 	return id, err
 }
 
 func (s *loggingService) ReconcilePublication(ctx context.Context) (string, error) {
 	id, err := s.Service.ReconcilePublication(ctx)
-	s.logPublication(ctx, id, err)
+	s.logBatchOutcome(ctx, "remote log archive publication", id, err)
 	return id, err
 }
 
-func (s *loggingService) logPublication(ctx context.Context, id string, err error) {
+func (s *loggingService) Evict(ctx context.Context) (string, error) {
+	id, err := s.Service.Evict(ctx)
+	s.logBatchOutcome(ctx, "local log archive eviction", id, err)
+	return id, err
+}
+
+func (s *loggingService) logBatchOutcome(ctx context.Context, operation, id string, err error) {
 	var message logger.Message
 	switch {
 	case err != nil && ctx.Err() == nil:
-		message = logger.NewMessage("remote log archive publication failed", err)
+		message = logger.NewMessage(strings.Concat(operation, " failed"), err)
 	case err == nil && !strings.IsEmpty(id):
-		message = logger.NewText("remote log archive publication completed")
+		message = logger.NewText(strings.Concat(operation, " completed"))
 	default:
 		return
 	}

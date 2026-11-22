@@ -1,7 +1,7 @@
 site.title: Registros · Einblick
 site.skip: Ir a los registros
 logs.heading: Registros
-logs.scope: Registros recientes del almacenamiento local
+logs.scope: Busca registros en el almacenamiento local y en los archivos configurados
 logs.service: Servicio
 logs.all_services: Todos los servicios
 logs.time_range: Intervalo
@@ -85,4 +85,4 @@ logs.date_range_too_wide: Este intervalo supera el límite de búsqueda.
 logs.invalid_dates: Introduce una hora de inicio y una de fin válidas en UTC.
 logs.cancelled: Se canceló la consulta de registros.
 logs.timed_out: La consulta de registros agotó el tiempo de espera. Prueba con un intervalo más corto.
-logs.unavailable: El almacenamiento local de registros no está disponible. Vuelve a intentarlo.
+logs.unavailable: El almacenamiento de registros no está disponible. Vuelve a intentarlo.

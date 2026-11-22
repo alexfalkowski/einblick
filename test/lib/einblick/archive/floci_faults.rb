@@ -46,6 +46,8 @@ module Einblick
 
       def restore
         release_acknowledgement
+        release_archive_read
+        release_archive_listing
         @part_gate&.close
         @part_gate = nil
         @mode = nil
@@ -62,6 +64,7 @@ module Einblick
       private
 
       def intercept(incoming, env)
+        wait_on_archive_read(incoming)
         return [503, {}, []] if @mode == :unavailable || wait_on_part?(incoming)
         return unless commit_request?(incoming)
 
@@ -123,8 +126,8 @@ module Einblick
         rack_response(response, body)
       end
 
-      def changed_bytes(bytes)
-        bytes.setbyte(0, bytes.getbyte(0) ^ 1)
+      def changed_bytes(bytes, index: 0)
+        bytes.setbyte(index, bytes.getbyte(index) ^ 1)
         bytes
       end
     end

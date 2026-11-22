@@ -1,5 +1,19 @@
 # frozen_string_literal: true
 
+RSpec::Matchers.define :retain_archive_members do |batch, logs|
+  match(notify_expectation_failures: true) do |members|
+    expect(members).to match_array(logs.map { |row| [row.first, batch] })
+  end
+end
+
+RSpec::Matchers.define :include_both_archive_copies do |expected_count|
+  match(notify_expectation_failures: true) do |logs|
+    copies_by_id = logs.group_by(&:id)
+    expect(copies_by_id.size).to eq(expected_count)
+    expect(copies_by_id.values.map(&:size)).to all(eq(2))
+  end
+end
+
 RSpec::Matchers.define :retain_staging_with_publication_status do |published|
   match(notify_expectation_failures: true) do |snapshot|
     expect(snapshot.fetch(:batches).size).to eq(1)

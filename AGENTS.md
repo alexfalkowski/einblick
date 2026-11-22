@@ -4,6 +4,14 @@
 
 Use `bin/AGENTS.md` for shared skills and cross-repository defaults.
 
+## Accepted design
+
+Before recording a finding, audit entry or proposed change, read the
+[accepted-design index](docs/agents/accepted-design.md) and its relevant
+area files. Apply the recorded scope of each decision. Add owner-accepted
+design choices, tradeoffs and dependency limitations to the relevant area file
+as they are agreed.
+
 ## Architecture and simplicity
 
 Before implementation, inspect both the closest existing service under

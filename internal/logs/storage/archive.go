@@ -16,9 +16,8 @@ import (
 const minimumRowBytes = 5 * 8
 
 // NewArchive provides durable batch state and Parquet writes over one DuckDB connection.
-func NewArchive(db *sql.DB) (archive.BatchRepository, archive.BatchWriter) {
-	store := &Archive{db: db}
-	return store, store
+func NewArchive(db *sql.DB) *Archive {
+	return &Archive{db: db}
 }
 
 // Archive owns durable log batch state and native Parquet operations.

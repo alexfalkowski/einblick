@@ -28,10 +28,12 @@ const (
 //
 // Service provides fixed telemetry query operations.
 type ServiceClient interface {
-	// ListLogs reads acknowledged local logs within explicit absolute bounds.
+	// ListLogs reads acknowledged logs within explicit absolute bounds. When an
+	// archive is configured, it includes matching archived logs.
 	// InvalidArgument identifies invalid bounds, filters or tokens. Cancellation
-	// and deadlines propagate through queueing and database work; storage failures
-	// return Unavailable. Failed queries never return partial pages.
+	// and deadlines propagate through queueing and database work. An active
+	// remote read may finish after cancellation. Storage failures return
+	// Unavailable. Failed queries never return partial pages.
 	ListLogs(ctx context.Context, in *ListLogsRequest, opts ...grpc.CallOption) (*ListLogsResponse, error)
 }
 
@@ -59,10 +61,12 @@ func (c *serviceClient) ListLogs(ctx context.Context, in *ListLogsRequest, opts 
 //
 // Service provides fixed telemetry query operations.
 type ServiceServer interface {
-	// ListLogs reads acknowledged local logs within explicit absolute bounds.
+	// ListLogs reads acknowledged logs within explicit absolute bounds. When an
+	// archive is configured, it includes matching archived logs.
 	// InvalidArgument identifies invalid bounds, filters or tokens. Cancellation
-	// and deadlines propagate through queueing and database work; storage failures
-	// return Unavailable. Failed queries never return partial pages.
+	// and deadlines propagate through queueing and database work. An active
+	// remote read may finish after cancellation. Storage failures return
+	// Unavailable. Failed queries never return partial pages.
 	ListLogs(context.Context, *ListLogsRequest) (*ListLogsResponse, error)
 	mustEmbedUnimplementedServiceServer()
 }

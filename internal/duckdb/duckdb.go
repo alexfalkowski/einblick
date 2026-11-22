@@ -20,8 +20,10 @@ import (
 // DuckDB manages the adjacent WAL and spill directory on the same writable path.
 func Open(lc signal.Lifecycle, cfg *Config) (*sql.DB, error) {
 	settings := url.Values{
-		"memory_limit": {cfg.MemoryLimit},
-		"threads":      {strconv.Itoa(cfg.Threads)},
+		"memory_limit":                 {cfg.MemoryLimit},
+		"threads":                      {strconv.Itoa(cfg.Threads)},
+		"autoinstall_known_extensions": {"false"},
+		"allow_persistent_secrets":     {"false"},
 	}
 	if !strings.IsEmpty(cfg.SpillLimit) {
 		settings.Set("max_temp_directory_size", cfg.SpillLimit)
