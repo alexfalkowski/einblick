@@ -121,6 +121,10 @@ Then('the stylesheet and script URLs should identify the content they serve') do
   expect(@log_assets).to serve_fingerprinted_log_assets
 end
 
+Then('I should see the Einblick icon in the browser tab') do
+  expect(@favicon).to serve_png_icon
+end
+
 Then('the query link should fix the {string} window of {int} hours ending now for the selected service') do |preset, hours|
   expect(@response).to preserve_recent_window(preset, hours * 3600, @preset_started..@preset_finished, @query.slice('service'))
 end

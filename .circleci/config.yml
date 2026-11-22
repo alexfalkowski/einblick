@@ -35,7 +35,13 @@ commands:
 executors:
   go:
     docker:
-      - image: alexfalkowski/go:5.26
+      - image: &go_image alexfalkowski/go:5.26
+  go-archive:
+    docker:
+      - image: *go_image
+      - image: floci/floci:2.5.0
+        environment:
+          FLOCI_AUTH_VALIDATE_SIGNATURES: "true"
   release:
     docker:
       - image: alexfalkowski/release:8.54
@@ -87,10 +93,13 @@ jobs:
     resource_class: arm.large
   features:
     parameters:
+      runtime:
+        type: executor
+        default: go
       partition:
         type: enum
         enum: [storage, archive, queries, site, service]
-    executor: go
+    executor: << parameters.runtime >>
     working_directory: ~/einblick
     steps:
       - prepare-service
@@ -247,13 +256,20 @@ workflows:
           matrix:
             alias: feature-groups
             parameters:
-              partition: [storage, archive, queries, site, service]
+              partition: [storage, queries, site, service]
+          requires:
+            - build-features
+      - features:
+          name: features-archive
+          partition: archive
+          runtime: go-archive
           requires:
             - build-features
       - coverage:
           requires:
             - build-service
             - feature-groups
+            - features-archive
       - test-docker-amd64:
           filters:
             branches:

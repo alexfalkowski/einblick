@@ -23,7 +23,9 @@ module Einblick
       end
 
       def open_logs_with_assets
-        @log_assets = site_client.load_log_assets(open_logs)
+        page = open_logs
+        @log_assets = site_client.load_log_assets(page)
+        @favicon = site_client.load_favicon(page)
       end
 
       def investigate_logs(layout, languages, overrides = {})

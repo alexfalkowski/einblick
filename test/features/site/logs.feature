@@ -7,6 +7,7 @@ Feature: Investigate recent logs in the browser
     Then I should see the recent log controls without a sign-in flow
     And I should see the available time presets and the five severity choices
     And the stylesheet and script URLs should identify the content they serve
+    And I should see the Einblick icon in the browser tab
 
   Scenario Outline: Replace a saved time range with a recent preset
     Given acknowledged searchable logs

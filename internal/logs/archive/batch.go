@@ -1,6 +1,13 @@
 package archive
 
-import "github.com/alexfalkowski/go-service/v3/context"
+import (
+	"github.com/alexfalkowski/go-service/v3/context"
+	"github.com/alexfalkowski/go-service/v3/io"
+	"github.com/alexfalkowski/go-service/v3/strings"
+)
+
+// Version is the archive projection and key prefix.
+const Version = "v1"
 
 // Batch identifies an immutable set of logs for one UTC event day.
 type Batch struct {
@@ -12,6 +19,11 @@ type Batch struct {
 
 	// ContentDigest identifies the logical records independently of file encoding.
 	ContentDigest string
+}
+
+// Path is the batch's stable path relative to the archive version.
+func (b Batch) Path() string {
+	return strings.Concat("signal=logs/day=", b.Day, "/", b.ID, ".parquet")
 }
 
 // StagedBatch pairs a batch with the checksum recorded for its completed file.
@@ -37,6 +49,27 @@ type BatchRepository interface {
 
 	// Requeue makes the same batch and membership pending again.
 	Requeue(ctx context.Context, id string) error
+
+	// NextPublication selects one batch for cleanup, reconciliation or upload
+	// and advances its position in the durable retry order.
+	// A zero batch indicates no work.
+	NextPublication(ctx context.Context) (Publication, error)
+
+	// NextReconciliation advances the retry order for one batch with pending
+	// cleanup or a recorded upload attempt. A zero batch indicates no work.
+	NextReconciliation(ctx context.Context) (Publication, error)
+
+	// RecordUpload persists an attempted file checksum before the remote write.
+	RecordUpload(ctx context.Context, id, checksum string) error
+
+	// HasUpload reports whether an object checksum matches an attempted write.
+	HasUpload(ctx context.Context, id, checksum string) (bool, error)
+
+	// ConfirmPublication records the verified remote checksum before file cleanup.
+	ConfirmPublication(ctx context.Context, id, checksum string) error
+
+	// FinishCleanup records completion and clears the staged-file checksum.
+	FinishCleanup(ctx context.Context, id string) error
 }
 
 // BatchWriter produces and verifies Parquet for a claimed batch.
@@ -56,4 +89,11 @@ type StagedFiles interface {
 
 	// Stage creates the completed file and returns its checksum after verification.
 	Stage(ctx context.Context, batch Batch) (string, error)
+
+	// OpenVerified opens the verified file at its start, or returns a nil
+	// reader if the file needs regeneration. The caller closes the reader.
+	OpenVerified(ctx context.Context, batch StagedBatch) (io.ReadCloser, int64, error)
+
+	// Remove releases a confirmed batch's local file. An absent file is already clean.
+	Remove(batch Batch) error
 }

@@ -1,6 +1,6 @@
 module github.com/alexfalkowski/einblick
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/alexfalkowski/go-health/v2 v2.44.0
@@ -9,6 +9,7 @@ require (
 	github.com/alexfalkowski/go-sync v1.40.0
 	github.com/duckdb/duckdb-go/v2 v2.20000.0
 	github.com/pressly/goose/v3 v3.30.1
+	github.com/termermc/go-micro-s3/client v0.0.0-20261107140028-4c9c7292e8c2
 	go.opentelemetry.io/proto/otlp v1.11.1
 	golang.org/x/text v0.44.0
 	google.golang.org/grpc v1.85.0

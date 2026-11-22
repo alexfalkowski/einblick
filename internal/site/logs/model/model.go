@@ -109,35 +109,17 @@ type MessageMatch struct {
 
 // LogDetails holds the supplemental values displayed for a log entry.
 type LogDetails struct {
-	// ObservedAt is the producer's observation time, or zero when absent.
-	ObservedAt time.Time
+	// Timing describes the timestamps and receipt offset shown in the inspector.
+	Timing LogTiming
 
-	// ReceivedAt is the receipt timestamp in UTC, with its original precision.
-	ReceivedAt time.Time
+	// Request summarizes the HTTP or gRPC request reported by the log.
+	Request RequestDetails
 
 	// Body contains the original value, including structured and blank messages.
 	Body LogValue
 
 	// Environment is the deployment environment when supplied by the resource.
 	Environment string
-
-	// EventTimeLabel identifies the timestamp used as the event time.
-	EventTimeLabel string
-
-	// ReceiptOffset is the formatted absolute difference between event and receipt.
-	ReceiptOffset string
-
-	// ReceiptLabel identifies the label for an earlier, later or simultaneous receipt.
-	ReceiptLabel string
-
-	// RequestStatus is the HTTP or gRPC status when identifiable from the attributes.
-	RequestStatus string
-
-	// RequestStatusLabel identifies the protocol-specific status label.
-	RequestStatusLabel string
-
-	// RequestDuration is a formatted duration from a request log, when available.
-	RequestDuration string
 
 	// SpanID is the hexadecimal span identifier, when present.
 	SpanID string
@@ -159,6 +141,36 @@ type LogDetails struct {
 
 	// Flags contains the original OTLP log flags.
 	Flags uint32
+}
+
+// LogTiming explains the selected event time and when the service received the log.
+type LogTiming struct {
+	// ObservedAt is the producer's observation time, or zero when absent.
+	ObservedAt time.Time
+
+	// ReceivedAt is the receipt timestamp in UTC, with its original precision.
+	ReceivedAt time.Time
+
+	// EventTimeLabel identifies the timestamp used as the event time.
+	EventTimeLabel string
+
+	// ReceiptOffset is the formatted absolute difference between event and receipt.
+	ReceiptOffset string
+
+	// ReceiptLabel identifies the label for an earlier, later or simultaneous receipt.
+	ReceiptLabel string
+}
+
+// RequestDetails presents the status and duration reported by an HTTP or gRPC log.
+type RequestDetails struct {
+	// Status is the HTTP or gRPC status when identifiable from the attributes.
+	Status string
+
+	// StatusLabel identifies the protocol-specific status label.
+	StatusLabel string
+
+	// Duration is a formatted duration from a request log, when available.
+	Duration string
 }
 
 // LogField represents a named metadata field or an attribute with its original key.

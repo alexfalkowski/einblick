@@ -67,6 +67,39 @@ interrupted work. Set `batch_size` to a positive decimal size such as `65KB`
 A larger accepted row gets its own batch. Allow room for the largest such file
 and the completed files retained on the workspace. See [staging and recovery](operations.md#-local-parquet-staging).
 
+## ☁️ R2 log archives
+
+Add `r2` under the existing `archive` section to publish staged log batches:
+
+```yaml
+archive:
+  workspace: /staging
+  interval: 1s
+  batch_size: 65536B
+  r2:
+    endpoint: https://ACCOUNT_ID.r2.cloudflarestorage.com
+    bucket: einblick
+    region: auto
+    access_key_id: file:/etc/secrets/einblick/r2-access-key-id
+    secret_access_key: file:/etc/secrets/einblick/r2-secret-access-key
+    request_timeout: 5s
+```
+
+Provision the bucket and credentials with object read and write access before
+enabling publication. Use the account's HTTPS S3 API endpoint and region `auto`
+for R2. Einblick puts the bucket name in the URL path. For local Floci, use an
+HTTP endpoint with a numeric loopback address such as `http://127.0.0.1:4566`.
+Go bypasses environment HTTP proxies for loopback IPs. The credentials are
+go-service sources read at startup. Restart to apply credential changes.
+
+The worker attempts one publication per interval. The client streams uploads
+and checksum verification, switching to multipart for large files. The
+`request_timeout` applies to each S3 request, including each upload part and
+the full-object download used to verify the checksum. Size it for the largest
+expected verification download at the available throughput. The S3 client
+also uses this timeout for multipart abort after cancellation. See the
+[shutdown limitation](operations.md#-r2-publication-and-recovery) when sizing it.
+
 ## 🩺 Health checks
 
 The `health` section requires a check interval and timeout:

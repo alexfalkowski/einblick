@@ -19,6 +19,13 @@ brew install duckdb
 The gem detects Homebrew without extra build flags. The configured
 [CI image](../.circleci/config.yml) already supplies the native dependency.
 
+## 🧱 Local dependencies
+
+From the Einblick repository root, run `make start` before running the service
+or its feature tests. This starts the shared stack, including Floci and the
+OpenTelemetry collector. Run `make stop` from the same directory when you are
+done using the stack. See [shared local dependencies](https://github.com/alexfalkowski/docker#-local-dependencies).
+
 ## 🥒 Tests and checks
 
 Run commands from the repository root. The Cucumber/Nonnative harness starts
@@ -32,6 +39,12 @@ make features-queries
 make features-site
 make features-service
 ```
+
+The archive group uses Floci from the shared stack on port `4566`, with the
+test relay on port `4567`. Set `EINBLICK_FLOCI_PORT` if your local emulator
+listens on a different port. The scenarios create and delete objects in a
+disposable test bucket. CI pins its Floci image in the
+[archive executor](../.circleci/config.yml).
 
 The storage group includes migrations. The service group covers health, metric
 and trace receipt, and scenarios outside the four tagged groups. Put each new
@@ -91,15 +104,16 @@ Keep timestamps as unsigned nanoseconds. Writes bind decimal strings to
 `UBIGINT` to preserve the full unsigned range; conversions through floating-point
 values or lower-precision timestamp types can lose data.
 
-The [Logs module](../internal/logs/module.go) wires local export. Keep changes
+The [Logs module](../internal/logs/module.go) wires staging and R2 publication. Keep changes
 in the package that owns the behavior.
 
 | Package | Owns |
 | --- | --- |
-| [archive](../internal/logs/archive) | Batch identity and export policy. |
-| [storage](../internal/logs/storage) | Durable batch state and native DuckDB Parquet writes. |
-| [staging](../internal/logs/archive/staging) | Workspace recovery, temporary files, checksums and final rename. |
-| [worker](../internal/logs/archive/worker) | Workspace preparation at startup and scheduling of recovery and exports. |
+| [archive](../internal/logs/archive) | Batch identity, export and publication policy. |
+| [storage](../internal/logs/storage) | Durable batch and upload state and native DuckDB Parquet writes. |
+| [staging](../internal/logs/archive/staging) | Workspace recovery, temporary files, checksums, final rename and file cleanup. |
+| [r2](../internal/logs/archive/r2) | Conditional S3 writes and streamed content verification. |
+| [worker](../internal/logs/archive/worker) | Workspace preparation and scheduling of recovery, exports and publication. |
 
 See [local Parquet staging](operations.md#-local-parquet-staging) for the recovery flow.
 

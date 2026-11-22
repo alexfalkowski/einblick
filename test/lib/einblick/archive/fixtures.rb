@@ -66,6 +66,39 @@ module Einblick
         value = common::AnyValue.new(bytes_value: Random.new(1).bytes(size))
         header.attributes << common::KeyValue.new(key: 'archive.context', value: value)
       end
+
+      def stage_with_different_parquet_encoding(multipart: false)
+        prepare_archive_publication
+        stage_log_archive(@archive_request, 1)
+        path = archive_files.fetch(0)
+        copy = File.join(WORKSPACE, 'repacked.parquet')
+        with_log_database do |connection|
+          repack_parquet(connection, path, copy)
+          File.rename(copy, path)
+          pad_parquet_for_multipart(path) if multipart
+          connection.query('UPDATE log_archive_batches SET parquet_sha256 = ?', Digest::SHA256.file(path).hexdigest)
+        end
+      end
+
+      def pad_parquet_for_multipart(path)
+        File.open(path, 'r+b') do |file|
+          file.seek(-8, IO::SEEK_END)
+          footer_size = file.read(4).unpack1('V') + 8
+          file.seek(-footer_size, IO::SEEK_END)
+          footer = file.read
+          # The footer points to the original column offsets. Move it past the
+          # pinned client's 64 MiB multipart threshold without changing the rows.
+          file.seek(64 * 1024 * 1024)
+          file.write(footer)
+        end
+      end
+
+      def repack_parquet(connection, path, copy)
+        connection.query(<<~SQL, path, copy)
+          COPY (SELECT * FROM read_parquet(?, hive_partitioning = false))
+          TO (?) (FORMAT PARQUET, COMPRESSION UNCOMPRESSED)
+        SQL
+      end
     end
   end
 end

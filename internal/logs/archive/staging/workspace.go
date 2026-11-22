@@ -14,11 +14,9 @@ import (
 )
 
 const (
-	archiveVersion = "v1"
-	logPartition   = "signal=logs"
-	pendingDir     = ".pending"
-	partialName    = ".logs.parquet.partial"
-	directoryMode  = 0o700
+	pendingDir    = ".pending"
+	partialName   = ".logs.parquet.partial"
+	directoryMode = 0o700
 )
 
 // Keep at least 128 bits of randomness when the filesystem folds case.
@@ -31,7 +29,7 @@ func NewWorkspace(cfg *archive.Config, writer archive.BatchWriter, fs *os.FS, ge
 		return nil
 	}
 
-	return &workspace{path: fs.Join(cfg.Workspace, archiveVersion), writer: writer, fs: fs, generator: generator}
+	return &workspace{path: fs.Join(cfg.Workspace, archive.Version), writer: writer, fs: fs, generator: generator}
 }
 
 type workspace struct {
@@ -75,20 +73,60 @@ func (w *workspace) Prepare() error {
 // Verify checks the completed file against the checksum recorded for the batch.
 // A missing file can be regenerated from the retained log rows.
 func (w *workspace) Verify(ctx context.Context, b archive.StagedBatch) (bool, error) {
+	file, _, err := w.OpenVerified(ctx, b)
+	if file == nil {
+		return false, err
+	}
+	return true, file.Close()
+}
+
+// OpenVerified checks the file opened through the workspace and rewinds it for upload.
+func (w *workspace) OpenVerified(ctx context.Context, b archive.StagedBatch) (io.ReadCloser, int64, error) {
 	root, info, err := w.openWorkspace()
 	if err != nil {
-		return false, err
+		return nil, 0, err
 	}
 	defer root.Close()
 
-	checksum, err := fileChecksum(ctx, root, w.batchPath(b.Batch))
+	file, err := root.Open(b.Path())
+	if err != nil {
+		if errors.Is(err, io.ErrNotExist) {
+			return nil, 0, w.checkWorkspace(info)
+		}
+		return nil, 0, err
+	}
+
+	checksum, size, err := checksumFile(ctx, file)
 	if workspaceErr := w.checkWorkspace(info); workspaceErr != nil {
-		return false, workspaceErr
+		return nil, 0, errors.Join(workspaceErr, file.Close())
 	}
+	if err != nil || checksum != b.Checksum {
+		return nil, 0, errors.Join(err, file.Close())
+	}
+	if _, err := file.Seek(0, 0); err != nil {
+		return nil, 0, errors.Join(err, file.Close())
+	}
+	return file, size, nil
+}
+
+// Remove unlinks a confirmed file from the prepared workspace. It is safe to retry.
+func (w *workspace) Remove(b archive.Batch) error {
+	root, info, err := w.openWorkspace()
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+
+	path := b.Path()
+	if err := root.Remove(path); err != nil && !errors.Is(err, io.ErrNotExist) {
+		return err
+	}
+
+	err = syncPath(root, w.fs.Dir(path))
 	if errors.Is(err, io.ErrNotExist) {
-		return false, nil
+		err = nil
 	}
-	return checksum == b.Checksum, err
+	return errors.Join(err, w.checkWorkspace(info))
 }
 
 // Stage writes, verifies and publishes one completed file. It returns the file
@@ -105,7 +143,7 @@ func (w *workspace) Stage(ctx context.Context, b archive.Batch) (_ string, err e
 		return strings.Empty, err
 	}
 
-	destination := w.batchPath(b)
+	destination := b.Path()
 	day := w.fs.Dir(destination)
 
 	// A pending batch can have a final filename after an interrupted rename
@@ -169,10 +207,6 @@ func (w *workspace) checkWorkspace(opened os.FileInfo) error {
 	return nil
 }
 
-func (w *workspace) batchPath(b archive.Batch) string {
-	return w.fs.Join(logPartition, "day="+b.Day, b.ID+".parquet")
-}
-
 func (w *workspace) publishFile(ctx context.Context, root *os.Root, partial, destination string) (string, error) {
 	checksum, err := fileChecksum(ctx, root, partial)
 	if err != nil {
@@ -197,12 +231,14 @@ func fileChecksum(ctx context.Context, root *os.Root, path string) (string, erro
 	}
 	defer file.Close()
 
-	hash := sha256.New()
-	if _, err := io.Copy(hash, contextReader{ctx: ctx, reader: file}); err != nil {
-		return strings.Empty, err
-	}
+	checksum, _, err := checksumFile(ctx, file)
+	return checksum, err
+}
 
-	return hex.EncodeToString(hash.Sum(nil)), nil
+func checksumFile(ctx context.Context, file io.Reader) (string, int64, error) {
+	hash := sha256.New()
+	size, err := io.Copy(hash, contextReader{ctx: ctx, reader: file})
+	return hex.EncodeToString(hash.Sum(nil)), size, err
 }
 
 type contextReader struct {

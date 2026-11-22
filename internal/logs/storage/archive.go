@@ -111,6 +111,7 @@ func (r *Archive) create(ctx context.Context, batchBytes int64) (archive.Batch, 
 	if err := tx.Commit(); err != nil {
 		return archive.Batch{}, err
 	}
+
 	return b, nil
 }
 

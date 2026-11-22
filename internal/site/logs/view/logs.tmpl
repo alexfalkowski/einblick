@@ -151,6 +151,8 @@
 {{define "log-inspector"}}
   {{$row := .Row}}
   {{$detail := .Row.Details}}
+  {{$request := $detail.Request}}
+  {{$timing := $detail.Timing}}
   {{$locale := .Localizer}}
   <div class="log-summary">
     {{if or $row.Severity $row.ReportedSeverity $row.ServiceName $detail.Environment}}<p class="log-context">
@@ -164,16 +166,16 @@
       <div class="log-body-value">{{template "log-value" (dict "Value" $detail.Body "Localizer" $locale)}}</div>
       {{end}}
     </div>
-    {{if or $detail.RequestStatus $detail.RequestDuration}}
+    {{if or $request.Status $request.Duration}}
     <dl class="log-summary-fields log-request-fields">
-      {{if $detail.RequestStatus}}<div><dt>{{$locale.Text $detail.RequestStatusLabel}}</dt><dd>{{$detail.RequestStatus}}</dd></div>{{end}}
-      {{if $detail.RequestDuration}}<div><dt>{{$locale.Text "logs.request_duration"}}</dt><dd>{{$detail.RequestDuration}}</dd></div>{{end}}
+      {{if $request.Status}}<div><dt>{{$locale.Text $request.StatusLabel}}</dt><dd>{{$request.Status}}</dd></div>{{end}}
+      {{if $request.Duration}}<div><dt>{{$locale.Text "logs.request_duration"}}</dt><dd>{{$request.Duration}}</dd></div>{{end}}
     </dl>
     {{end}}
     <dl class="log-summary-fields log-event-fields">
-      <div><dt>{{$locale.Text $detail.EventTimeLabel}}</dt><dd><time datetime="{{$row.EventTime.Format .ExactTime}}">{{($row.EventTime.Round 1000000).Format ($locale.Text "logs.detail_time_format")}}</time></dd></div>
-      {{if $detail.ReceiptLabel}}
-      <div><dt>{{$locale.Text "logs.received_short"}}</dt><dd>{{$locale.Message $detail.ReceiptLabel $detail}}</dd></div>
+      <div><dt>{{$locale.Text $timing.EventTimeLabel}}</dt><dd><time datetime="{{$row.EventTime.Format .ExactTime}}">{{($row.EventTime.Round 1000000).Format ($locale.Text "logs.detail_time_format")}}</time></dd></div>
+      {{if $timing.ReceiptLabel}}
+      <div><dt>{{$locale.Text "logs.received_short"}}</dt><dd>{{$locale.Message $timing.ReceiptLabel $timing}}</dd></div>
       {{end}}
     </dl>
   </div>
@@ -203,13 +205,13 @@
     <details class="log-section log-timing">
       <summary>{{$locale.Text "logs.timing"}}</summary>
       <dl class="log-fields">
-        {{if eq $detail.EventTimeLabel "logs.timestamp"}}
+        {{if eq $timing.EventTimeLabel "logs.timestamp"}}
         <dt>{{$locale.Text "logs.timestamp"}}</dt><dd><time datetime="{{$row.EventTime.Format .ExactTime}}">{{$row.EventTime.Format .ExactTime}}</time></dd>
         {{end}}
-        {{if not $detail.ObservedAt.IsZero}}
-        <dt>{{$locale.Text "logs.observed"}}</dt><dd><time datetime="{{$detail.ObservedAt.Format .ExactTime}}">{{$detail.ObservedAt.Format .ExactTime}}</time></dd>
+        {{if not $timing.ObservedAt.IsZero}}
+        <dt>{{$locale.Text "logs.observed"}}</dt><dd><time datetime="{{$timing.ObservedAt.Format .ExactTime}}">{{$timing.ObservedAt.Format .ExactTime}}</time></dd>
         {{end}}
-        <dt>{{$locale.Text "logs.received"}}</dt><dd><time datetime="{{$detail.ReceivedAt.Format .ExactTime}}">{{$detail.ReceivedAt.Format .ExactTime}}</time></dd>
+        <dt>{{$locale.Text "logs.received"}}</dt><dd><time datetime="{{$timing.ReceivedAt.Format .ExactTime}}">{{$timing.ReceivedAt.Format .ExactTime}}</time></dd>
         {{if $row.TraceID}}<dt>{{$locale.Text "logs.trace_id"}}</dt><dd><code class="log-id">{{$row.TraceID}}</code></dd>{{end}}
         {{if $detail.SpanID}}<dt>{{$locale.Text "logs.span_id"}}</dt><dd><code class="log-id">{{$detail.SpanID}}</code></dd>{{end}}
         {{if $detail.Flags}}<dt>{{$locale.Text "logs.flags"}}</dt><dd><code>{{$detail.Flags}}</code></dd>{{end}}

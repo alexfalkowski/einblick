@@ -13,4 +13,5 @@ var Module = signal.Module(
 	signal.Constructor(duckdbConfig),
 	signal.Constructor(queryConfig),
 	signal.Constructor(archiveConfig),
+	signal.Constructor(r2Config),
 )
