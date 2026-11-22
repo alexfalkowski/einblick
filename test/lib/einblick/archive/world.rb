@@ -32,9 +32,9 @@ module Einblick
       end
 
       def wait_for_archive(file_count, existing)
-        wait_for { archive_files.size }.to eq(file_count)
-        # File rename precedes the durable completion update and its success log.
-        wait_for { archive_diagnostics.scan('local log archive export completed').size }.to eq(file_count - existing)
+        # Wait for the durable completion update after the Parquet file is renamed and synced.
+        wait(timeout: 10).for { archive_diagnostics.scan('local log archive export completed').size }.to eq(file_count - existing)
+        expect(archive_files.size).to eq(file_count)
       end
 
       def stage_late_log_archive

@@ -98,7 +98,7 @@ jobs:
         default: go
       partition:
         type: enum
-        enum: [storage, archive, queries, site, service]
+        enum: [storage, archive-staging, archive-publication, queries, site, service]
     executor: << parameters.runtime >>
     working_directory: ~/einblick
     steps:
@@ -256,12 +256,12 @@ workflows:
           matrix:
             alias: feature-groups
             parameters:
-              partition: [storage, queries, site, service]
+              partition: [storage, archive-staging, queries, site, service]
           requires:
             - build-features
       - features:
-          name: features-archive
-          partition: archive
+          name: features-archive-publication
+          partition: archive-publication
           runtime: go-archive
           requires:
             - build-features
@@ -269,7 +269,7 @@ workflows:
           requires:
             - build-service
             - feature-groups
-            - features-archive
+            - features-archive-publication
       - test-docker-amd64:
           filters:
             branches:
