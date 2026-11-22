@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/alexfalkowski/go-service/v3/context"
+	"github.com/alexfalkowski/go-service/v3/database/sql"
 	"github.com/alexfalkowski/go-service/v3/encoding/json"
 	"github.com/alexfalkowski/go-service/v3/errors"
 	"github.com/alexfalkowski/go-service/v3/strings"
@@ -29,9 +30,10 @@ var ErrTimeRangeTooWide = errors.New("logs: search interval exceeds the configur
 const timestampBits = 64
 
 type cursor struct {
-	BeforeNS  string `json:"before_ns"`
-	QueryHash string `json:"query_hash"`
-	BeforeID  int64  `json:"before_id"`
+	BeforeNS     string `json:"before_ns"`
+	QueryHash    string `json:"query_hash"`
+	BeforeSource string `json:"before_source,omitempty"`
+	BeforeID     int64  `json:"before_id"`
 }
 
 // List executes a fixed, bounded query. It propagates cancellation through queue
@@ -58,7 +60,11 @@ func (r *repository) List(ctx context.Context, query Query) (*Page, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.readPage(ctx, query, position)
+	page, err := r.readPage(ctx, query, position)
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	return page, err
 }
 
 func (r *repository) readPage(ctx context.Context, query Query, position *cursor) (*Page, error) {
@@ -68,27 +74,42 @@ func (r *repository) readPage(ctx context.Context, query Query, position *cursor
 		severity = strings.Concat("SEVERITY_NUMBER_", query.Severity)
 	}
 
-	rows, err := r.db.QueryContext(ctx, listLogsQuery,
+	args := []any{
 		unixNanoseconds(query.StartTime).String(), unixNanoseconds(query.EndTime).String(),
-		position.BeforeNS, position.BeforeNS, position.BeforeID,
+		position.BeforeNS, position.BeforeNS, position.BeforeID, position.BeforeID, position.BeforeSource,
 		query.Service, query.Service, severity, severity, query.Text, query.Text,
-		query.TraceID, base64.StdEncoding.EncodeToString(trace), query.PageSize+1)
+		query.TraceID, base64.StdEncoding.EncodeToString(trace), query.PageSize + 1,
+	}
+	if r.store != nil {
+		return r.readHistory(ctx, query, position, args)
+	}
+
+	rows, err := r.db.QueryContext(ctx, logPageSQL(strings.Empty), args...)
 	if err != nil {
 		return nil, err
 	}
+	return scanPage(ctx, rows, query.PageSize, position)
+}
+
+func scanPage(ctx context.Context, rows *sql.Rows, size int, position *cursor) (*Page, error) {
 	defer rows.Close()
 
-	page := &Page{Logs: make([]*Log, 0, query.PageSize)}
+	page := &Page{Logs: make([]*Log, 0, size)}
 	for rows.Next() {
 		var log Log
 		var event, received uint64
-		var resource, scope, record string
-		if err := rows.Scan(&log.ID, &event, &received, &resource, &scope, &record); err != nil {
+		var resource, scope, record, source string
+		if err := rows.Scan(&log.ID, &event, &received, &resource, &scope, &record, &source); err != nil {
 			return nil, err
 		}
+
 		log.EventTime, log.ReceiveTime = timestamp(event), timestamp(received)
 		log.Resource, log.Scope, log.Record = json.RawMessage(resource), json.RawMessage(scope), json.RawMessage(record)
+
 		page.Logs = append(page.Logs, &log)
+		if len(page.Logs) == size {
+			position.BeforeSource = source
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -96,11 +117,11 @@ func (r *repository) readPage(ctx context.Context, query Query, position *cursor
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if len(page.Logs) <= query.PageSize {
+	if len(page.Logs) <= size {
 		return page, nil
 	}
 
-	page.Logs = page.Logs[:query.PageSize]
+	page.Logs = page.Logs[:size]
 	last := page.Logs[len(page.Logs)-1]
 	position.BeforeNS, position.BeforeID = unixNanoseconds(last.EventTime).String(), last.ID
 

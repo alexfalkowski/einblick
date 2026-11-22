@@ -1,11 +1,11 @@
-# 🔎 Recent-log queries
+# 🔎 Log queries
 
 [← Back to README](../README.md)
 
-## 🖥️ Investigate recent logs in the browser
+## 🖥️ Investigate logs in the browser
 
 Open `http://localhost:11000/logs` with the development configuration.
-The page starts with the configured maximum range ending now. Use the exact
+The page opens on the last hour, or the configured query limit if it is shorter. Use the exact
 service name, **Search messages**, a hexadecimal **Trace ID**, or severity to
 narrow the results. An empty service filter includes unnamed services. A severity
 choice matches one exact level (Debug, Info, Warn, Error, or Fatal), while
@@ -42,15 +42,16 @@ resends the same inputs. A transport timeout appears in in-place updates and can
 return an empty HTTP 504 on direct navigation.
 
 The page supports English, German and Spanish with English fallback. Anyone who
-can reach the HTTP route can query the same local data as the API without a site login.
+can reach the HTTP route can query the same data as the API without a site login.
 
-## 🔌 Query recent logs through the API
+## 🔌 Query logs through the API
 
 Use `einblick.v1.Service/ListLogs` over gRPC or
 `POST /einblick.v1.Service/ListLogs` on the HTTP listener. Both use the
-[versioned protobuf contract](../api/einblick/v1/service.proto). Queries read
-the local DuckDB database and accept the fixed filters below. Archived reads
-are planned.
+[versioned protobuf contract](../api/einblick/v1/service.proto). With R2
+configured, queries combine local rows and archived Parquet for the selected
+UTC days. Each page reads a batch from a single source, including during
+publication and local eviction.
 
 With the development configuration:
 
@@ -95,7 +96,7 @@ All supplied filters must match:
 ## 📄 Results and pagination
 
 The response contains `meta`, `logs` and `next_page_token`. `meta` carries shared
-request metadata such as `request_id` and `user_agent`. Each log includes a local
+request metadata such as `request_id` and `user_agent`. Each log includes a volume-local
 `id`, protobuf `event_time` and `receive_time` Timestamps, and typed OTLP
 `resource`, `scope` and `record` messages.
 
@@ -108,20 +109,21 @@ the complete original typed content.
 Trace/span IDs inside the original record also use protobuf JSON's base64 form;
 the query filter accepts hexadecimal IDs.
 
-Results sort by event time descending, then local ID descending. Duplicate
+Results sort by event time descending, then ID descending. Archive batch
+identity breaks ties when different volumes reuse both values. Duplicate
 exports remain separate records. Pass the returned token as `page_token` with
 the same bounds, filters and effective page size.
 
 ```mermaid
 sequenceDiagram
-    accTitle: Continue a recent-log query
+    accTitle: Continue a log query
     accDescr: Keep the query parameters fixed and pass the returned token to read rows after the last result in descending order.
     participant C as Client
     participant E as Einblick
     C->>E: ListLogs with bounds, filters and page size
     E-->>C: First page and token if more rows exist
     C->>E: Same query plus token
-    E-->>C: Rows strictly after the token's event time and ID
+    E-->>C: Rows strictly after the token's position
 ```
 
 Each page reads the committed records visible to that request. New records
@@ -133,19 +135,18 @@ An empty token means exhaustion. Token size is independent of filter length.
 An empty first page means no matches. Protobuf JSON omits default-valued fields, so
 `logs` and `nextPageToken` can be absent; generated
 clients expose an empty collection and empty string respectively.
-There is no total-count query. Tokens survive service restarts and have no
-time-based expiry while all local source rows remain retained. They are
-continuation data, not credentials; clients must treat them as opaque.
-Archive/eviction support must define continued source ownership or explicit
-expiry before removing local rows.
+There is no total-count query. Tokens survive service restarts and eviction
+on the same volume while the archived objects remain available. Open a fresh
+query after replacing the database volume. Clients must treat tokens as opaque.
 
 ## ⏱️ Bounds and failures
 
 Required [query configuration](configuration.md#-recent-log-queries) limits page
 size, selected range, timeout and active queries. The query timeout covers queue
-waits and SQL work together. Cancellation propagates to
-DuckDB; the service returns no partial page on failure. The HTTP request timeout
-can end a query earlier, so align it with the desired query budget.
+waits, archive discovery and SQL work together. Cancellation propagates to
+DuckDB. An active native object read can hold query resources until it returns.
+The HTTP request timeout can end the client request earlier. Failed queries
+return an error without a page.
 
 | Outcome | HTTP result | gRPC result |
 | --- | --- | --- |
@@ -153,7 +154,7 @@ can end a query earlier, so align it with the desired query budget.
 | Invalid bounds, filters, page size or token; changed pagination parameters | `400`. | `InvalidArgument`. |
 | Cancelled request | `499` when the connection can still carry a response. | `Canceled`. |
 | Deadline exceeded | `504`. | `DeadlineExceeded`. |
-| Local query/storage failure, including native resource exhaustion | `503`. | `Unavailable`. |
+| Local or archive query failure, including an unavailable object store | `503`. | `Unavailable`. |
 
 Errors use go-service's safe error responses. A disconnected client may receive
 no response. No partial coverage or successful empty result is substituted for

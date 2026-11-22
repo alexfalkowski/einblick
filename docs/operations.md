@@ -87,7 +87,7 @@ the new filesystem so the worker can regenerate missing files from retained logs
 With [R2 configured](configuration.md#-r2-log-archives), the archive worker
 publishes each closed batch to the same versioned key as its staged path.
 OTLP acknowledges the local DuckDB commit. Publication and staging cleanup run
-in the background, and recent-log queries continue reading the local source rows.
+in the background. Queries use the local copy until its batch is evicted.
 
 Before sending a file, the worker records its SHA-256 in DuckDB. R2 writes are
 conditional on the key being absent. After upload or on retry, the worker
@@ -120,7 +120,26 @@ one-minute abort cap. If it uses the remaining time in the application's
 Incomplete multipart uploads follow the bucket's incomplete-upload lifecycle
 policy.
 
-Historical reads and eviction of local source rows are planned.
+## 🔎 Historical log availability
+
+When R2 is configured, the query API and Logs page discover Parquet objects in
+the selected UTC days. A fresh database volume can query existing objects as
+soon as it can reach the configured bucket. Keep the same bucket when reopening
+a database that has evicted batches.
+
+Historical reads include existing `v1` Parquet objects. The local migration
+adds eviction state without changing archived files. Use the
+[schema rollback guidance](#-log-storage-and-recovery) for the database volume.
+
+When [local retention](configuration.md#-r2-log-archives) is enabled, the worker
+downloads the confirmed object and verifies its checksum before deleting the
+batch's local source rows. Count this GET in the
+[R2 Class B operation budget](https://developers.cloudflare.com/r2/pricing/#class-b-operations).
+Look for `local log archive eviction failed` under `component=log_archive` when
+eligible batches stay local. A missing, unavailable or changed object leaves its
+source rows in DuckDB. The worker continues with other eligible batches and
+retries the blocked batch. A failed historical query reports unavailable storage.
+Restore access to the bucket and retry the same absolute interval.
 
 ## 🚢 Deployment
 

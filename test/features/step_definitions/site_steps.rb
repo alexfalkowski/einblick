@@ -235,7 +235,7 @@ Then('the {string} view should show {string} in {string} with HTTP {int}') do |l
   expect(@response).to show_log_view(layout, language, status).and show_log_outcome(outcome, language)
 end
 
-Then('the failed query should show that local storage is unavailable in German') do
+Then('the failed query should show that log storage is unavailable in German') do
   expect(@unavailable_response).to show_log_view('partial', 'de', 503).and show_log_outcome('unavailable', 'de')
 end
 

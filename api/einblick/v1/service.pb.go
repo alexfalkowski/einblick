@@ -23,7 +23,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// ListLogsRequest selects a bounded page of locally committed logs.
+// ListLogsRequest selects a bounded page of committed logs.
 // Filters are conjunctive and remain fixed across continuation requests.
 type ListLogsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -140,7 +140,7 @@ func (x *ListLogsRequest) GetPageToken() string {
 // Log contains a committed record with its complete typed OTLP context.
 type Log struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// id is the stable local record identity and descending timestamp tie-breaker.
+	// id is the stable record identity within its original database volume.
 	Id int64 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
 	// event_time selects the original Timestamp, then ObservedTimestamp, then receipt.
 	EventTime *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=event_time,json=eventTime,proto3" json:"event_time,omitempty"`
@@ -234,11 +234,13 @@ type ListLogsResponse struct {
 	// meta contains infrastructure metadata such as request_id and user_agent.
 	Meta map[string]string `protobuf:"bytes,1,rep,name=meta,proto3" json:"meta,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// logs orders records by event_time descending, then id descending.
+	// Archive records with identical time and ID from different volumes have a
+	// stable additional tie-breaker carried by the opaque page token.
 	Logs []*Log `protobuf:"bytes,2,rep,name=logs,proto3" json:"logs,omitempty"`
 	// next_page_token is empty at exhaustion. Membership is not frozen: newly
 	// committed records behind the cursor may enter later pages; refresh for
-	// arrivals ahead. Existing records do not repeat. Tokens survive restart
-	// while local source rows are retained.
+	// arrivals ahead. Existing records do not repeat. Tokens survive restart and
+	// local eviction on the same database volume.
 	NextPageToken string `protobuf:"bytes,3,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

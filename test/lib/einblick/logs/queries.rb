@@ -54,11 +54,11 @@ module Einblick
         response
       end
 
-      def collect_log_pages(first_page, page_size: 2)
+      def collect_log_pages(first_page, page_size: 2, identity: :id)
         page = first_page
         @query_pages = []
         loop do
-          expect(page).to advance_log_query(@query_pages, @query_record_count)
+          expect(page).to advance_log_query(@query_pages, @query_record_count, identity)
           @query_pages << page
           break if page.next_page_token.empty?
 

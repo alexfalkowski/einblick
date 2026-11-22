@@ -2,7 +2,7 @@ package storage
 
 import "github.com/alexfalkowski/go-service/v3/time"
 
-// Config bounds recent-log queries. Every setting is required; there are no defaults.
+// Config bounds log queries. Every setting is required.
 type Config struct {
 	// MaxResults is the largest page, and the page size when the caller omits it.
 	MaxResults int `yaml:"max_results" json:"max_results" toml:"max_results" validate:"gt=0,lt=9223372036854775807"`

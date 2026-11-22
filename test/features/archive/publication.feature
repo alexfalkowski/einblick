@@ -105,10 +105,11 @@ Feature: Publish log archives to object storage
     When the service starts with an unreadable staged batch and only the later upload committed
     Then the earlier batch should remain unconfirmed and the later batch should be reclaimed
 
-  Scenario: Continue publishing while cleanup of an earlier batch is blocked
+  Scenario: Continue publishing and evicting while cleanup of an earlier batch is blocked
     Given acknowledged log batches are staged for two archive days
     When the service publishes while the earlier staging directory is unwritable
     Then both batches should be confirmed and only the later batch should be reclaimed
+    And eviction should reclaim the later batch and retain the earlier batch locally
 
   Scenario: Publish newly accepted logs while repair of an earlier batch is blocked
     Given an acknowledged log export staged in Parquet

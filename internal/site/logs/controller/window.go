@@ -13,11 +13,12 @@ import (
 var errInvalidDates = errors.New("logs: could not read the submitted dates")
 
 const (
-	quarterHour = 15 * time.Minute
-	day         = 24 * time.Hour
-	threeDays   = 3 * day
-	week        = 7 * day
-	recentRange = "recent"
+	quarterHour  = 15 * time.Minute
+	day          = 24 * time.Hour
+	threeDays    = 3 * day
+	week         = 7 * day
+	recentRange  = "recent"
+	oneHourRange = "1h"
 )
 
 type timePreset struct {
@@ -33,7 +34,7 @@ type timeWindow struct {
 
 var presets = []timePreset{
 	{option: model.FilterOption{Value: "15m", Label: "logs.range_15_minutes"}, duration: quarterHour},
-	{option: model.FilterOption{Value: "1h", Label: "logs.range_one_hour"}, duration: time.Hour},
+	{option: model.FilterOption{Value: oneHourRange, Label: "logs.range_one_hour"}, duration: time.Hour},
 	{option: model.FilterOption{Value: "24h", Label: "logs.range_24_hours"}, duration: day},
 	{option: model.FilterOption{Value: "3d", Label: "logs.range_three_days"}, duration: threeDays},
 	{option: model.FilterOption{Value: "7d", Label: "logs.range_seven_days"}, duration: week},
@@ -51,6 +52,9 @@ func resolveWindow(form url.Values, maxRange time.Duration) (timeWindow, error) 
 
 	hasBounds := form.Has("start_time") || form.Has("end_time") || form.Has("start_utc") || form.Has("end_utc")
 	if !hasBounds && !hasCursor {
+		if maxRange >= time.Hour {
+			return recentWindow(oneHourRange, time.Hour), nil
+		}
 		return recentWindow(recentRange, maxRange), nil
 	}
 	return absoluteWindow(form, maxRange, hasCursor)

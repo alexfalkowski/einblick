@@ -1,2 +1,2 @@
-// Package logs serves the browser investigation view over the local log repository.
+// Package logs serves the browser investigation view for local and archived logs.
 package logs

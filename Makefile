@@ -8,7 +8,7 @@ include bin/build/make/claude.mak
 include bin/build/make/codex.mak
 
 .PHONY: features-storage features-archive features-archive-staging features-archive-publication \
-	features-queries features-site features-service \
+	features-archive-upload features-archive-history features-queries features-site features-service \
 	coverage-workspace-stage coverage-workspace-restore
 
 override export partition := $(value partition)
@@ -25,9 +25,17 @@ features-archive:
 features-archive-staging:
 	@$(MAKE) features tags="@archive and not @publication"
 
-# Run R2 archive publication and recovery features with Floci.
+# Run R2 archive publication, recovery, and historical query features with Floci.
 features-archive-publication:
 	@$(MAKE) features tags="@archive and @publication"
+
+# Run R2 archive uploads and publication recovery features with Floci.
+features-archive-upload:
+	@$(MAKE) features tags="@archive and @publication and not @archive_history"
+
+# Run R2-backed historical log queries and local eviction features with Floci.
+features-archive-history:
+	@$(MAKE) features tags="@archive and @publication and @archive_history"
 
 # Run recent log query features.
 features-queries:

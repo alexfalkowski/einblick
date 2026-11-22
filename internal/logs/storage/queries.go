@@ -14,6 +14,15 @@ var insertLogQuery string
 //go:embed queries/list_logs.sql
 var listLogsQuery string
 
+//go:embed queries/local_logs.sql
+var localLogsQuery string
+
+//go:embed queries/archived_logs.sql
+var archivedLogsQuery string
+
+//go:embed queries/archive/sources.sql
+var archiveSourcesQuery string
+
 //go:embed queries/archive/next_batch.sql
 var nextBatchQuery string
 
@@ -55,6 +64,24 @@ var clearUploadsQuery string
 
 //go:embed queries/archive/finish_cleanup.sql
 var finishCleanupQuery string
+
+//go:embed queries/archive/next_eviction.sql
+var nextEvictionQuery string
+
+//go:embed queries/archive/evict_resources.sql
+var evictResourcesQuery string
+
+//go:embed queries/archive/evict_scopes.sql
+var evictScopesQuery string
+
+//go:embed queries/archive/evict_logs.sql
+var evictLogsQuery string
+
+//go:embed queries/archive/evict_members.sql
+var evictMembersQuery string
+
+//go:embed queries/archive/mark_evicted.sql
+var markEvictedQuery string
 
 //go:embed queries/parquet/copy_batch.sql
 var copyBatchQuery string

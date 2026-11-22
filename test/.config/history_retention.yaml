@@ -1,0 +1,54 @@
+environment: development
+archive:
+  workspace: reports/archive/resource=main
+  interval: 100ms
+  batch_size: 65536B
+  local_retention: 1h
+  r2:
+    endpoint: http://127.0.0.1:4567
+    bucket: einblick-publication-feature
+    region: us-east-1
+    access_key_id: test
+    secret_access_key: test
+    # Keep the transfer deadline longer than Nonnative's 5s stop timeout so
+    # the interrupted upload scenario depends on shutdown cancellation.
+    request_timeout: 10s
+queries:
+  max_results: 100
+  max_range: 168h
+  timeout: 30s
+  concurrency: 1
+duckdb:
+  path: reports/recent.duckdb
+  memory_limit: 64MiB
+  threads: 1
+health:
+  duration: 1s
+  timeout: 1s
+id:
+  kind: uuid
+telemetry:
+  logger:
+    kind: text
+    level: debug
+  metrics:
+    kind: prometheus
+  tracer:
+    kind: otlp
+    endpoint: http://localhost:4318/v1/traces
+transport:
+  http:
+    address: tcp://:11000
+    limiter:
+      kind: service-method
+      tokens: 1000
+      interval: 1s
+    timeout: 5s
+  grpc:
+    address: tcp://:12000
+    max_receive_size: 1MB
+    limiter:
+      kind: service-method
+      tokens: 1000
+      interval: 1s
+    timeout: 5s

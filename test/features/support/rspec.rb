@@ -20,15 +20,15 @@ RSpec::Matchers.define :have_active_log_query_limit do |limit|
   end
 end
 
-RSpec::Matchers.define :advance_log_query do |pages, record_count|
+RSpec::Matchers.define :advance_log_query do |pages, record_count, identity|
   match do |page|
-    ids = page.logs.map(&:id)
-    previous_ids = pages.flat_map { |previous| previous.logs.map(&:id) }
+    ids = page.logs.map(&identity)
+    previous_ids = pages.flat_map { |previous| previous.logs.map(&identity) }
     token = page.next_page_token
     @reason = if pages.size >= record_count
                 "exceeded the #{record_count}-page bound from exported fixture records"
               elsif ids.uniq != ids || ids.intersect?(previous_ids)
-                'repeated record IDs'
+                'repeated a record'
               elsif !token.empty? && pages.any? { |previous| previous.next_page_token == token }
                 'repeated a continuation token'
               elsif !token.empty? && ids.empty?

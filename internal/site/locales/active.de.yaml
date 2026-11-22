@@ -1,7 +1,7 @@
 site.title: Protokolle · Einblick
 site.skip: Zu den Protokollen
 logs.heading: Protokolle
-logs.scope: Aktuelle Protokolle aus dem lokalen Speicher
+logs.scope: Protokolle im lokalen Speicher und in konfigurierten Archiven suchen
 logs.service: Dienst
 logs.all_services: Alle Dienste
 logs.time_range: Zeitraum
@@ -85,4 +85,4 @@ logs.date_range_too_wide: Dieser Zeitraum überschreitet das Suchlimit.
 logs.invalid_dates: Gib einen gültigen Beginn und ein gültiges Ende in UTC ein.
 logs.cancelled: Die Protokollabfrage wurde abgebrochen.
 logs.timed_out: Zeitlimit der Protokollabfrage überschritten. Einen kürzeren Zeitraum wählen.
-logs.unavailable: Der lokale Protokollspeicher ist nicht verfügbar. Erneut versuchen.
+logs.unavailable: Der Protokollspeicher ist nicht verfügbar. Erneut versuchen.

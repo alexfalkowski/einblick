@@ -21,7 +21,7 @@ func ValidTraceID(id string) bool {
 	return err == nil
 }
 
-// Query selects one recent-log page. Filters are conjunctive and remain fixed
+// Query selects one log page. Filters are conjunctive and remain fixed
 // across pages; SQL text and arbitrary expressions are never accepted.
 type Query struct {
 	// StartTime is the inclusive absolute time, encoded as RFC 3339 with nanosecond precision.
@@ -50,7 +50,7 @@ type Query struct {
 }
 
 // Page contains complete records in descending event-time/ID order. Errors
-// return no page; an empty Logs slice means no matches in the local database.
+// return no page; an empty Logs slice means no matches in the selected sources.
 type Page struct {
 	// NextPageToken is empty at exhaustion. It is opaque, query-bound and stateless.
 	NextPageToken string `json:"next_page_token"`

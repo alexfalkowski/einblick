@@ -17,4 +17,8 @@ type Config struct {
 	// a positive decimal size string such as "65536B".
 	// A single larger accepted row gets its own batch.
 	BatchSize bytes.Size `yaml:"batch_size" json:"batch_size" toml:"batch_size" validate:"gt=0"`
+
+	// LocalRetention keeps a confirmed batch until all its rows are this old by receipt time.
+	// Zero retains the local copy.
+	LocalRetention time.Duration `yaml:"local_retention" json:"local_retention" toml:"local_retention" validate:"gte=0"`
 }

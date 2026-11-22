@@ -2,12 +2,19 @@ package archive
 
 import (
 	"github.com/alexfalkowski/go-service/v3/context"
+	"github.com/alexfalkowski/go-service/v3/id/uuid"
 	"github.com/alexfalkowski/go-service/v3/io"
 	"github.com/alexfalkowski/go-service/v3/strings"
+	"github.com/alexfalkowski/go-service/v3/time"
 )
 
 // Version is the archive projection and key prefix.
 const Version = "v1"
+
+// DayLayout is the UTC date in v1 object keys.
+const DayLayout = "2006-01-02"
+
+const parquetExtension = ".parquet"
 
 // Batch identifies an immutable set of logs for one UTC event day.
 type Batch struct {
@@ -23,7 +30,26 @@ type Batch struct {
 
 // Path is the batch's stable path relative to the archive version.
 func (b Batch) Path() string {
-	return strings.Concat("signal=logs/day=", b.Day, "/", b.ID, ".parquet")
+	return strings.Concat(dayPath(b.Day), b.ID, parquetExtension)
+}
+
+// Key is the complete object key for the batch.
+func (b Batch) Key() string {
+	return strings.Concat(Version, "/", b.Path())
+}
+
+func dayPath(day string) string {
+	return strings.Concat("signal=logs/day=", day, "/")
+}
+
+func isBatchFilename(filename string) bool {
+	if !strings.HasSuffix(filename, parquetExtension) {
+		return false
+	}
+
+	batchID := strings.TrimSuffix(filename, parquetExtension)
+	id, err := uuid.Parse(batchID)
+	return err == nil && id.String() == batchID
 }
 
 // StagedBatch pairs a batch with the checksum recorded for its completed file.
@@ -70,6 +96,16 @@ type BatchRepository interface {
 
 	// FinishCleanup records completion and clears the staged-file checksum.
 	FinishCleanup(ctx context.Context, id string) error
+}
+
+// EvictionRepository selects and removes eligible complete local batches.
+type EvictionRepository interface {
+	// NextEviction advances the retry order for one confirmed and cleaned batch
+	// whose rows predate cutoff. A zero batch indicates no eligible work.
+	NextEviction(ctx context.Context, cutoff time.Time) (Publication, error)
+
+	// Evict removes the selected batch's source rows and marks it evicted atomically.
+	Evict(ctx context.Context, id string) error
 }
 
 // BatchWriter produces and verifies Parquet for a claimed batch.

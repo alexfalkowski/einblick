@@ -18,7 +18,7 @@ module LogView
       title: 'Protokolle · Einblick', heading: 'Protokolle', service: 'Dienst', submit: 'Suchen', reset: 'Zurücksetzen',
       loading: 'Protokolle werden geladen …', results: 'Ergebnisse der Protokollabfrage', message: 'Meldung',
       empty: 'Keine Protokolle gefunden', empty_hint: 'Wähle einen größeren Zeitraum oder entferne einen Filter.',
-      unavailable: 'Der lokale Protokollspeicher ist nicht verfügbar', structured: 'Strukturierte Meldung',
+      unavailable: 'Der Protokollspeicher ist nicht verfügbar', structured: 'Strukturierte Meldung',
       no_message: 'Keine Meldung', timing: 'Zeitangaben und IDs', order: 'Neueste zuerst',
       search: 'Meldungen durchsuchen', time_range: 'Zeitraum', retry: 'Erneut versuchen',
       'dates out of order': 'Das Ende muss nach dem Beginn liegen.', related_logs: 'Zugehörige Protokolle finden',
@@ -421,7 +421,7 @@ RSpec::Matchers.define :show_time_and_severity_controls do
     document = Nokogiri::HTML5(response.body)
     presets = document.at_css('.filters > .time-presets[aria-labelledby=time-range-label]')
     expect(presets.css('button').map(&:text)).to eq(['15 min', '1 hour', '24 hours', '3 days', '7 days'])
-    expect(presets.css('button[aria-pressed=true]').map(&:text)).to eq(['7 days'])
+    expect(presets.css('button[aria-pressed=true]').map(&:text)).to eq(['1 hour'])
     expect(document.css('input[type=datetime-local]')).to be_empty
     expect(document.css('#severity option').map(&:text)).to eq(['All severities', 'Debug', 'Info', 'Warn', 'Error', 'Fatal'])
   end

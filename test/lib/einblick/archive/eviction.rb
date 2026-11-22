@@ -1,0 +1,118 @@
+# frozen_string_literal: true
+
+module Einblick
+  module Archive
+    # Drives the archive worker and inspects which batches still occupy local storage.
+    module World
+      def evict_with_unverified_archive(fault)
+        @retained_archive_record_count = @query_record_count
+        with_floci do
+          publish_searchable_logs
+          earlier_key = @floci.keys.fetch(0)
+          publish_searchable_logs(query_fixture('log_queries')) { @logs_before_fault = next_log_query_page('', page_size: 100).logs.to_a }
+          record_eviction_pair(earlier_key)
+          invalidate_archive_object(earlier_key, fault)
+          with_archive_eviction { @logs_after_fault = next_log_query_page('', page_size: 100).logs.to_a }
+        end
+        inspect_eviction
+      end
+
+      def evict_batches_with_mixed_receipt_ages
+        @retained_archive_record_count = @query_record_count
+        with_floci do
+          age_unbatched_archive_logs(keep_latest: true)
+          publish_searchable_logs
+          earlier_key = @floci.keys.fetch(0)
+          publish_older_archive_logs
+          record_eviction_pair(earlier_key)
+          with_archive_eviction('history_retention')
+        end
+        inspect_eviction
+      end
+
+      def prepare_shared_context_batches
+        prepare_archive_storage
+        stage_log_archive(shared_archive_context_fixture, 2)
+        @evicted_batch_id, @retained_batch_id = @archive_batches.map(&:first)
+        @sibling_archive_key = staged_archive_key(@retained_batch_id)
+        times = @stored_archive_logs.map(&:last)
+        @query = { 'start_time' => query_time(times.min), 'end_time' => query_time(times.max + 1) }
+        @shared_context_logs_before_eviction = next_log_query_page('', page_size: 3).logs.to_a
+      end
+
+      def query_with_local_sibling_batch
+        with_floci do
+          @floci.hold_archive_read(@sibling_archive_key)
+          with_archive_eviction do
+            @shared_context_logs_after_eviction = next_log_query_page('', page_size: 3).logs.to_a
+          end
+        end
+        inspect_eviction
+      end
+
+      def with_archive_eviction(profile = 'history')
+        with_eviction_profile(profile) do
+          wait_for { archive_diagnostics }.to include('local log archive eviction completed')
+          yield if block_given?
+        end
+      end
+
+      def with_eviction_profile(profile = 'history', &)
+        @archive_offset = File.size('reports/server.log')
+        with_server_profile(profile, &)
+      end
+
+      def wait_for_archive_evictions(*keys)
+        ids = keys.map { |key| File.basename(key, '.parquet') }
+        wait_for { archive_diagnostics.scan(/local log archive eviction completed.*batch_id=([\w-]+)/).flatten }.to include(*ids)
+      end
+
+      def inspect_eviction
+        with_log_database do |connection|
+          @batch_eviction_status = connection.query('SELECT id::VARCHAR, evicted_at IS NOT NULL FROM log_archive_batches').to_a.to_h
+          @local_archive_members = connection.query('SELECT log_id, batch_id::VARCHAR FROM log_archive_members').to_a
+          @local_archive_rows = schema_data(connection)
+        end
+      end
+
+      private
+
+      def staged_archive_key(batch_id)
+        file = archive_files.find { |path| File.basename(path, '.parquet') == batch_id }
+        file.delete_prefix("#{WORKSPACE}/")
+      end
+
+      def record_eviction_pair(earlier_key)
+        later_key = (@floci.keys - [earlier_key]).fetch(0)
+        @retained_batch_id = File.basename(earlier_key, '.parquet')
+        @evicted_batch_id = File.basename(later_key, '.parquet')
+      end
+
+      def invalidate_archive_object(key, fault)
+        case fault
+        when 'missing' then @floci.delete_archive(key)
+        when 'checksum changed' then @floci.replace_archive(key)
+        when 'contents changed without checksum' then @floci.replace_archive(key, keep_checksum: true)
+        else raise ArgumentError, "Unknown archive fault: #{fault}"
+        end
+      end
+
+      def publish_older_archive_logs
+        acknowledge_query_export(query_fixture('log_queries'))
+        age_unbatched_archive_logs
+        publish_searchable_logs
+      end
+
+      def age_unbatched_archive_logs(keep_latest: false)
+        older_receipt = (Time.now - (2 * 3600)).to_i * 1_000_000_000
+        with_log_database do |connection|
+          connection.query(<<~SQL, older_receipt, keep_latest)
+            UPDATE logs SET received_timestamp_ns = ?
+            WHERE id NOT IN (SELECT log_id FROM log_archive_members)
+              AND (NOT ?::BOOLEAN OR id <> (SELECT max(id) FROM logs))
+          SQL
+        end
+      end
+    end
+  end
+end

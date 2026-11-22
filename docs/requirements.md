@@ -1,15 +1,15 @@
 # Telemetry service: first-version requirements
 
 **Status:** Implementation specification. Local log persistence, recovery,
-[recent-log queries in the browser and API](queries.md),
-[local Parquet staging](operations.md#-local-parquet-staging) and
-[R2 publication](operations.md#-r2-publication-and-recovery) are implemented.
-Metrics and traces remain print-only. Historical queries and trace and metric
-views are planned.
+[log queries in the browser and API](queries.md),
+[local Parquet staging](operations.md#-local-parquet-staging),
+[R2 publication](operations.md#-r2-publication-and-recovery),
+and [historical log reads and local eviction](operations.md#-historical-log-availability)
+are implemented. Metrics and traces remain print-only.
 
-**Revision:** 0.25
+**Revision:** 0.26
 
-**Last updated:** 2026-11-21
+**Last updated:** 2026-11-22
 
 **Audience:** Implementing agents, reviewers, product owner, and operators.
 
@@ -151,8 +151,8 @@ Use these capabilities when implementing the service:
   the application schema at startup through a single Goose history;
   [operations](operations.md#-log-storage-and-recovery) owns compatibility and
   failure/rollback behavior. Local Parquet staging uses DuckDB's bundled
-  writer. E-07 adds the S3 transfer client. E-08 packages and verifies DuckDB
-  remote reads in the required service images.
+  writer. The S3 client transfers and lists archive objects. Einblick installs
+  and loads DuckDB's signed `httpfs` extension at R2 startup for remote Parquet reads.
 - Ingestion uses the upstream OTLP/gRPC service definitions. The versioned
   query API has its own protobuf contract and generation workflow.
   [Query API development](development.md#-query-api)
@@ -360,7 +360,7 @@ web
 
 | View or panel | Initial content and interpretation |
 | --- | --- |
-| Shared controls | Service and time window. The Logs page offers 15-minute, 1-hour, 24-hour, 3-day and 7-day presets within the configured query range. For limits under 15 minutes, offer a Recent preset using the full configured duration. Search and Enter advance the default recent window or the chosen preset to now. Show the selected duration or Current range when the duration falls outside the available presets. Search from an absolute-range bookmark keeps the exact bounds. Pagination and clearing the message filter use the applied bounds and retain the preset for the next search, including during full-page navigation. The search URL records the applied absolute bounds. Later service views add instance, refresh/pause and protocol filters where meaningful. Do not issue overlapping automatic queries. |
+| Shared controls | Service and time window. The Logs page opens on the last hour, capped by the configured query limit. It offers 15-minute, 1-hour, 24-hour, 3-day and 7-day presets within that limit. For limits under 15 minutes, offer a Recent preset using the full configured duration. Search and Enter advance the default recent window or the chosen preset to now. Show the selected duration or Current range when the duration falls outside the available presets. Search from an absolute-range bookmark keeps the exact bounds. Pagination and clearing the message filter use the applied bounds and retain the preset for the next search, including during full-page navigation. The search URL records the applied absolute bounds. Later service views add instance, refresh/pause and protocol filters where meaningful. Do not issue overlapping automatic queries. |
 | Latency | p50/p95/p99 over time from compatible request-duration histograms, displayed in milliseconds. Aggregate histograms across selected instances before quantile calculation. |
 | Traffic | Incoming requests per second, separate HTTP and gRPC groups. Do not sum client and server measurements for the same request. |
 | Errors | HTTP 4xx and 5xx identified explicitly; gRPC non-OK identified explicitly. Prefer separate HTTP 4xx/5xx series if useful. A combined summary is labelled non-success, since 4xx/non-OK do not all imply a service fault. |
@@ -462,7 +462,7 @@ This is a logical configuration inventory, not a finalized YAML schema or comman
 | Export interval | Explicit local log export cadence. | Interface implemented; production tuning open |
 | Export batch size | Target projected source bytes; large accepted rows can form singleton batches. | Interface implemented; production tuning open |
 | Export staging workspace | Separate quota-limited filesystem; 1 GiB starting point for testing. | Working design; production sizing open |
-| Recent local window | Target approximately 15 minutes, not a RAM residency guarantee. | Proposed |
+| Recent local window | Configure separately from export cadence, using receipt age. Approximately 15 minutes is a starting point. | Interface implemented; production tuning open |
 | Archive retention | Seven days normally. | Agreed direction |
 | Testing retention | 24 hours initially, or another explicitly configured shorter value. | Proposed |
 | Retention clock | Object age versus event age must be explicit. | Open |
@@ -486,7 +486,7 @@ R2 credential values must not be embedded in checked-in examples. Use configured
 
 - **DEP-001 — Per-service CGO opt-in.** Keep the root Makefile's existing `static=0` setting for Docker build/test/release paths. The owner validates the resulting native service image at deployment. Record the consumed `bin` revision in the handoff and preserve the shared default for other services.
 - **DEP-002 — Actual native packaging.** Pin a compatible DuckDB Go driver and bundled engine. Demonstrate the target runtime image has the required native runtime support; a statically linked DuckDB library alone does not establish a fully static executable.
-- **DEP-003 — Extensions available at startup.** Package the required remote-Parquet/R2 extension support with the release image or otherwise make it available without a runtime internet download. Verify paths under the read-only root filesystem.
+- **DEP-003 — Extensions available at startup.** When R2 is enabled, Einblick installs and loads signed `httpfs` at startup. Deployment provides a writable home on the persistent data volume and access to DuckDB's extension repository when the matching binary is absent. Verify installation and reuse with a read-only container root.
 - **DEP-004 — Persistent volume.** Use infraops' delivered optional `storage` capability to provision and mount persistent application storage explicitly. Set capacity and a dedicated data path; select the provisioning profile for the installation. Preserve claim identity across pod replacement and document protection, migration and deletion behavior. An ephemeral-storage request/limit is not a substitute.
 - **DEP-005 — One writer.** Reuse the existing one-replica rolling-update configuration and ensure only one process holds the DuckDB database for writing. Replacement processes may overlap during shutdown/startup; handle temporary database-lock unavailability within bounded startup and keep intake unready until database access and recovery succeed. Validate this handoff with the actual persistent volume.
 - **DEP-006 — Standard runtime integration.** Use the existing go-service server/config/DI/lifecycle patterns and the owning repositories' supported build and validation workflows. Before enabling storage, verify storage-aware release tooling in every configuration-writing pipeline and record actual tool/image revisions. The known source baseline is release image `8.48` with `cmd/bump` `2.617.0`. Demonstrate that version updates for this or another application preserve every application's storage settings, including optional-profile presence. Source pins alone do not establish successful execution.
@@ -520,7 +520,7 @@ These are service-boundary scenarios for future implementation, not claims that 
 | AC-015 | Telemetry containing HTML/script-like text is displayed as content, and log-to-trace navigation preserves useful investigation context. | WEB-001, WEB-002, WEB-003, WEB-010 |
 | AC-016 | Storage unavailability or intentionally partial results are visibly distinct from no matches; archive delay and recovery/resource status are observable independently of intake. Backend diagnostics do not recursively generate incoming telemetry. | WEB-011, QRY-010, OPS-005, OPS-006, OPS-007 |
 | AC-017 | Existing archives remain readable across the supported schema/runtime upgrade path, and local migration/rollback behavior is documented and exercised. | DAT-007, DEP-002 |
-| AC-018 | The required CGO images run with packaged extensions, a read-only root, mounted secrets and a persistent volume. The existing rolling-update path handles delayed graceful shutdown and overlapping replacement startup with one active DuckDB writer, bounded lock handling and readiness after recovery; ordinary shutdown closes DuckDB. Record actual release-image/tool revisions; releases of this or another application preserve storage configuration. The OTLP listener remains internal. | ING-007, DEP-001, DEP-002, DEP-003, DEP-004, DEP-005, DEP-006, DEP-007, DEP-008, DEP-009, DEP-010 |
+| AC-018 | The required CGO images run with the required extensions available at startup, a read-only root, mounted secrets and a persistent volume. The existing rolling-update path handles delayed graceful shutdown and overlapping replacement startup with one active DuckDB writer, bounded lock handling and readiness after recovery; ordinary shutdown closes DuckDB. Record actual release-image/tool revisions; releases of this or another application preserve storage configuration. The OTLP listener remains internal. | ING-007, DEP-001, DEP-002, DEP-003, DEP-004, DEP-005, DEP-006, DEP-007, DEP-008, DEP-009, DEP-010 |
 | AC-019 | Successful archival allows safe complete-batch local expiration and workspace cleanup; pending or in-use records/files are retained. | STO-006, STO-010, STO-011 |
 | AC-020 | The one-application pilot supplies observed signal rates, retained sizes, process memory, disk use, and representative query times, with the explicit go-service exporter configuration recorded. | ING-008, OPS-008 |
 | AC-021 | Design/code review confirms that queries use DuckDB execution, archival publishes closed Parquet exports rather than copying a live database file, and the per-service build opt-in preserves other services' CGO default. This is a review criterion, not a source-inspection test. | QRY-007, STO-012, DEP-001 |
@@ -559,7 +559,7 @@ no permanent discard mode or second backend is planned.
 | P2 | Query recent logs, then add a thin MVC Logs page. | E-04 then E-05: log AC-001/AC-004, local query bounds in AC-013 and log rendering in AC-015. |
 | P3 | Export immutable log batches to local Parquet files. | E-06: log archive-format AC-003, interrupted local export in AC-009, pending-job AC-008 and derivative cleanup in AC-019. No R2 dependency. |
 | P4 | Publish completed log batches to R2 in the background and retain local source rows. | E-07: Floci scenarios for OTLP log read back from the Parquet object, retry and restart recovery in AC-008/AC-009, and staging cleanup in AC-019. Client validation and R2 API compatibility review in AC-026. |
-| P5 | Read archived logs with packaged DuckDB remote extensions and safely evict published local batches. | E-08: log AC-007/AC-011/AC-019, packaged remote reads in AC-018, and historical query bounds and failures in AC-013/AC-016. |
+| P5 | Read archived logs with DuckDB's `httpfs` extension and safely evict published local batches. | E-08: log AC-007/AC-011/AC-019, remote reads in AC-018, and historical query bounds and failures in AC-013/AC-016. |
 | P6 | Add log retention and verify R2 outage, capacity and backlog recovery. | E-09: log AC-010/AC-012 and repeated disk/workspace cycles in AC-019. |
 | P7 | Replace trace printing with durable intake, then add trace query/view and archive support. | E-10/E-11/E-12: trace portions of AC-001–AC-003/AC-005 and the existing recovery/archive scenarios. |
 | P8 | Replace metric printing with durable intake, then add numerical queries and archives. | E-13/E-14/E-15: metric portions of AC-001–AC-003/AC-006/AC-024 and recovery/archive scenarios. All-signal backend evidence closes here. |
@@ -581,7 +581,7 @@ full recovery/archive evidence follow in P7/P8.
 | O-007 | R2 bucket and persistent-volume ownership/configuration | Reuse infraops' delivered protected-PVC and optional R2 expiration capabilities; choose capacity, path, provisioning profile, backing-volume reclaim policy and operational ownership. Verify actual release-tooling execution and storage preservation before activating storage. | Local storage path in P1; runtime settings before use |
 | O-008 | Concrete resource and query bounds | Log export uses one active batch and a separate quota-limited staging filesystem. DuckDB uses its default spill limit unless configured explicitly. Use 1 GiB as a starting point for testing the staging filesystem. Measure one-application ingestion and representative queries to size memory/native headroom, export batches, staging capacity and the persistent outage budget. | Bound each capability as introduced in P0–P8; refine with workload measurements |
 | O-009 | Reserved: site authentication | Outside v1 under D-012/WEB-012. | No v1 work |
-| O-010 | Required platform matrix and native runtime image | Retain Linux amd64/arm64 containers and native macOS arm64 development. Package the actual driver/engine/extensions accordingly. The owner will validate deployed platform/runtime behavior; it remains unavailable acceptance evidence until run. | Repository dependency checks as introduced; deployed runtime validation owned by the operator |
+| O-010 | Required platform matrix and native runtime image | Retain Linux amd64/arm64 containers and native macOS arm64 development. Package the driver and engine and verify extension installation for each platform. The owner will validate deployed platform/runtime behavior. | Repository dependency checks as introduced. The operator owns deployed runtime validation. |
 | O-012 | Catalog selectors and supported go-service metric profile | Use the transports field; begin with id for service identity; confirm actual server surfaces and native instruments/units. Optional resource filters must use attributes clients actually emit. | Metric profile in P8; catalog in P9 |
 | O-013 | Frontend library versions and visual refinement | The [full-page layout](../internal/site/root/layout/full.tmpl) pins htmx and daisyUI. A local theme applies Einblick’s colors and density to the shared controls. Confirm the chart dependency and refine the working views as panels are added. | Full frontend in P9 |
 
@@ -600,7 +600,7 @@ The durable first version is ready for its measured one-application pilot when:
 - Site authentication remains deferred; internal ingestion has its documented transport/authentication boundary.
 - The selected lean S3 client meets AC-026, with Floci transfer and recovery evidence, documented R2 API compatibility, and no AWS Go SDK in its runtime path.
 - Resource and query work are bounded and operational state is visible.
-- Required container/platform builds work with CGO, packaged extensions, read-only root, and persistent storage.
+- Required container/platform builds work with CGO, the DuckDB extension available at startup, read-only root, and persistent storage.
 - Applicable active acceptance scenarios have actually run through the supported harness, with failures and limitations reported.
 - No unmeasured throughput, memory, latency, exactly-once, or full-volume-loss recovery guarantee is claimed.
 

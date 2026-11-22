@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"github.com/alexfalkowski/einblick/internal/logs/archive"
 	"github.com/alexfalkowski/go-service/v3/context"
 	"github.com/alexfalkowski/go-service/v3/database/sql"
 	"github.com/alexfalkowski/go-service/v3/errors"
@@ -13,7 +14,7 @@ import (
 // pinned log schema. Transport callers must report a permanent input failure.
 var ErrInvalidLog = errors.New("logs: invalid protobuf content")
 
-// Repository provides local log persistence. NewRepository composes diagnostic
+// Repository provides log persistence and queries. NewRepository composes diagnostic
 // logging without taking ownership of the database lifecycle.
 type Repository interface {
 	// Add atomically persists a complete export and returns the committed record
@@ -29,10 +30,10 @@ type Repository interface {
 
 // NewRepository composes log persistence and diagnostic logging over the service-owned database.
 // The migrate package initializes the schema before the listeners start.
-func NewRepository(cfg *Config, db *sql.DB, pool *sync.BufferPool, log *logger.Logger) Repository {
+func NewRepository(cfg *Config, db *sql.DB, pool *sync.BufferPool, objects archive.ObjectStore, log *logger.Logger) Repository {
 	return &loggingRepository{
 		Repository: &repository{
-			config: cfg, db: db, pool: pool,
+			config: cfg, db: db, pool: pool, store: objects,
 			queries: sync.NewSemaphore(int64(cfg.Concurrency)),
 		},
 		logger: log,

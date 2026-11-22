@@ -33,7 +33,7 @@ func (w *worker) stop(ctx context.Context) error {
 }
 
 func (w *worker) run(ctx context.Context) error {
-	recovered := false
+	var recovered bool
 	return signal.Timer(ctx, w.interval.Duration(), func(ctx context.Context) error {
 		recovered = recovered || w.service.Recover(ctx) == nil
 		if recovered {
@@ -42,6 +42,8 @@ func (w *worker) run(ctx context.Context) error {
 		} else {
 			_, _ = w.service.ReconcilePublication(ctx)
 		}
+
+		_, _ = w.service.Evict(ctx)
 		return nil
 	})
 }

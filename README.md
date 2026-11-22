@@ -40,12 +40,13 @@ disposable; use a persistent mount to retain accepted logs.
 ```mermaid
 flowchart LR
     accTitle: Telemetry in Einblick today
-    accDescr: OTLP logs are stored in DuckDB for recent-log queries and optional Parquet archival to R2. Metrics and traces are printed and discarded.
+    accDescr: OTLP logs are stored in DuckDB and optionally archived to R2. Queries combine local and archived logs. Metrics and traces are printed and discarded.
     OTLP["OTLP/gRPC"] -->|Logs| DB[(DuckDB)]
     OTLP -->|Metrics and traces| Logger[Service logger]
     DB --> Queries[Browser and query API]
     DB -->|Optional| Parquet[Local Parquet files]
     Parquet -->|Optional| R2[Cloudflare R2]
+    R2 -->|Historical logs| Queries
 ```
 
 See [telemetry ingestion](docs/ingestion.md) for OTLP/gRPC methods, gzip,
@@ -57,7 +58,8 @@ and [R2 publication](docs/configuration.md#-r2-log-archives) to configure archiv
 Open `http://localhost:11000/logs` to investigate acknowledged logs with
 service, severity, string-body text and trace-ID filters. The Logs page
 uses your browser language preferences and displays expandable typed log
-details. See [recent-log queries](docs/queries.md) for the browser and API usage.
+details. With R2 configured, the same search includes archived logs. See
+[log queries](docs/queries.md) for the browser and API usage.
 
 ## ⚙️ Configuration
 
@@ -78,6 +80,6 @@ history is available in [GitHub releases](https://github.com/alexfalkowski/einbl
 
 ## 🧭 Roadmap
 
-Historical queries and persistence and views for metrics and
-traces are planned. See the [product requirements](docs/requirements.md) and
+Persistence, archive queries and views for metrics and traces are planned.
+See the [product requirements](docs/requirements.md) and
 [implementation plan](docs/review-and-plan.md).

@@ -41,13 +41,20 @@ module Einblick
       end
 
       def publish_past_blocked_cleanup
+        @retained_batch_id = File.basename(@earlier_key, '.parquet')
+        @evicted_batch_id = File.basename(@later_key, '.parquet')
+        @retained_archive_record_count = log_query_records(@archive_request).size
         with_floci do
-          with_unwritable_directory(File.dirname(@earlier_archive)) do
-            observe_publication_failure(/remote log archive publication failed.*permission denied/i) do
-              wait_for_later_archive_cleanup
-            end
-          end
+          with_unwritable_directory(File.dirname(@earlier_archive)) { evict_past_blocked_cleanup }
           inspect_publication_progress
+        end
+        inspect_eviction
+      end
+
+      def evict_past_blocked_cleanup
+        with_eviction_profile do
+          wait_for { archive_diagnostics }.to match(/remote log archive publication failed.*permission denied/i)
+          wait_for_archive_evictions(@later_key)
         end
       end
 

@@ -50,7 +50,8 @@ end
 
 Then('startup should reject the newer migration history without changing storage') do
   expect(@startup_status).not_to be_success, @startup_output
-  expect(@startup_output).to include('migrate: unsupported storage schema version 4')
+  version = @migration_history_before.last.fetch(1)
+  expect(@startup_output).to include("migrate: unsupported storage schema version #{version}")
   expect(@schema_data_after).to eq(@schema_data_before)
   expect(@migration_history_after).to eq(@migration_history_before)
 end

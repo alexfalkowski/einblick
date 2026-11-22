@@ -90,14 +90,38 @@ enabling publication. Use the account's HTTPS S3 API endpoint and region `auto`
 for R2. Einblick puts the bucket name in the URL path. For local Floci, use an
 HTTP endpoint with a numeric loopback address such as `http://127.0.0.1:4566`.
 Go bypasses environment HTTP proxies for loopback IPs. The credentials are
-go-service sources read at startup. Restart to apply credential changes.
+go-service sources read at startup and shared by publication and historical
+reads. Restart to apply credential changes.
+
+Use a dedicated bucket for the installation and restrict object writes to trusted
+publishers. Historical queries discover Parquet objects directly from the bucket,
+including on a fresh database volume. Give other consumers read-only access.
+
+With R2 enabled, Einblick installs and loads DuckDB's signed `httpfs` extension
+at startup. DuckDB downloads the matching binary from its extension repository
+when it is absent from `$HOME/.duckdb/extensions`.
+Give the service user a writable home and allow access to the extension
+repository for an empty cache.
+[Container setup](development.md#-container-builds)
+
+With R2 enabled, positive `local_retention` sets how long to keep each accepted
+row locally, measured from server receipt. All rows must be old enough and the
+batch must be confirmed and cleaned before eviction. Omit the setting or use
+`0s` to keep the local copies. Export cadence is independent of this window.
+Before setting a positive value, verify that R2 enforces protection against
+deletes and overwrites throughout the required archive retention period,
+including when the worker evicts the local copy. Check the scope and remaining
+duration of protection against the bucket's expiration policy. Keep eviction
+disabled until that protection is in place.
+[Cloudflare R2 bucket locks](https://developers.cloudflare.com/r2/buckets/bucket-locks/)
 
 The worker attempts one publication per interval. The client streams uploads
 and checksum verification, switching to multipart for large files. The
 `request_timeout` applies to each S3 request, including each upload part and
 the full-object download used to verify the checksum. Size it for the largest
 expected verification download at the available throughput. The S3 client
-also uses this timeout for multipart abort after cancellation. See the
+also uses this timeout for multipart abort after cancellation. DuckDB uses it
+for historical object reads, rounded up to a whole second. See the
 [shutdown limitation](operations.md#-r2-publication-and-recovery) when sizing it.
 
 ## 🩺 Health checks
