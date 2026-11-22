@@ -40,7 +40,9 @@ make features-site
 make features-service
 ```
 
-The archive group uses Floci from the shared stack on port `4566`, with the
+`make features-archive` runs both archive groups. Use `make features-archive-staging`
+for local Parquet staging and `make features-archive-publication` for R2 publication.
+The publication group uses Floci from the shared stack on port `4566`, with the
 test relay on port `4567`. Set `EINBLICK_FLOCI_PORT` if your local emulator
 listens on a different port. The scenarios create and delete objects in a
 disposable test bucket. CI pins its Floci image in the
@@ -48,7 +50,9 @@ disposable test bucket. CI pins its Floci image in the
 
 The storage group includes migrations. The service group covers health, metric
 and trace receipt, and scenarios outside the four tagged groups. Put each new
-scenario in at most one tagged group. `make features` runs all feature scenarios.
+scenario in at most one of `@storage`, `@archive`, `@queries`, and `@site`.
+Add `@publication` to archive scenarios that require Floci. `make features` runs
+all feature scenarios.
 Use `make features tags=@printing` or `make features feature=features/migrate`
 to narrow a local run. Run groups one at a time locally because they share ports
 and the test database. Run `make coverage` to merge the profiles in `test/reports/`

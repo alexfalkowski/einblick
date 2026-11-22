@@ -7,7 +7,8 @@ include bin/build/make/git.mak
 include bin/build/make/claude.mak
 include bin/build/make/codex.mak
 
-.PHONY: features-storage features-archive features-queries features-site features-service \
+.PHONY: features-storage features-archive features-archive-staging features-archive-publication \
+	features-queries features-site features-service \
 	coverage-workspace-stage coverage-workspace-restore
 
 override export partition := $(value partition)
@@ -19,6 +20,14 @@ features-storage:
 # Run log staging and R2 publication features with Floci.
 features-archive:
 	@$(MAKE) features tags="@archive"
+
+# Run local Parquet staging and recovery features.
+features-archive-staging:
+	@$(MAKE) features tags="@archive and not @publication"
+
+# Run R2 archive publication and recovery features with Floci.
+features-archive-publication:
+	@$(MAKE) features tags="@archive and @publication"
 
 # Run recent log query features.
 features-queries:
