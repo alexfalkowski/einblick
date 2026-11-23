@@ -5,6 +5,7 @@ module Einblick
     # Relays S3 requests to the disposable Floci bucket and simulates interruptions.
     class Floci
       include FlociFaults
+      include FlociMultipart
       include FlociReads
 
       BUCKET = '/einblick-publication-feature'
@@ -92,7 +93,7 @@ module Einblick
 
       def forward(env)
         incoming = Rack::Request.new(env)
-        intercepted = intercept(incoming, env)
+        intercepted = intercept(incoming, env) || archive_listing_failure(incoming) || multipart_initiation_failure(incoming)
         return intercepted if intercepted
 
         listing = archive_listing?(incoming)

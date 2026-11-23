@@ -109,13 +109,13 @@ publication rotation. A blocked repair leaves the export slot available for
 new logs on other days. If the key contains conflicting bytes, investigate the
 bucket and key ownership before changing the object. The worker preserves an
 existing object and leaves the batch pending when verification fails. If
-verification repeatedly times out, check that `request_timeout` covers the full
-download of the object. If publication succeeds but workspace cleanup fails,
+verification repeatedly times out, check that `archive.r2.client.timeout`
+covers the full download. If publication succeeds but workspace cleanup fails,
 restore staging access so the worker can reclaim the file.
 
 The S3 client can continue a multipart abort after worker cancellation. A
-stalled abort shares `request_timeout` with transfers, subject to the client's
-one-minute abort cap. If it uses the remaining time in the application's
+stalled abort shares `archive.r2.client.timeout` with transfers, subject to the
+client's one-minute abort cap. If it uses the remaining time in the application's
 15-second shutdown budget, the process may exit before DuckDB closes cleanly.
 Incomplete multipart uploads follow the bucket's incomplete-upload lifecycle
 policy.

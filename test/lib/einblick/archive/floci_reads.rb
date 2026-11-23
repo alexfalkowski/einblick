@@ -8,6 +8,10 @@ module Einblick
         @archive_listings.to_i
       end
 
+      def fail_next_archive_listing
+        @mode = :fail_next_archive_listing
+      end
+
       def hold_archive_listing(key)
         @archive_listing_prefix = "#{File.dirname(key)}/"
         @archive_listing_gate = Queue.new
@@ -43,6 +47,13 @@ module Einblick
       end
 
       private
+
+      def archive_listing_failure(incoming)
+        return unless @mode == :fail_next_archive_listing && archive_listing?(incoming)
+
+        @mode = nil
+        [503, {}, []]
+      end
 
       def archive_listing?(incoming)
         incoming.get? && incoming.path_info == Floci::BUCKET && incoming.GET['list-type'] == '2'

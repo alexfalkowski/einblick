@@ -77,12 +77,13 @@ archive:
   interval: 1s
   batch_size: 65536B
   r2:
-    endpoint: https://ACCOUNT_ID.r2.cloudflarestorage.com
+    client:
+      endpoint: https://ACCOUNT_ID.r2.cloudflarestorage.com
+      timeout: 5s
     bucket: einblick
     region: auto
     access_key_id: file:/etc/secrets/einblick/r2-access-key-id
     secret_access_key: file:/etc/secrets/einblick/r2-secret-access-key
-    request_timeout: 5s
 ```
 
 Provision the bucket and credentials with object read and write access before
@@ -116,13 +117,20 @@ disabled until that protection is in place.
 [Cloudflare R2 bucket locks](https://developers.cloudflare.com/r2/buckets/bucket-locks/)
 
 The worker attempts one publication per interval. The client streams uploads
-and checksum verification, switching to multipart for large files. The
-`request_timeout` applies to each S3 request, including each upload part and
-the full-object download used to verify the checksum. Size it for the largest
-expected verification download at the available throughput. The S3 client
-also uses this timeout for multipart abort after cancellation. DuckDB uses it
-for historical object reads, rounded up to a whole second. See the
-[shutdown limitation](operations.md#-r2-publication-and-recovery) when sizing it.
+and checksum verification, switching to multipart for large files.
+`client.timeout` bounds each S3 request, including each upload part, the
+full-object verification download, and multipart abort after cancellation.
+Size it for the largest expected verification download at the available
+throughput. Omit it to use the shared HTTP client default. DuckDB uses the
+resolved timeout for historical object reads, rounded up to a whole second.
+[Shutdown limitation](operations.md#-r2-publication-and-recovery)
+
+The Go S3 clients support `client.tls`, `client.breaker`, and `client.retry`.
+Log searches and the archive worker track circuit breaker failures separately.
+With retries configured, only safe requests such as archive listings and
+checksum reads can retry within the request timeout. The archive worker handles
+write recovery. DuckDB uses its native TLS handling and makes its historical
+object reads with retries disabled.
 
 ## 🩺 Health checks
 

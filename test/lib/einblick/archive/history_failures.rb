@@ -4,6 +4,24 @@ module Einblick
   module Archive
     # Exercises history queries when an archive listing or read is interrupted.
     module World
+      def query_after_archive_listing_failure
+        query_from_fresh_archive do
+          @floci.fail_next_archive_listing
+          query_logs
+        end
+      end
+
+      def publish_while_archive_listings_are_unavailable
+        with_floci do
+          @floci.fail_next_archive_listing
+          run_publication('publication_breaker') do
+            query_during_archive_recovery
+            acknowledge_archive_logs(@archive_request)
+          end
+          inspect_publication
+        end
+      end
+
       def query_across_stale_listing
         with_floci do
           publish_searchable_logs

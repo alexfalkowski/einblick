@@ -4,14 +4,17 @@ archive:
   interval: 100ms
   batch_size: 65536B
   r2:
-    endpoint: http://127.0.0.1:4567
+    client:
+      endpoint: http://127.0.0.1:4567
+      # Keep the deadline longer than Nonnative's 5s stop timeout so the
+      # interrupted upload scenario depends on shutdown cancellation.
+      timeout: 10s
+      retry:
+        attempts: 2
     bucket: einblick-publication-feature
     region: us-east-1
     access_key_id: test
     secret_access_key: test
-    # Keep the transfer deadline longer than Nonnative's 5s stop timeout so
-    # the interrupted upload scenario depends on shutdown cancellation.
-    request_timeout: 10s
 queries:
   max_results: 100
   max_range: 168h

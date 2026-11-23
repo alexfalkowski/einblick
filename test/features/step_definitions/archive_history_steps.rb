@@ -25,6 +25,14 @@ When('the archive is published and the client searches during an object store ou
   query_fresh_archive(failure: true)
 end
 
+When('the archive is published and the client searches while the object store briefly fails to list archives') do
+  query_after_archive_listing_failure
+end
+
+When('the service accepts logs after a listing failure opens the search circuit breaker') do
+  publish_while_archive_listings_are_unavailable
+end
+
 When('the client cancels an active archive query, searches while it drains, and retries') do
   query_after_archive_cancellation
 end
