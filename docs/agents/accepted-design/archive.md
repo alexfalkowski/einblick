@@ -9,6 +9,12 @@ during startup. A missing signed extension is downloaded for the linked engine
 version and platform. Deployment supplies a writable home on the data volume.
 [Container setup](../../development.md#-container-builds)
 
+## Archive timestamps
+
+Store archive and migration timestamps in UTC. For a DuckDB `TIMESTAMP`
+column, construct SQL-generated values from Unix microseconds to avoid the
+session time zone during conversion. Legacy timestamps carry no zone metadata.
+
 ## DuckDB remote-read cancellation
 
 Use DuckDB's native `httpfs` for E-08 archived Parquet reads. The owner
@@ -52,6 +58,27 @@ protection covers the required archive retention period.
 Checksum verification covers the bytes read before eviction. Bucket policy
 protects the object through the local deletion and subsequent reads.
 [R2 configuration](../../configuration.md#-r2-log-archives)
+
+## R2 archive retention
+
+Archive retention uses the age of each R2 object. Infraops manages the
+bucket lifecycle rule and R2 deletes eligible objects asynchronously. The
+event timestamp still determines the archive partition and query bounds.
+For legacy batches, use the object time from the R2 listing and report
+unavailable history if a missing object's expiration cannot be established.
+Verify the effective remote rule and rule removal through the R2 API.
+Exercise Einblick with objects that remain listed after eligibility, objects
+that disappear after expiration, and missing objects within retention.
+Cloudflare's lifecycle contract supplies the deletion timing.
+[Retention requirements](../../requirements.md#85-retention-and-delivery-semantics)
+
+## Early log disk backpressure
+
+Log intake returns retryable `UNAVAILABLE` when local writes fail. At the
+measured pilot load, the owner prioritized historical search performance and
+deferred early disk backpressure under OPS-004. Revisit it when observed disk
+usage or backlog growth during outages warrants a disk headroom policy.
+[Capacity behavior](../../requirements.md#10-resource-latency-and-operational-requirements)
 
 ## S3 multipart abort during shutdown
 

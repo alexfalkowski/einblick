@@ -10,6 +10,9 @@ type Logs struct {
 	// QueryURL identifies the current search with fixed, exact bounds.
 	QueryURL string
 
+	// ResultScope identifies the sources searched for the current page.
+	ResultScope string
+
 	// Rows contains matching logs in newest-first order.
 	Rows []LogRow
 
@@ -42,6 +45,9 @@ type Filters struct {
 
 	// RecentWindow is the preset for the next search. An empty value keeps the absolute bounds.
 	RecentWindow string
+
+	// SearchScope is the requested selection of data sources.
+	SearchScope string
 
 	// SeverityOptions lists the available levels in ascending severity order.
 	SeverityOptions []FilterOption

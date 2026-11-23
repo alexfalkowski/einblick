@@ -5,11 +5,13 @@ import (
 	"encoding/hex"
 	"iter"
 
+	"github.com/alexfalkowski/einblick/internal/logs/archive"
 	"github.com/alexfalkowski/go-service/v3/context"
 	"github.com/alexfalkowski/go-service/v3/errors"
 	"github.com/alexfalkowski/go-service/v3/io"
 	"github.com/alexfalkowski/go-service/v3/net/http"
 	"github.com/alexfalkowski/go-service/v3/strings"
+	"github.com/alexfalkowski/go-service/v3/time"
 	"github.com/termermc/go-micro-s3/client"
 	"github.com/termermc/go-micro-s3/client/api"
 )
@@ -38,7 +40,7 @@ func NewStore(settings *BucketSettings, publication, discovery *http.Client) (*S
 		return nil, err
 	}
 
-	return &Store{publication: writer, discovery: lister, bucket: settings.Bucket}, nil
+	return &Store{publication: writer, discovery: lister, bucket: settings.Bucket, retention: settings.Retention}, nil
 }
 
 func newClient(settings *BucketSettings, httpClient *http.Client) (*client.Client, error) {
@@ -57,23 +59,24 @@ type Store struct {
 	publication *client.Client
 	discovery   *client.Client
 	bucket      string
+	retention   time.Duration
 }
 
-// List yields object keys with the given prefix and stops on the first error.
-func (s *Store) List(ctx context.Context, prefix string) iter.Seq2[string, error] {
-	return func(yield func(string, error) bool) {
+// List yields objects with the given prefix and stops on the first error.
+func (s *Store) List(ctx context.Context, prefix string) iter.Seq2[archive.Object, error] {
+	return func(yield func(archive.Object, error) bool) {
 		for entry, err := range s.discovery.List(ctx, s.bucket, &client.ListOptions{Prefix: prefix}) {
 			if err != nil {
-				yield(strings.Empty, err)
+				yield(archive.Object{}, err)
 				return
 			}
 
 			if err := ctx.Err(); err != nil {
-				yield(strings.Empty, err)
+				yield(archive.Object{}, err)
 				return
 			}
 
-			if !yield(entry.Key, nil) {
+			if !yield(archive.Object{Key: entry.Key, StoredAt: entry.LastModified}, nil) {
 				return
 			}
 		}
@@ -85,18 +88,23 @@ func (s *Store) URI(key string) string {
 	return strings.Concat("s3://", s.bucket, "/", key)
 }
 
-// CheckPublication verifies that the stored bytes match the published checksum.
-func (s *Store) CheckPublication(ctx context.Context, key, checksum string) error {
+// Retention reports the configured object-age expiration duration.
+func (s *Store) Retention() time.Duration {
+	return s.retention
+}
+
+// CheckPublication verifies the published bytes and returns the immutable object's timestamp.
+func (s *Store) CheckPublication(ctx context.Context, key, checksum string) (time.Time, error) {
 	meta, err := s.publication.Stat(ctx, s.bucket, key, nil)
 	if err != nil {
-		return err
+		return time.Time{}, err
 	}
 	if meta.Metadata["sha256"] != checksum {
-		return errors.New("remote log archive no longer matches confirmed publication")
+		return time.Time{}, errors.New("remote log archive no longer matches confirmed publication")
 	}
 
 	_, err = s.verifyChecksum(ctx, key, meta)
-	return err
+	return meta.LastModified, err
 }
 
 // Create streams an object and its checksum with a condition that the key is absent.

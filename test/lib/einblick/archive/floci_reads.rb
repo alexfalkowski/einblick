@@ -12,6 +12,15 @@ module Einblick
         @mode = :fail_next_archive_listing
       end
 
+      def delete_from_next_archive_listing(key)
+        @delete_on_listing = key
+      end
+
+      def set_archive_object_time(key, stored_at)
+        @archive_object_times ||= {}
+        @archive_object_times[key] = stored_at
+      end
+
       def hold_archive_listing(key)
         @archive_listing_prefix = "#{File.dirname(key)}/"
         @archive_listing_gate = Queue.new
@@ -49,7 +58,14 @@ module Einblick
       private
 
       def archive_listing_failure(incoming)
-        return unless @mode == :fail_next_archive_listing && archive_listing?(incoming)
+        return unless archive_listing?(incoming)
+
+        if @delete_on_listing
+          key = @delete_on_listing
+          @delete_on_listing = nil
+          delete_archive(key)
+        end
+        return unless @mode == :fail_next_archive_listing
 
         @mode = nil
         [503, {}, []]
@@ -63,11 +79,39 @@ module Einblick
         @archive_listing_gate&.pop if incoming.GET['prefix'] == @archive_listing_prefix
       end
 
+      def archive_listing_response(incoming, response)
+        wait_on_archive_listing(incoming)
+        return respond(incoming, response) unless @archive_object_times
+
+        body = archive_listing_body(response.body)
+        rack_response(response, body).tap { |_, headers, _| headers['content-length'] = body.bytesize.to_s }
+      end
+
+      def archive_listing_body(body)
+        document = Nokogiri::XML(body)
+        document.xpath('//*[local-name()="Contents"]').each do |object|
+          key = object.at_xpath('./*[local-name()="Key"]').text
+          stored_at = @archive_object_times[key]
+          object.at_xpath('./*[local-name()="LastModified"]').content = stored_at.iso8601 if stored_at
+        end
+        document.to_xml
+      end
+
+      def archive_object_response(incoming, response, body)
+        rack_response(response, body).tap do |_, headers, _|
+          stored_at = @archive_object_times&.[](archive_key(incoming))
+          headers['last-modified'] = stored_at.httpdate if stored_at && response.is_a?(Net::HTTPSuccess)
+        end
+      end
+
       def wait_on_archive_read(incoming)
         return unless @archive_read_gates && (incoming.head? || incoming.get?)
 
-        key = URI::DEFAULT_PARSER.unescape(incoming.path_info).delete_prefix("#{Floci::BUCKET}/")
-        @archive_read_gates[key]&.pop
+        @archive_read_gates[archive_key(incoming)]&.pop
+      end
+
+      def archive_key(incoming)
+        URI::DEFAULT_PARSER.unescape(incoming.path_info).delete_prefix("#{Floci::BUCKET}/")
       end
     end
   end

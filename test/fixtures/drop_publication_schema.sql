@@ -1,4 +1,4 @@
--- Restore the previous archive schema in a disposable test database.
+-- Restore the previous archive schema after removing retention metadata.
 ALTER TABLE log_archive_batches DROP COLUMN evicted_at;
 ALTER TABLE log_archive_batches DROP COLUMN eviction_attempted_at;
 DELETE FROM goose_db_version WHERE version = 4;

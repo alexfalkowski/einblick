@@ -31,7 +31,8 @@ func newLogsModel(
 ) (*model.Logs, error) {
 	windows, selectedWindow := windowOptions(maxRange, time.Duration(query.EndTime.Sub(query.StartTime)))
 	viewModel := &model.Logs{
-		QueryURL: logsURL(query, strings.Empty),
+		QueryURL:    logsURL(query, strings.Empty),
+		ResultScope: string(results.SearchScope),
 		Filters: model.Filters{
 			StartTime:       query.StartTime.UTC(),
 			EndTime:         query.EndTime.UTC(),
@@ -44,6 +45,7 @@ func newLogsModel(
 			SelectedWindow:  selectedWindow,
 			RecentWindow:    recent,
 			PageSize:        query.PageSize,
+			SearchScope:     string(query.SearchScope),
 		},
 		Rows: make([]model.LogRow, 0, len(results.Logs)),
 	}
@@ -92,9 +94,11 @@ func newLogRow(stored *storage.Log, search string) (model.LogRow, error) {
 		return model.LogRow{}, err
 	}
 
-	severity := strings.Empty
+	var severity string
 	if level := entry.GetSeverityNumber(); level != logs.SeverityNumber_SEVERITY_NUMBER_UNSPECIFIED {
 		severity = strings.TrimPrefix(level.String(), "SEVERITY_NUMBER_")
+	} else {
+		severity = strings.Empty
 	}
 	message, messageLabel := logMessage(entry.GetBody())
 

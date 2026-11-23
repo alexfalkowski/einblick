@@ -23,6 +23,7 @@ func parseQuery(req *http.Request, maxRange time.Duration) (storage.Query, strin
 	query := storage.Query{
 		Service: form.Get("service"), Severity: form.Get("severity"),
 		Text: form.Get("text"), TraceID: form.Get("trace_id"), PageToken: form.Get("page_token"),
+		SearchScope: storage.SearchScope(form.Get("search_scope")),
 	}
 	if form.Get("clear_message") == "1" {
 		query.Text = strings.Empty
@@ -64,6 +65,9 @@ func logsURL(query storage.Query, searchWindow string) string {
 	}
 	if query.PageSize != 0 {
 		values.Set("page_size", strconv.Itoa(query.PageSize))
+	}
+	if query.SearchScope == storage.ScopeCurrentVolume {
+		values.Set("search_scope", string(query.SearchScope))
 	}
 
 	return "/logs?" + values.Encode()

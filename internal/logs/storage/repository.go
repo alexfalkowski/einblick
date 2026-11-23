@@ -18,11 +18,12 @@ import (
 // repository writes one atomic transaction per nonempty OTLP export. It owns no
 // background queue, extra connection pool, retries or independent lifecycle.
 type repository struct {
-	config  *Config
-	db      *sql.DB
-	pool    *sync.BufferPool
-	queries *sync.Semaphore
-	store   archive.ObjectStore
+	config         *Config
+	db             *sql.DB
+	pool           *sync.BufferPool
+	localQueries   *sync.Semaphore
+	archiveQueries *sync.Semaphore
+	store          archive.ObjectStore
 }
 
 // Add commits all records and their resource/scope context before returning

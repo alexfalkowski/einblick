@@ -5,7 +5,6 @@ import (
 	"github.com/alexfalkowski/go-service/v3/context"
 	"github.com/alexfalkowski/go-service/v3/database/sql"
 	"github.com/alexfalkowski/go-service/v3/errors"
-	"github.com/alexfalkowski/go-service/v3/telemetry/logger"
 	"github.com/alexfalkowski/go-sync"
 	collector "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 )
@@ -14,8 +13,7 @@ import (
 // pinned log schema. Transport callers must report a permanent input failure.
 var ErrInvalidLog = errors.New("logs: invalid protobuf content")
 
-// Repository provides log persistence and queries. NewRepository composes diagnostic
-// logging without taking ownership of the database lifecycle.
+// Repository provides log persistence and queries over the service-owned database.
 type Repository interface {
 	// Add atomically persists a complete export and returns the committed record
 	// count, or zero and an error on failure. Duplicate exports add new records.
@@ -28,14 +26,12 @@ type Repository interface {
 	List(ctx context.Context, query Query) (*Page, error)
 }
 
-// NewRepository composes log persistence and diagnostic logging over the service-owned database.
+// NewRepository provides log persistence and queries over the service-owned database.
 // The migrate package initializes the schema before the listeners start.
-func NewRepository(cfg *Config, db *sql.DB, pool *sync.BufferPool, objects archive.ObjectStore, log *logger.Logger) Repository {
-	return &loggingRepository{
-		Repository: &repository{
-			config: cfg, db: db, pool: pool, store: objects,
-			queries: sync.NewSemaphore(int64(cfg.Concurrency)),
-		},
-		logger: log,
+func NewRepository(cfg *Config, db *sql.DB, pool *sync.BufferPool, objects archive.ObjectStore) Repository {
+	return &repository{
+		config: cfg, db: db, pool: pool, store: objects,
+		localQueries:   sync.NewSemaphore(int64(cfg.Concurrency)),
+		archiveQueries: sync.NewSemaphore(int64(cfg.Concurrency)),
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"math"
 	"math/big"
 	"strconv"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/alexfalkowski/go-service/v3/encoding/json"
 	"github.com/alexfalkowski/go-service/v3/errors"
 	"github.com/alexfalkowski/go-service/v3/strings"
+	"github.com/alexfalkowski/go-sync"
 	logs "go.opentelemetry.io/proto/otlp/logs/v1"
 )
 
@@ -36,6 +38,8 @@ type cursor struct {
 	BeforeID     int64  `json:"before_id"`
 }
 
+var maxPageTokenLength = cursorTokenLimit()
+
 // List executes a fixed, bounded query. It propagates cancellation through queue
 // waits and SQL execution. No partial page is returned.
 func (r *repository) List(ctx context.Context, query Query) (*Page, error) {
@@ -51,44 +55,63 @@ func (r *repository) List(ctx context.Context, query Query) (*Page, error) {
 		return nil, err
 	}
 
-	if err := r.queries.Acquire(ctx, 1); err != nil {
+	var scope SearchScope
+	var admission *sync.Semaphore
+	if r.store != nil && query.SearchScope != ScopeCurrentVolume {
+		scope, admission = ScopeAllSources, r.archiveQueries
+	} else {
+		scope, admission = ScopeCurrentVolume, r.localQueries
+	}
+	if err := admission.Acquire(ctx, 1); err != nil {
 		return nil, err
 	}
-	defer r.queries.Release(1)
+	defer admission.Release(1)
 
 	position, err := queryCursor(query)
 	if err != nil {
 		return nil, err
 	}
-	page, err := r.readPage(ctx, query, position)
+
+	page, err := r.readPage(ctx, query, position, scope)
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
-	return page, err
-}
-
-func (r *repository) readPage(ctx context.Context, query Query, position *cursor) (*Page, error) {
-	trace, _ := hex.DecodeString(query.TraceID)
-	severity := strings.Empty
-	if !strings.IsEmpty(query.Severity) {
-		severity = strings.Concat("SEVERITY_NUMBER_", query.Severity)
+	if err != nil {
+		return nil, err
 	}
 
-	args := []any{
+	page.SearchScope = scope
+	return page, nil
+}
+
+func (r *repository) readPage(ctx context.Context, query Query, position *cursor, scope SearchScope) (*Page, error) {
+	if scope == ScopeAllSources {
+		return r.readHistory(ctx, query, *position)
+	}
+
+	rows, err := r.db.QueryContext(ctx, logPageSQL(strings.Empty), pageArgs(query, *position)...)
+	if err != nil {
+		return nil, err
+	}
+	return scanPage(ctx, rows, query.PageSize, position)
+}
+
+func pageArgs(query Query, position cursor) []any {
+	trace, _ := hex.DecodeString(query.TraceID)
+
+	var severity string
+	if !strings.IsEmpty(query.Severity) {
+		severity = strings.Concat("SEVERITY_NUMBER_", query.Severity)
+	} else {
+		severity = strings.Empty
+	}
+
+	return []any{
 		unixNanoseconds(query.StartTime).String(), unixNanoseconds(query.EndTime).String(),
 		position.BeforeNS, position.BeforeNS, position.BeforeID, position.BeforeID, position.BeforeSource,
 		query.Service, query.Service, severity, severity, query.Text, query.Text,
 		query.TraceID, base64.StdEncoding.EncodeToString(trace), query.PageSize + 1,
 	}
-	if r.store != nil {
-		return r.readHistory(ctx, query, position, args)
-	}
-
-	rows, err := r.db.QueryContext(ctx, logPageSQL(strings.Empty), args...)
-	if err != nil {
-		return nil, err
-	}
-	return scanPage(ctx, rows, query.PageSize, position)
 }
 
 func scanPage(ctx context.Context, rows *sql.Rows, size int, position *cursor) (*Page, error) {
@@ -139,6 +162,12 @@ func (r *repository) validateQuery(query Query) error {
 		return err
 	}
 
+	switch query.SearchScope {
+	case ScopeDefault, ScopeAllSources, ScopeCurrentVolume:
+	default:
+		return ErrInvalidQuery
+	}
+
 	if query.PageSize < 1 || query.PageSize > r.config.MaxResults {
 		return ErrInvalidQuery
 	}
@@ -175,7 +204,15 @@ func (r *repository) validateRange(query Query) error {
 
 func queryCursor(query Query) (*cursor, error) {
 	token := query.PageToken
+	if len(token) > maxPageTokenLength {
+		return nil, ErrInvalidQuery
+	}
+
 	query.PageToken = strings.Empty
+	if query.SearchScope == ScopeAllSources {
+		query.SearchScope = ScopeDefault
+	}
+
 	content, err := json.Marshal(query)
 	if err != nil {
 		return nil, err
@@ -205,4 +242,16 @@ func queryCursor(query Query) (*cursor, error) {
 	}
 
 	return &cursor{QueryHash: fingerprint, BeforeNS: unixNanoseconds(query.EndTime).String()}, nil
+}
+
+func cursorTokenLimit() int {
+	// Bound the token by the largest values that can appear in an emitted cursor.
+	longest := cursor{
+		BeforeNS:     strconv.FormatUint(math.MaxUint64, 10),
+		QueryHash:    hex.EncodeToString(make([]byte, sha256.Size)),
+		BeforeSource: "00000000-0000-0000-0000-000000000000",
+		BeforeID:     math.MaxInt64,
+	}
+	content, _ := json.Marshal(longest) // The cursor only contains strings and an integer.
+	return base64.RawURLEncoding.EncodedLen(len(content))
 }

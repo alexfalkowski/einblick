@@ -14,7 +14,7 @@ func (Querier) CreateTable(tableName string) string {
 }
 
 // InsertVersion consumes Goose's version and always-true applied parameters.
-// Only the version is stored; the history row itself records application.
+// The history row records application with its UTC timestamp.
 func (Querier) InsertVersion(tableName string) string {
 	return fmt.Sprintf(insertVersionQuery, tableName)
 }

@@ -3,6 +3,7 @@ DROP VIEW log_archive_rows;
 DROP TABLE log_archive_uploads;
 DROP TABLE log_archive_members;
 DROP TABLE log_archive_batches;
+DROP SEQUENCE log_archive_queue_order;
 DROP TABLE logs;
 DROP TABLE log_scopes;
 DROP TABLE log_resources;

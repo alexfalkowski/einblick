@@ -62,9 +62,7 @@ module Einblick
 
       def recover_log_archive
         @archive_offset = File.size('reports/server.log')
-        with_server_profile('archive') do
-          wait_for { archive_diagnostics }.to include('local log archive export completed')
-        end
+        with_server_profile('archive') { wait_for_archive(1, 0) }
         inspect_archive
       end
 

@@ -4,12 +4,23 @@ import (
 	"encoding/hex"
 
 	"github.com/alexfalkowski/go-service/v3/encoding/json"
+	"github.com/alexfalkowski/go-service/v3/strings"
 	"github.com/alexfalkowski/go-service/v3/time"
 )
 
-const (
-	traceIDHexLength = 32
-)
+// SearchScope selects which data sources a log query can read.
+type SearchScope string
+
+// ScopeDefault searches local storage and the configured archive.
+const ScopeDefault SearchScope = strings.Empty
+
+// ScopeAllSources searches the current database volume and any configured archive.
+const ScopeAllSources SearchScope = "local-and-archive"
+
+// ScopeCurrentVolume searches the current database volume only.
+const ScopeCurrentVolume SearchScope = "local"
+
+const traceIDHexLength = 32
 
 // ValidTraceID reports whether id can be used as an exact trace filter.
 func ValidTraceID(id string) bool {
@@ -29,6 +40,9 @@ type Query struct {
 
 	// EndTime is the exclusive absolute time. Query bounds must fit the stored OTLP time range.
 	EndTime time.Time `json:"end_time"`
+
+	// SearchScope selects the sources to search.
+	SearchScope SearchScope `json:"search_scope,omitempty"`
 
 	// Service exactly matches the string resource attribute service.name; empty selects all.
 	Service string `json:"service"`
@@ -52,6 +66,9 @@ type Query struct {
 // Page contains complete records in descending event-time/ID order. Errors
 // return no page; an empty Logs slice means no matches in the selected sources.
 type Page struct {
+	// SearchScope reports which sources the query searched.
+	SearchScope SearchScope `json:"search_scope"`
+
 	// NextPageToken is empty at exhaustion. It is opaque, query-bound and stateless.
 	NextPageToken string `json:"next_page_token"`
 

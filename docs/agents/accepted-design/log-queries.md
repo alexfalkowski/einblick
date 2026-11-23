@@ -9,6 +9,19 @@ This narrows archive discovery on initial navigation. Longer searches are
 available through the time presets and absolute links within the configured limit.
 [Log queries](../../queries.md#-investigate-logs-in-the-browser)
 
+## Search scope
+
+Log searches use an explicit scope. The response reports which sources the
+search covered, including for empty results.
+[ListLogs protobuf contract](../../../api/einblick/v1/service.proto)
+
+## Search admission by scope
+
+Apply `queries.concurrency` independently to current-volume and archive-inclusive
+searches. A stalled native archive read keeps its archive slot until cleanup
+finishes. Local-only searches use the current-volume slots.
+[Query configuration](../../configuration.md#-recent-log-queries)
+
 ## Response work after repository admission
 
 The query repository releases admission when it returns a page. The API and

@@ -72,6 +72,7 @@ jobs:
             - einblick-go-lint-cache-o
       - run: make clean
       - run: make lint
+      # - run: make proto-breaking
       - save_cache:
           name: save go lint cache
           key: einblick-go-lint-cache-{{ checksum "go.sum" }}-{{ checksum "~/.go-lint-version" }}-{{ checksum ".source-key" }}

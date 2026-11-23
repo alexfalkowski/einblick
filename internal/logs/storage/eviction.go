@@ -22,17 +22,22 @@ func (r *Archive) NextEviction(ctx context.Context, cutoff time.Time) (archive.P
 
 // Evict removes a confirmed batch and its unused OTLP headers after the worker
 // checks its object. Retained batch state identifies the remote query source.
-func (r *Archive) Evict(ctx context.Context, id string) error {
+func (r *Archive) Evict(ctx context.Context, id string, storedAt time.Time) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	for _, statement := range []string{evictResourcesQuery, evictScopesQuery, evictLogsQuery, evictMembersQuery, markEvictedQuery} {
+	for _, statement := range []string{evictResourcesQuery, evictScopesQuery, evictLogsQuery, evictMembersQuery} {
 		if _, err := tx.ExecContext(ctx, statement, id); err != nil {
 			return err
 		}
+	}
+
+	objectStoredAt := sql.NullTime{Time: storedAt.UTC(), Valid: !storedAt.IsZero()}
+	if _, err := tx.ExecContext(ctx, markEvictedQuery, objectStoredAt, id); err != nil {
+		return err
 	}
 	return tx.Commit()
 }

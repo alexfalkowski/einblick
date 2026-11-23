@@ -27,14 +27,17 @@ type ObjectStore interface {
 	// Create streams a file under key, failing if the key already exists.
 	Create(ctx context.Context, key, checksum string, file io.Reader, size int64) error
 
-	// List yields object keys in a selected prefix and stops on the first error.
-	List(ctx context.Context, prefix string) iter.Seq2[string, error]
+	// List yields objects in a selected prefix and stops on the first error.
+	List(ctx context.Context, prefix string) iter.Seq2[Object, error]
 
 	// URI returns the DuckDB location for a validated object key.
 	URI(key string) string
 
-	// CheckPublication verifies that the stored bytes match the published checksum.
-	CheckPublication(ctx context.Context, key, checksum string) error
+	// Retention returns the configured object-age expiration duration.
+	Retention() time.Duration
+
+	// CheckPublication verifies the stored bytes and returns the object's timestamp.
+	CheckPublication(ctx context.Context, key, checksum string) (time.Time, error)
 }
 
 func (s *service) Evict(ctx context.Context) (string, error) {
@@ -47,11 +50,12 @@ func (s *service) Evict(ctx context.Context) (string, error) {
 		return strings.Empty, err
 	}
 
-	if err := s.objects.CheckPublication(ctx, batch.Key(), batch.PublishedChecksum); err != nil {
+	storedAt, err := s.objects.CheckPublication(ctx, batch.Key(), batch.PublishedChecksum)
+	if err != nil {
 		return batch.ID, err
 	}
 
-	return batch.ID, s.eviction.Evict(ctx, batch.ID)
+	return batch.ID, s.eviction.Evict(ctx, batch.ID, storedAt)
 }
 
 func (s *service) Publish(ctx context.Context) (string, error) {
@@ -67,9 +71,11 @@ func (s *service) processPublication(ctx context.Context, allowUpload bool) (str
 		return strings.Empty, nil
 	}
 
-	next := s.batches.NextReconciliation
+	var next func(context.Context) (Publication, error)
 	if allowUpload {
 		next = s.batches.NextPublication
+	} else {
+		next = s.batches.NextReconciliation
 	}
 	batch, err := next(ctx)
 	if err != nil || strings.IsEmpty(batch.ID) {

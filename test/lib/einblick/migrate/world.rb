@@ -23,12 +23,12 @@ module Einblick
 
       def attempt_future_migration
         Nonnative.stop
-        change_schema_version(4, 5)
+        change_schema_version(5, 6)
         log_database { |connection| @schema_data_before, @migration_history_before = migration_snapshot(connection) }
         attempt_database_start('server.yaml')
       ensure
         log_database { |connection| @schema_data_after, @migration_history_after = migration_snapshot(connection) }
-        change_schema_version(5, 4)
+        change_schema_version(6, 5)
         Nonnative.start
       end
 
@@ -36,6 +36,7 @@ module Einblick
         prepare_acknowledged_log_export
         Nonnative.stop
         log_database do |connection|
+          connection.query(File.read('fixtures/drop_archive_retention_schema.sql'))
           connection.query(File.read('fixtures/drop_publication_schema.sql'))
           connection.query(File.read('fixtures/drop_archive_schema.sql'))
           @schema_data_before, @migration_history_before = migration_snapshot(connection)

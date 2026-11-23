@@ -30,8 +30,8 @@ module Einblick
         query_logs(selection == 'empty' ? { 'service' => '' } : {})
       end
 
-      def query_fixture(name)
-        fixture = File.read("fixtures/#{name}.json").gsub('fixture-query-service', @query_service)
+      def query_fixture(name, service: @query_service)
+        fixture = File.read("fixtures/#{name}.json").gsub('fixture-query-service', service)
         Einblick::OTLP.request_type('logs').decode_json(fixture)
       end
 
@@ -67,8 +67,8 @@ module Einblick
         @query_logs = @query_pages.flat_map { |part| part.logs.to_a }
       end
 
-      def next_log_query_page(token, page_size:)
-        query_logs('page_size' => page_size, 'page_token' => token)
+      def next_log_query_page(token, page_size:, **filters)
+        query_logs(filters.merge('page_size' => page_size, 'page_token' => token))
         raise "query failed: #{@response.code} #{@response.body}" unless @response.code == 200
 
         Einblick::V1::ListLogsResponse.decode_json(@response.body)

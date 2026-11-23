@@ -123,7 +123,7 @@ module Einblick
 
         body = response.body.to_s
         body = changed_bytes(body) if @mode == :corrupt_verification && incoming.get? && response.is_a?(Net::HTTPSuccess)
-        rack_response(response, body)
+        archive_object_response(incoming, response, body)
       end
 
       def changed_bytes(bytes, index: 0)

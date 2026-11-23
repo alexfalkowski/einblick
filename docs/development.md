@@ -89,9 +89,11 @@ python3 tools/check_handoff.py
 `internal/duckdb` opens, instruments and closes the shared database.
 `internal/logs/storage` keeps the `Repository` interface and composing
 `NewRepository` constructor in `storage.go`. The database implementation and
-transactional `Add` operation live in `repository.go`; the diagnostic decorator
-lives in `logging.go`. SQL files live in `queries/` and are embedded as strings
-declared in `queries.go`.
+transactional `Add` operation live in `repository.go`. SQL files live in
+`queries/` and are embedded as strings declared in `queries.go`.
+The Logs module applies the repository logging decorator and registers archive
+metrics in [`internal/logs/telemetry`](../internal/logs/telemetry). Storage
+supplies the backlog snapshot used by the metrics callback.
 
 ```mermaid
 flowchart TD

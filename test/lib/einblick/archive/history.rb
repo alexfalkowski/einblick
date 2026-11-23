@@ -12,6 +12,7 @@ module Einblick
 
       def continue_across_eviction
         with_floci do
+          @query['search_scope'] = 'LOG_SEARCH_SCOPE_ALL_SOURCES'
           publish_searchable_logs { collect_log_pages(@first_log_page) }
           @overlap_query_logs = @query_logs
           with_archive_eviction { collect_log_pages(@first_log_page) }
@@ -45,7 +46,16 @@ module Einblick
         query_from_fresh_archive do
           @floci.pause_access if failure
           query_logs
+          search_fresh_volume_scopes unless failure
         end
+      end
+
+      def search_fresh_volume_scopes
+        site = Einblick::Site::HTTP.new('http://localhost:11000')
+        first = site.submit('/logs', @query.merge('page_size' => 1), 'en')
+        next_page = Nokogiri::HTML5.fragment(first.body).at_css('a.next')['hx-put']
+        @archive_scope_fragment = site.submit(next_page, {}, 'en')
+        @local_scope_fragment = site.submit('/logs', @query.merge('search_scope' => 'local'), 'en')
       end
 
       def query_duplicate_archive_ids
@@ -97,7 +107,7 @@ module Einblick
         @archive_offset = File.size('reports/server.log')
         with_server_profile('publication') do
           acknowledge_query_export(request) if request
-          wait_for { archive_diagnostics }.to include('remote log archive publication completed')
+          wait_for_publication
           yield if block_given?
         end
       end

@@ -53,8 +53,9 @@ module Einblick
 
       def evict_past_blocked_cleanup
         with_eviction_profile do
-          wait_for { archive_diagnostics }.to match(/remote log archive publication failed.*permission denied/i)
+          wait(timeout: 10).for { archive_diagnostics }.to match(/remote log archive publication failed.*permission denied/i)
           wait_for_archive_evictions(@later_key)
+          @publication_retry_diagnostics = archive_diagnostics
         end
       end
 

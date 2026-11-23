@@ -99,7 +99,8 @@ module Einblick
         listing = archive_listing?(incoming)
         @archive_listings = archive_listings + 1 if listing
         response = request(incoming.request_method, incoming.fullpath, payload(incoming), forward_headers(env))
-        wait_on_archive_listing(incoming) if listing && response.is_a?(Net::HTTPSuccess)
+        return archive_listing_response(incoming, response) if listing && response.is_a?(Net::HTTPSuccess)
+
         respond(incoming, response)
       end
 
