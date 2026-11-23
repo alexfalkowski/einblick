@@ -36,6 +36,10 @@ When('the service stops during a multipart upload and restarts') do
   recover_interrupted_multipart_publication
 end
 
+When('the object store temporarily rejects the start of the multipart upload') do
+  recover_failed_multipart_initiation
+end
+
 When('the store serves different bytes during verification and then serves the correct object') do
   recover_from_checksum_mismatch
 end
@@ -84,6 +88,10 @@ Then('only the newly accepted logs should be published and the blocked staging f
   expect(@published_keys.size).to eq(1)
   expect(@published_rows).to have_stored_log_export(@later_archive_request)
   expect(@retained_staging_files).to eq([@first_archive_path])
+end
+
+Then('the worker should check the object before starting another multipart upload') do
+  expect(@multipart_recovery_requests).to eq(%w[HEAD POST])
 end
 
 Then('the batch should be published under its original archive key') do

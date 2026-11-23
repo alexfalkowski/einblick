@@ -32,6 +32,13 @@ Feature: Publish log archives to object storage
     And the published batch should be recorded and its staging file reclaimed
     And the acknowledged logs should still be queryable locally
 
+  Scenario: Recheck the archive after a multipart upload fails to start
+    Given an acknowledged log batch staged for multipart upload
+    When the object store temporarily rejects the start of the multipart upload
+    Then the worker should check the object before starting another multipart upload
+    And the object store should contain one Parquet batch with the accepted logs
+    And the published batch should be recorded and its staging file reclaimed
+
   Scenario: Recover a multipart upload when the completion acknowledgement is lost
     Given an acknowledged log batch staged for multipart upload
     When the service restarts after the object store commits an unacknowledged upload and staging is lost

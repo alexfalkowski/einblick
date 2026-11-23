@@ -56,6 +56,18 @@ Feature: Read acknowledged logs across local storage and the archive
     When the archive is published and the client searches during an object store outage
     Then the log query should report unavailable history
 
+  Scenario: Search archived logs after a transient listing failure
+    Given acknowledged logs are ready to archive
+    When the archive is published and the client searches while the object store briefly fails to list archives
+    Then the archive should supply the complete matching logs
+
+  Scenario: Publish logs while archive listings are unavailable
+    Given log archival is configured for a disposable object store
+    When the service accepts logs after a listing failure opens the search circuit breaker
+    Then the log query should report unavailable history
+    And the object store should contain one Parquet batch with the accepted logs
+    And the published batch should be recorded and its staging file reclaimed
+
   Scenario: Report unavailable history when an evicted archive object is missing
     Given acknowledged logs are ready to archive
     When the client searches the same volume after one matching evicted archive object disappears

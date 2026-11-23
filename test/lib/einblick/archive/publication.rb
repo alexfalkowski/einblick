@@ -46,26 +46,6 @@ module Einblick
         path
       end
 
-      def recover_interrupted_multipart_publication
-        with_floci do
-          stop_during_multipart_upload
-          @uploads_after_stop = @floci.multipart_uploads
-          @objects_after_stop = @floci.keys
-          @staging_after_stop = archive_files
-          @floci.restore
-          run_publication
-          inspect_publication
-        end
-      end
-
-      def stop_during_multipart_upload
-        @floci.hold_upload_parts
-        with_server_profile('publication') do
-          wait_for { @floci.upload_part_waiting? }.to be(true)
-          @uploads_before_stop = @floci.multipart_uploads
-        end
-      end
-
       def interrupt_publication_after_commit
         @floci.lose_acknowledgement
         with_server_profile('publication') do
@@ -95,9 +75,9 @@ module Einblick
         @floci.stop
       end
 
-      def run_publication
+      def run_publication(profile = 'publication')
         @archive_offset = File.size('reports/server.log')
-        with_server_profile('publication') do
+        with_server_profile(profile) do
           yield if block_given?
           wait_for { archive_diagnostics }.to include('remote log archive publication completed')
           query_during_archive_recovery

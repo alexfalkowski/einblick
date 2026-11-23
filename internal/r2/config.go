@@ -2,6 +2,7 @@ package r2
 
 import (
 	"github.com/alexfalkowski/go-service/v3/bytes"
+	"github.com/alexfalkowski/go-service/v3/config/client"
 	"github.com/alexfalkowski/go-service/v3/errors"
 	"github.com/alexfalkowski/go-service/v3/net/url"
 	"github.com/alexfalkowski/go-service/v3/os"
@@ -10,8 +11,8 @@ import (
 
 // Config describes the R2 bucket and its S3 connection settings.
 type Config struct {
-	// Endpoint is the S3 API base URL. Local emulators may use loopback HTTP.
-	Endpoint *url.SecureURL `yaml:"endpoint" json:"endpoint" toml:"endpoint" validate:"required"`
+	// Client configures the required S3 API endpoint and HTTP transport.
+	Client *client.Config `yaml:"client" json:"client" toml:"client" validate:"required"`
 
 	// Bucket already exists and accepts reads and writes.
 	Bucket string `yaml:"bucket" json:"bucket" toml:"bucket" validate:"required"`
@@ -24,25 +25,55 @@ type Config struct {
 
 	// SecretAccessKey is a go-service source string read at startup.
 	SecretAccessKey string `yaml:"secret_access_key" json:"secret_access_key" toml:"secret_access_key" validate:"required"`
-
-	// RequestTimeout bounds each S3 request including multipart abort.
-	RequestTimeout time.Duration `yaml:"request_timeout" json:"request_timeout" toml:"request_timeout" validate:"gt=0"`
 }
 
-// GetAccessKeyID resolves the configured access key ID using fs.
-func (c *Config) GetAccessKeyID(fs *os.FS) (string, error) {
-	key, err := fs.ReadSource(c.AccessKeyID)
+// BucketSettings contains the resolved S3 settings shared by the archive store and DuckDB.
+type BucketSettings struct {
+	// Endpoint is the validated S3 API base URL.
+	Endpoint *url.SecureURL
+
+	// Bucket is the name of the existing archive bucket.
+	Bucket string
+
+	// Region is the S3 signing region.
+	Region string
+
+	// AccessKeyID is the resolved S3 access key ID.
+	AccessKeyID string
+
+	// SecretAccessKey is the resolved S3 secret access key.
+	SecretAccessKey string
+
+	// Timeout is the effective per-request timeout of the Go S3 client.
+	Timeout time.Duration
+}
+
+// Resolve loads the credential sources and combines them with the resolved HTTP settings.
+func (c *Config) Resolve(fs *os.FS, endpoint *url.SecureURL, timeout time.Duration) (*BucketSettings, error) {
+	accessKeyID, err := readCredential(fs, c.AccessKeyID)
+	if err != nil {
+		return nil, errors.Prefix("R2 access key ID", err)
+	}
+
+	secretAccessKey, err := readCredential(fs, c.SecretAccessKey)
+	if err != nil {
+		return nil, errors.Prefix("R2 secret access key", err)
+	}
+
+	return &BucketSettings{
+		Endpoint:        endpoint,
+		Bucket:          c.Bucket,
+		Region:          c.Region,
+		AccessKeyID:     accessKeyID,
+		SecretAccessKey: secretAccessKey,
+		Timeout:         timeout,
+	}, nil
+}
+
+func readCredential(fs *os.FS, source string) (string, error) {
+	key, err := fs.ReadSource(source)
 	if err == nil && len(key) == 0 {
 		err = errors.New("credential source is empty")
 	}
-	return bytes.String(key), errors.Prefix("R2 access key ID", err)
-}
-
-// GetSecretAccessKey resolves the configured secret access key using fs.
-func (c *Config) GetSecretAccessKey(fs *os.FS) (string, error) {
-	key, err := fs.ReadSource(c.SecretAccessKey)
-	if err == nil && len(key) == 0 {
-		err = errors.New("credential source is empty")
-	}
-	return bytes.String(key), errors.Prefix("R2 secret access key", err)
+	return bytes.String(key), err
 }
