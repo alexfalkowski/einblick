@@ -4,7 +4,7 @@ go 1.27.2
 
 require (
 	github.com/alexfalkowski/go-health/v2 v2.44.0
-	github.com/alexfalkowski/go-service/v3 v3.9.0
+	github.com/alexfalkowski/go-service/v3 v3.13.0
 	github.com/alexfalkowski/go-signal/v2 v2.1.0
 	github.com/alexfalkowski/go-sync v1.40.0
 	github.com/duckdb/duckdb-go/v2 v2.20000.0
@@ -70,7 +70,7 @@ require (
 	github.com/jackc/puddle/v2 v2.2.3 // indirect
 	github.com/jellydator/ttlcache/v3 v3.4.1 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.20.4 // indirect
+	github.com/klauspost/compress v1.20.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/leodido/go-urn v1.5.0 // indirect
 	github.com/lmittmann/tint v1.2.1 // indirect
@@ -104,7 +104,7 @@ require (
 	github.com/shirou/gopsutil/v4 v4.26.10 // indirect
 	github.com/sony/gobreaker v1.0.0 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
-	github.com/standard-webhooks/standard-webhooks/libraries v0.0.1 // indirect
+	github.com/standard-webhooks/standard-webhooks/libraries v1.3.0 // indirect
 	github.com/tklauser/go-sysconf v0.4.0 // indirect
 	github.com/tklauser/numcpus v0.12.0 // indirect
 	github.com/urfave/negroni/v3 v3.1.2 // indirect
@@ -148,7 +148,7 @@ require (
 	golang.org/x/crypto v0.59.0 // indirect
 	golang.org/x/exp v0.0.0-20261109185158-a52e3aef5920 // indirect
 	golang.org/x/mod v0.42.0 // indirect
-	golang.org/x/net v0.62.0 // indirect
+	golang.org/x/net v0.63.0 // indirect
 	golang.org/x/sync v0.25.0 // indirect
 	golang.org/x/sys v0.50.0 // indirect
 	golang.org/x/telemetry v0.0.0-20261009151841-97e8ea77aa2a // indirect
