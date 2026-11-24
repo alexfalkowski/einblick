@@ -35,9 +35,9 @@ module Einblick
       end
 
       def fail_archive_write
-        with_server_profile('archive') do
-          with_unwritable_directory(ARCHIVE_DIRECTORY) do
-            acknowledge_archive_logs(@archive_request)
+        commit_archive_fixture(@archive_request)
+        with_unwritable_directory(prepare_archive_day_directory) do
+          with_server_profile('archive') do
             wait_for { archive_diagnostics }.to include('local log archive export failed')
             Process.kill('KILL', Nonnative.pool.process_by_name('server').memory.pid)
           end
@@ -49,7 +49,7 @@ module Einblick
       def with_unwritable_directory(path)
         permissions = File.stat(path).mode & 0o777
         File.chmod(0o500, path)
-        yield
+        yield permissions
       ensure
         File.chmod(permissions, path) if permissions
       end
@@ -61,20 +61,19 @@ module Einblick
       end
 
       def recover_log_archive
-        @archive_offset = File.size('reports/server.log')
-        with_server_profile('archive') { wait_for_archive(1, 0) }
+        stage_ready_archive(1, 0)
         inspect_archive
       end
 
       def recover_before_staging_new_logs
-        acknowledge_archive_logs(@archive_request)
-        @archive_offset = File.size('reports/server.log')
-        with_server_profile('archive') { wait_for_archive(2, 0) }
+        commit_archive_fixture(@archive_request)
+        stage_ready_archive(2, 0)
         @completed_archive_ids = archive_diagnostics.scan(/local log archive export completed.*batch_id=([\w-]+)/).flatten
         inspect_archive
       end
 
       def export_during_archive_recovery
+        @archive_offset = File.size('reports/server.log')
         with_unreadable_archive_file do |path, permissions|
           with_server_profile('archive') do
             acknowledge_archive_logs(@archive_request)

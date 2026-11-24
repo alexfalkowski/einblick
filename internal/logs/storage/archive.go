@@ -1,40 +1,65 @@
 package storage
 
 import (
-	"crypto/sha256"
-	"encoding/binary"
-	"encoding/hex"
-
 	"github.com/alexfalkowski/einblick/internal/logs/archive"
 	"github.com/alexfalkowski/go-service/v3/context"
 	"github.com/alexfalkowski/go-service/v3/database/sql"
 	"github.com/alexfalkowski/go-service/v3/errors"
 	"github.com/alexfalkowski/go-service/v3/strings"
+	"github.com/alexfalkowski/go-service/v3/time"
 )
 
-// Five 64-bit fields give each projected candidate at least 40 source bytes.
-const minimumRowBytes = 5 * 8
-
-// NewArchive provides durable batch state and Parquet writes over one DuckDB connection.
+// NewArchive provides durable batch state and Parquet exports backed by DuckDB.
 func NewArchive(db *sql.DB) *Archive {
 	return &Archive{db: db}
 }
 
-// Archive owns durable log batch state and native Parquet operations.
+// Archive owns durable log batch state and Parquet content verification.
 type Archive struct {
 	db *sql.DB
 }
 
-// Next returns the oldest pending batch or claims a new batch up to the target
-// size. A single larger accepted row may form its own batch. The zero batch
-// indicates an empty queue. The archive worker calls Next serially.
-func (r *Archive) Next(ctx context.Context, batchBytes int64) (archive.Batch, error) {
-	var b archive.Batch
-	err := r.db.QueryRowContext(ctx, nextBatchQuery).Scan(&b.ID, &b.Day, &b.ContentDigest)
-	if errors.Is(err, sql.ErrNoRows) {
-		return r.create(ctx, batchBytes)
+// Next selects the earliest work and advances the attempted batch to the end
+// of the staging queue. The worker calls Next serially.
+func (r *Archive) Next(ctx context.Context, eventBefore, receiptBefore time.Time) (archive.Batch, error) {
+	var pending archive.Batch
+	var order sql.Null[int64]
+	err := r.db.QueryRowContext(ctx, nextBatchQuery).Scan(&pending.ID, &pending.Day, &pending.ContentDigest, &order)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return archive.Batch{}, err
 	}
-	return b, err
+
+	// Staging positions share the log ID sequence, so already waiting log rows
+	// can take precedence over a retry without starving it behind new arrivals.
+	claimed, err := r.create(ctx, eventBefore, receiptBefore, order)
+	if err != nil {
+		return claimed, err
+	}
+	if !strings.IsEmpty(claimed.ID) {
+		return r.seal(ctx, claimed)
+	}
+	if strings.IsEmpty(pending.ID) {
+		return pending, nil
+	}
+
+	if _, err := r.db.ExecContext(ctx, rotateStagingQuery, pending.ID); err != nil {
+		return pending, err
+	}
+	return r.seal(ctx, pending)
+}
+
+func (r *Archive) seal(ctx context.Context, batch archive.Batch) (archive.Batch, error) {
+	if !strings.IsEmpty(batch.ContentDigest) {
+		return batch, nil
+	}
+
+	digest, err := r.sourceDigest(ctx, batch.ID)
+	if err != nil {
+		return batch, err
+	}
+	batch.ContentDigest = digest
+	_, err = r.db.ExecContext(ctx, sealBatchQuery, digest, batch.ID)
+	return batch, err
 }
 
 // VisitCompleted streams completed batches from durable state. A visitor error
@@ -71,15 +96,16 @@ func (r *Archive) Requeue(ctx context.Context, id string) error {
 	return err
 }
 
-func (r *Archive) create(ctx context.Context, batchBytes int64) (archive.Batch, error) {
+func (r *Archive) create(ctx context.Context, eventBefore, receiptBefore time.Time, order sql.Null[int64]) (archive.Batch, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return archive.Batch{}, err
 	}
 	defer tx.Rollback()
 
+	eventLimit, receiptLimit := unixNanoseconds(eventBefore).String(), unixNanoseconds(receiptBefore).String()
 	var b archive.Batch
-	err = tx.QueryRowContext(ctx, nextDayQuery).Scan(&b.ID, &b.Day)
+	err = tx.QueryRowContext(ctx, nextDayQuery, eventLimit, receiptLimit, order).Scan(&b.ID, &b.Day)
 	if errors.Is(err, sql.ErrNoRows) {
 		return archive.Batch{}, nil
 	}
@@ -87,23 +113,11 @@ func (r *Archive) create(ctx context.Context, batchBytes int64) (archive.Batch, 
 		return archive.Batch{}, err
 	}
 
-	// Include one candidate even when the configured target is smaller.
-	limit := max(batchBytes/minimumRowBytes, 1)
-	if _, err := tx.ExecContext(ctx, assignMembersQuery, minimumRowBytes, b.Day, limit, b.ID, batchBytes); err != nil {
+	if _, err := tx.ExecContext(ctx, assignMembersQuery, b.ID, b.Day, receiptLimit); err != nil {
 		return archive.Batch{}, err
 	}
 
-	rows, err := tx.QueryContext(ctx, sourceRowsQuery, b.ID)
-	if err != nil {
-		return archive.Batch{}, err
-	}
-
-	b.ContentDigest, err = archiveContentDigest(rows)
-	if err != nil {
-		return archive.Batch{}, err
-	}
-
-	if _, err := tx.ExecContext(ctx, insertBatchQuery, b.ID, b.Day, b.ContentDigest); err != nil {
+	if _, err := tx.ExecContext(ctx, insertBatchQuery, b.ID, b.Day); err != nil {
 		return archive.Batch{}, err
 	}
 
@@ -112,30 +126,4 @@ func (r *Archive) create(ctx context.Context, batchBytes int64) (archive.Batch, 
 	}
 
 	return b, nil
-}
-
-// archiveContentDigest identifies v1 logical rows independently of Parquet encoding.
-// It consumes and closes rows from the v1 projection in log-ID order. Length
-// prefixes keep delimiters in stored protobuf JSON from changing field boundaries.
-func archiveContentDigest(rows *sql.Rows) (string, error) {
-	defer rows.Close()
-
-	hash := sha256.New()
-	_, _ = hash.Write([]byte("einblick/logs/v1\x00"))
-
-	var length [8]byte
-	for rows.Next() {
-		var id, timestamp, observed, received, event, resource, scope, record string
-		if err := rows.Scan(&id, &timestamp, &observed, &received, &event, &resource, &scope, &record); err != nil {
-			return strings.Empty, err
-		}
-
-		for _, value := range [...]string{id, timestamp, observed, received, event, resource, scope, record} {
-			binary.BigEndian.PutUint64(length[:], uint64(len(value)))
-			_, _ = hash.Write(length[:])
-			_, _ = hash.Write([]byte(value))
-		}
-	}
-
-	return hex.EncodeToString(hash.Sum(nil)), rows.Err()
 }

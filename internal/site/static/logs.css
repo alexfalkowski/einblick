@@ -28,7 +28,6 @@ body { margin: 0; }
 a:not(.btn) { color: var(--color-primary); text-underline-offset: .2em; }
 :focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }
 h1 { margin: 0; font-size: clamp(1.65rem, 3vw, 2.2rem); font-weight: 800; letter-spacing: -.035em; }
-header p { color: var(--muted); margin: .25rem 0 1.25rem; font-size: var(--text-body); }
 code, time, pre, .log-row .message, .log-body, #trace-id { font-family: ui-monospace, Menlo, Consolas, monospace; }
 .log-row .message, .log-body { font-size: .9375rem; font-weight: 550; line-height: 1.5; }
 
@@ -122,7 +121,6 @@ label, #time-range-label { font-size: var(--text-small); font-weight: 700; }
 #query-progress { min-height: 1.75rem; margin: .5rem 0; color: var(--color-primary); font-size: .85rem; text-align: end; }
 .htmx-indicator { display: none; }
 .htmx-request .htmx-indicator { display: inline; }
-.result-coverage { margin: 0 0 .55rem; color: var(--muted); font-size: var(--text-small); font-weight: 650; }
 .table-card { border: var(--border) solid var(--color-base-300); border-radius: var(--radius-box); overflow: auto; background: var(--color-base-100); container-type: inline-size; }
 .table { width: 100%; min-width: 35rem; table-layout: fixed; }
 .table :is(th, td) { text-align: left; vertical-align: top; overflow-wrap: anywhere; }

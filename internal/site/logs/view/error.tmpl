@@ -30,9 +30,6 @@
     {{if or .Full (eq $label "logs.invalid_link")}}
     <a class="btn btn-outline btn-sm" href="/logs">{{.Localizer.Text "logs.open"}}</a>
     {{end}}
-    {{if and .Full (or (eq .Model.Code 503) (eq .Model.Code 504))}}
-    <a class="btn btn-outline btn-sm" href="/logs?search_scope=local">{{.Localizer.Text "logs.search_local"}}</a>
-    {{end}}
   </div>
 </section>
 {{end}}

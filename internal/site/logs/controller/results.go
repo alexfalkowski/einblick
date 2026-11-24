@@ -31,8 +31,7 @@ func newLogsModel(
 ) (*model.Logs, error) {
 	windows, selectedWindow := windowOptions(maxRange, time.Duration(query.EndTime.Sub(query.StartTime)))
 	viewModel := &model.Logs{
-		QueryURL:    logsURL(query, strings.Empty),
-		ResultScope: string(results.SearchScope),
+		QueryURL: logsURL(query, strings.Empty),
 		Filters: model.Filters{
 			StartTime:       query.StartTime.UTC(),
 			EndTime:         query.EndTime.UTC(),
@@ -45,11 +44,9 @@ func newLogsModel(
 			SelectedWindow:  selectedWindow,
 			RecentWindow:    recent,
 			PageSize:        query.PageSize,
-			SearchScope:     string(query.SearchScope),
 		},
 		Rows: make([]model.LogRow, 0, len(results.Logs)),
 	}
-
 	for _, stored := range results.Logs {
 		if err := ctx.Err(); err != nil {
 			return nil, err

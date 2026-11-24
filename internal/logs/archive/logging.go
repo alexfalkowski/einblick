@@ -4,6 +4,7 @@ import (
 	"github.com/alexfalkowski/go-service/v3/context"
 	"github.com/alexfalkowski/go-service/v3/strings"
 	"github.com/alexfalkowski/go-service/v3/telemetry/logger"
+	"github.com/alexfalkowski/go-service/v3/time"
 )
 
 type loggingService struct {
@@ -19,8 +20,8 @@ func (s *loggingService) Recover(ctx context.Context) error {
 	return err
 }
 
-func (s *loggingService) Export(ctx context.Context) (string, error) {
-	id, err := s.Service.Export(ctx)
+func (s *loggingService) Export(ctx context.Context, today time.Time) (string, error) {
+	id, err := s.Service.Export(ctx, today)
 	s.logBatchOutcome(ctx, "local log archive export", id, err)
 	return id, err
 }
@@ -37,8 +38,8 @@ func (s *loggingService) ReconcilePublication(ctx context.Context) (string, erro
 	return id, err
 }
 
-func (s *loggingService) Evict(ctx context.Context) (string, error) {
-	id, err := s.Service.Evict(ctx)
+func (s *loggingService) Evict(ctx context.Context, today time.Time) (string, error) {
+	id, err := s.Service.Evict(ctx, today)
 	s.logBatchOutcome(ctx, "local log archive eviction", id, err)
 	return id, err
 }

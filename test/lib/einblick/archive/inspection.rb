@@ -65,6 +65,19 @@ module Einblick
         FileUtils.rm_f(path)
       end
 
+      def inspect_large_daily_archive(content)
+        path = File.join(WORKSPACE, 'large-day.parquet')
+        File.binwrite(path, content)
+        with_log_database do |connection|
+          @large_daily_archive_timestamps = connection.query(<<~SQL, path).to_a.flatten
+            SELECT timestamp_ns FROM read_parquet(?, hive_partitioning = false) ORDER BY log_id
+          SQL
+          @largest_daily_archive_group = connection.query('SELECT max(row_group_num_rows) FROM parquet_metadata(?)', path).to_a.dig(0, 0)
+        end
+      ensure
+        FileUtils.rm_f(path)
+      end
+
       def inspect_published_state(connection)
         @published_state = publication_batches(connection)
         @archive_members = connection.query('SELECT log_id, batch_id::VARCHAR FROM log_archive_members ORDER BY log_id').to_a
@@ -88,8 +101,8 @@ module Einblick
         Time.at(receipt_log.fetch(5) / 1_000_000_000).utc.strftime('%F')
       end
 
-      def archive_event_day
-        timestamp = log_query_records(@archive_request).first.time_unix_nano
+      def archive_event_day(request = @archive_request)
+        timestamp = log_query_records(request).first.time_unix_nano
         Time.at(timestamp / 1_000_000_000).utc.strftime('%F')
       end
     end

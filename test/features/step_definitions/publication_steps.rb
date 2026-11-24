@@ -4,7 +4,7 @@ Given('log archival is configured for a disposable object store') do
   prepare_archive_publication
 end
 
-Given('a log batch staged on the previous database schema') do
+Given('a log batch was staged before object storage was configured') do
   stage_before_publication
 end
 
@@ -20,8 +20,8 @@ Given('acknowledged log batches are staged for two archive days') do
   stage_two_archive_batches
 end
 
-Given('acknowledged log batches are staged for two archive days on the previous schema') do
-  stage_legacy_archive_batches
+Given('acknowledged logs are waiting to be staged for two archive days') do
+  prepare_two_pending_archive_days
 end
 
 When('the service accepts and publishes a log export') do
@@ -32,7 +32,7 @@ When('the service restarts after the object store commits an unacknowledged uplo
   recover_ambiguous_publication
 end
 
-When('the upgraded service publishes the staged batch') do
+When('the service publishes the staged batch') do
   publish_staged_log_archive
 end
 
@@ -84,11 +84,33 @@ When('the service publishes while the earlier staging directory is unwritable') 
   publish_past_blocked_cleanup
 end
 
-When('a staged file is corrupted and its directory is unwritable as logs arrive for another day') do
+When('a staged file is corrupted and its directory is unwritable while another day is ready to archive') do
   publish_past_blocked_repair
 end
 
-Then('only the newly accepted logs should be published and the blocked staging file should remain') do
+When('the earlier staging directory is unwritable and later becomes writable') do
+  publish_past_blocked_staging
+end
+
+When('the source read for the earlier day fails and the service restarts after repair') do
+  recover_from_archive_digest_failure
+end
+
+Then('the earlier archive should contain the original batch members under the original key') do
+  expect(@pending_archive_digest).to be_nil
+  expect(@pending_digest_members.size).to eq(log_query_records(@archive_request).size)
+  expect(@recovered_digest_members).to eq(@pending_digest_members)
+end
+
+Then('the later day should be published while staging is blocked for the earlier day') do
+  expect(@published_while_staging_blocked.map { |key| File.dirname(key) }).to eq(["v1/signal=logs/day=#{@later_archive_day}"])
+end
+
+Then('the earlier day should publish under its original batch key after access returns') do
+  expect(@published_after_staging_recovered).to match_array(@published_while_staging_blocked + [@blocked_staging_key])
+end
+
+Then("only the healthy day's logs should be published and the blocked staging file should remain") do
   expect(@published_keys.size).to eq(1)
   expect(@published_rows).to have_stored_log_export(@later_archive_request)
   expect(@retained_staging_files).to eq([@first_archive_path])
@@ -110,12 +132,6 @@ end
 Then('both batches should be confirmed and only the later batch should be reclaimed') do
   expect(@interrupted_publication).to retain_only_earlier_staging(@earlier_key, @later_key, @staged_checksums, true)
   expect(@visible_objects).to match_archive_key_checksums(@staged_checksums, @earlier_key, @later_key)
-end
-
-Then('publication should complete the healthy batch before retrying the blocked one') do
-  expect(@publication_retry_diagnostics).to complete_archive_batch_before_retry(
-    'remote log archive publication', @evicted_batch_id, @retained_batch_id
-  )
 end
 
 Then('the corrupt staged file should have remained pending for cleanup after confirmation') do

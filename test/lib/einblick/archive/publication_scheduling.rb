@@ -6,14 +6,31 @@ module Einblick
     module World
       def stage_two_archive_batches
         prepare_archive_publication
-        @archive_offset = File.size('reports/server.log')
-        with_server_profile('archive') do
-          acknowledge_archive_logs(@archive_request)
-          wait_for_archive(1, 0)
-          acknowledge_archive_logs(next_day_archive_request)
-          wait_for_archive(2, 0)
-        end
+        stage_log_archive(@archive_request, 1)
+        stage_log_archive(next_day_archive_request, 2)
         inspect_staged_publications
+      end
+
+      def publish_past_blocked_staging
+        directory = prepare_archive_day_directory
+        with_floci do
+          with_unwritable_directory(directory) do |permissions|
+            run_publication(query_local: false) do
+              capture_progress_during_blocked_staging
+              File.chmod(permissions, directory)
+              wait(timeout: 10).for { @published_after_staging_recovered = @floci.keys }.to include(@blocked_staging_key)
+            end
+          end
+        end
+      end
+
+      def capture_progress_during_blocked_staging
+        wait(timeout: 10).for do
+          @blocked_staging_id = archive_diagnostics[/local log archive export failed.*batch_id=([\w-]+)/, 1]
+        end.not_to be_nil
+        @blocked_staging_key = "v1/signal=logs/day=#{archive_event_day}/#{@blocked_staging_id}.parquet"
+        wait_for_publication
+        @published_while_staging_blocked = @floci.keys
       end
 
       def next_day_archive_request
@@ -55,11 +72,12 @@ module Einblick
         with_eviction_profile do
           wait(timeout: 10).for { archive_diagnostics }.to match(/remote log archive publication failed.*permission denied/i)
           wait_for_archive_evictions(@later_key)
-          @publication_retry_diagnostics = archive_diagnostics
         end
       end
 
       def publish_past_blocked_repair
+        @later_archive_request = next_day_archive_request
+        commit_archive_fixture(@later_archive_request)
         with_floci do
           @floci.pause_access
           with_unwritable_directory(File.dirname(@first_archive_path)) { publish_during_blocked_repair }
@@ -68,13 +86,15 @@ module Einblick
       end
 
       def publish_during_blocked_repair
-        run_publication do
-          wait_for { archive_diagnostics }.to include('remote log archive publication failed')
-          corrupt_staged_file
-          @floci.restore
-          wait_for { archive_diagnostics }.to match(/remote log archive publication failed.*permission denied/i)
-          @later_archive_request = next_day_archive_request
-          acknowledge_archive_logs(@later_archive_request)
+        later_directory = prepare_archive_day_directory(archive_event_day(@later_archive_request))
+        with_unwritable_directory(later_directory) do |permissions|
+          run_publication do
+            wait_for { archive_diagnostics }.to include('remote log archive publication failed')
+            corrupt_staged_file
+            @floci.restore
+            wait_for { archive_diagnostics }.to match(/remote log archive publication failed.*permission denied/i)
+            File.chmod(permissions, later_directory)
+          end
         end
       end
 

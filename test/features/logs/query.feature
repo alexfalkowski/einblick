@@ -68,7 +68,7 @@ Feature: Query recent logs
       | {"end_time":"2026-11-26T11:04:05.123456789Z"}                                                         | 6,5,4,3,2,1 |
       | {"start_time":"2026-11-19T12:04:05.123456790+01:00","end_time":"2026-11-19T12:04:05.123456791+01:00"} | 3,2         |
 
-  Scenario Outline: Empty results are successful and retain the documented search scope
+  Scenario Outline: Return a successful empty page when no logs match
     When the client queries recent logs with <parameters>
     Then the log query should return no matches
 

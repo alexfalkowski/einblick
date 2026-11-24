@@ -92,9 +92,7 @@ func registerBacklogMetrics(meter metrics.Meter, loadBacklog func() *archive.Bac
 			observer.ObserveInt64(pending, backlog.PendingRecords)
 			observer.ObserveInt64(pendingBytes, backlog.PendingRecordBytes)
 			observer.ObserveInt64(age, ageSeconds)
-			if backlog.LastPublishedAt != nil {
-				observer.ObserveInt64(last, backlog.LastPublishedAt.Unix())
-			}
+			observer.ObserveInt64(last, backlog.LastPublishedAt.Unix())
 		}
 		// Preserve the export of unrelated metrics when backlog storage is unavailable.
 		return nil

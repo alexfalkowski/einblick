@@ -1,13 +1,6 @@
 site.title: Registros · Einblick
 site.skip: Ir a los registros
 logs.heading: Registros
-logs.all_sources: Local y archivo
-logs.search_scope: Alcance de búsqueda
-logs.local_only: Solo local
-logs.search_local: Buscar registros locales
-logs.local_coverage: Los resultados solo incluyen registros de este volumen de base de datos.
-logs.archive_coverage: Los resultados incluyen registros de este volumen de base de datos y del archivo.
-logs.scope: Busca registros en el almacenamiento local y en los archivos configurados
 logs.service: Servicio
 logs.all_services: Todos los servicios
 logs.time_range: Intervalo

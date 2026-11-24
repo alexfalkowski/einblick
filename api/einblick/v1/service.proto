@@ -8,18 +8,6 @@ import "opentelemetry/proto/logs/v1/logs.proto";
 option go_package = "github.com/alexfalkowski/einblick/api/einblick/v1";
 option ruby_package = "Einblick::V1";
 
-// LogSearchScope describes the sources of a log search. New sources may be added.
-enum LogSearchScope {
-  // Use the configured sources when the caller omits the scope.
-  LOG_SEARCH_SCOPE_UNSPECIFIED = 0;
-
-  // Search the current database volume and any configured archive.
-  LOG_SEARCH_SCOPE_ALL_SOURCES = 1;
-
-  // Search the current database volume only.
-  LOG_SEARCH_SCOPE_CURRENT_VOLUME = 2;
-}
-
 // ListLogsRequest selects a bounded page of committed logs.
 // Filters are conjunctive and remain fixed across continuation requests.
 message ListLogsRequest {
@@ -29,10 +17,6 @@ message ListLogsRequest {
   // end_time is the required exclusive absolute event-time boundary.
   // The interval must fit the configured maximum range and unsigned OTLP times.
   google.protobuf.Timestamp end_time = 2;
-
-  // search_scope selects the data sources to search. Continue subsequent pages
-  // with the same scope.
-  LogSearchScope search_scope = 3;
 
   // service exactly matches resource service.name; empty selects all services.
   string service = 4;
@@ -82,9 +66,6 @@ message ListLogsResponse {
   // meta contains infrastructure metadata such as request_id and user_agent.
   map<string, string> meta = 1;
 
-  // search_scope identifies the sources searched, including for an empty page.
-  LogSearchScope search_scope = 2;
-
   // logs orders records by event_time descending, then id descending.
   // Archive records with identical time and ID from different volumes have a
   // stable additional tie-breaker carried by the opaque page token.
@@ -99,8 +80,8 @@ message ListLogsResponse {
 
 // Service provides fixed telemetry query operations.
 service Service {
-  // ListLogs reads acknowledged logs within explicit absolute bounds. When an
-  // archive is configured, it includes matching archived logs by default.
+  // ListLogs reads acknowledged logs within explicit absolute bounds. When
+  // configured, the archive is searched for bounds that can include evicted logs.
   // InvalidArgument identifies invalid bounds, filters or tokens. Cancellation
   // and deadlines propagate through queueing and database work. An active
   // remote read may finish after cancellation. Storage failures return

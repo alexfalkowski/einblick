@@ -262,7 +262,7 @@ The exact SQL schema and typed-attribute representation are implementation desig
 - **QRY-007 — Database execution.** Use database operators for query execution. Small telemetry-domain calculations are expected; a second general-purpose query execution pipeline is not.
 - **QRY-008 — Local/archive overlap.** Return each archive batch once when records exist both locally and in R2. A query must not gain gaps or duplicate batches while upload or local eviction occurs.
 - **QRY-009 — Bounded work.** Configure result limits, query timeout, historical-query concurrency, and a supported search-range bound. Propagate cancellation and enforce bounds without relying only on browser behavior.
-- **QRY-010 — Explicit failures.** Distinguish no matches, unavailable history, cancelled queries, and intentionally partial results. If partial results are returned, identify the missing coverage.
+- **QRY-010 — Explicit failures.** Distinguish no matches, unavailable history, cancelled queries, and intentionally partial results. Log searches fail when required archive history is unavailable. If other queries return partial results, identify the missing coverage.
 - **QRY-011 — Controlled query surface.** Serve the fixed browser workflows through server-owned parameterized queries. A public arbitrary-SQL endpoint is outside scope.
 - **QRY-012 — Historical reads.** Select relevant day partitions and read archived Parquet through DuckDB. Startup must not require downloading or importing the full archive.
 - **QRY-013 — Built-in go-service metric queries.** Define and verify the native metric names, resource/scope attributes, units, temporality, and dimensions used by each standard panel against supported go-service payloads. Convert units for display and aggregate compatible histogram buckets before calculating percentiles. Do not infer all-request rates or error percentages from sampled traces.
@@ -279,7 +279,7 @@ The exact SQL schema and typed-attribute representation are implementation desig
 - **STO-007 — UTC event-day partitioning.** Export by signal and UTC event day. Late arrivals append new immutable objects to the appropriate older partition.
 - **STO-008 — Retry identity.** Reuse the same R2 object key on retry. Use an application-controlled content identity/checksum where needed; do not assume a multipart ETag is an ordinary file checksum.
 - **STO-009 — Rebuildable archive discovery.** For the initial append-only archive, discover files through selected R2 prefixes and Parquet metadata. Any local archive catalog must be rebuildable from R2.
-- **STO-010 — Independent windows.** Configure export cadence separately from local retention. Keeping approximately 15 minutes locally must not delay archival for 15 minutes.
+- **STO-010 — Export and local retention.** Log export waits until a UTC event day has been closed for 24 hours before claiming its committed rows as one batch. It groups subsequent arrivals by UTC event day once their receipt day has closed. With R2 configured, the worker reclaims eligible rows after verified publication and retains the current and previous UTC event days. With local-only staging, the source rows stay in DuckDB.
 - **STO-011 — Temporary files.** Bound query/export workspace and clean abandoned temporary exports safely. Never remove a file currently required by a query or pending recovery job.
 - **STO-012 — Standard remote access.** Use DuckDB's supported remote-Parquet access for queries and a lean existing Go S3 client for archive transfer/discovery/deletion where required. Keep those responsibilities explicit. Do not implement a custom S3 signer/client or copy the live DuckDB file periodically and call that a consistent backup.
 - **STO-013 — No AWS Go SDK.** The service's R2 runtime path must not import aws-sdk-go or aws-sdk-go-v2, including through a wrapper. Use of the S3 API and SigV4 is expected and is separate from an SDK dependency. Record the selected version, runtime dependency graph, and linked binary delta; do not count test/tool-only modules as linked code. Keep any reusable storage package opt-in.
@@ -425,7 +425,7 @@ discards telemetry; its receipt responses provide no recovery guarantee.
 ### Important limits
 
 - This is asynchronous archival, not synchronous remote replication of every acknowledged record.
-- Complete volume loss can lose all still-unarchived records. The usual exposure is related to upload lag, but an R2 outage can make the backlog older than the nominal upload interval.
+- Complete volume loss can lose all still-unarchived records. With daily log export, that normally includes 24–48 hours of on-time logs. An R2 outage can leave older days unarchived as well.
 - This contract does not make upstream SDK queues infinite or promise end-to-end losslessness before records reach the service.
 - OTLP permits retry duplicates. Do not describe the system as exactly once.
 - Graceful shutdown should complete or stop accepted work within the deployment's termination budget, preserve committed export jobs, and avoid depending on R2 availability to exit safely.

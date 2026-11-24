@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"strconv"
+
 	"github.com/alexfalkowski/einblick/internal/logs/archive"
 	"github.com/alexfalkowski/go-service/v3/context"
 	"github.com/alexfalkowski/go-service/v3/database/sql"
@@ -21,6 +23,17 @@ type archiveList struct {
 
 func logPageSQL(archived string) string {
 	return strings.Concat("WITH selected_logs AS (", localLogsQuery, archived, ") ", listLogsQuery)
+}
+
+func archivePageEnd(query Query, position cursor) time.Time {
+	if position.BeforeID > 0 {
+		beforeNS, _ := strconv.ParseUint(position.BeforeNS, 10, 64)
+		end := timestamp(beforeNS).Add(time.Nanosecond.Duration())
+		if end.After(query.StartTime) && end.Before(query.EndTime) {
+			return end
+		}
+	}
+	return query.EndTime
 }
 
 func (r *repository) readHistory(ctx context.Context, query Query, position cursor) (*Page, error) {
@@ -134,9 +147,13 @@ func (r *repository) readArchivePage(ctx context.Context, query Query, position 
 	return scanPage(ctx, rows, query.PageSize, &position)
 }
 
+func archiveDays(query Query) (string, string) {
+	return query.StartTime.Format(archive.DayLayout), query.EndTime.Add(-time.Nanosecond.Duration()).Format(archive.DayLayout)
+}
+
 func archiveSources(ctx context.Context, tx *sql.Tx, query Query, listing archiveList, expirationCutoff time.Time) ([]string, error) {
-	rows, err := tx.QueryContext(ctx, archiveSourcesQuery, query.StartTime.Format(archive.DayLayout),
-		query.EndTime.Add(-time.Nanosecond.Duration()).Format(archive.DayLayout))
+	startDay, endDay := archiveDays(query)
+	rows, err := tx.QueryContext(ctx, archiveSourcesQuery, startDay, endDay)
 	if err != nil {
 		return nil, err
 	}

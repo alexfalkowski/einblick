@@ -5,11 +5,10 @@ module Einblick
     # Exercises publication recovery through Floci and the normal server.
     module World
       def recover_from_checksum_mismatch
+        commit_archive_fixture(@archive_request)
         with_floci do
           @floci.corrupt_verification
-          observe_publication_failure(/remote log archive checksum verification failed/) do
-            acknowledge_archive_logs(@archive_request)
-          end
+          observe_publication_failure(/remote log archive checksum verification failed/)
           inspect_interrupted_publication
           @floci.restore
           run_publication
@@ -18,10 +17,10 @@ module Einblick
       end
 
       def recover_live_corrupt_staging
+        commit_archive_fixture(@archive_request)
         with_floci do
           @floci.pause_access
           run_publication do
-            acknowledge_archive_logs(@archive_request)
             wait_for { archive_diagnostics }.to include('remote log archive publication failed')
             @original_publication_key = corrupt_staged_file.delete_prefix("#{WORKSPACE}/")
             @floci.restore

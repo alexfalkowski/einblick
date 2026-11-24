@@ -35,15 +35,16 @@ func (w *worker) stop(ctx context.Context) error {
 func (w *worker) run(ctx context.Context) error {
 	var recovered bool
 	return signal.Timer(ctx, w.interval.Duration(), func(ctx context.Context) error {
+		today := archive.DayStart(time.Now())
 		recovered = recovered || w.service.Recover(ctx) == nil
 		if recovered {
-			_, _ = w.service.Export(ctx)
+			_, _ = w.service.Export(ctx, today)
 			_, _ = w.service.Publish(ctx)
 		} else {
 			_, _ = w.service.ReconcilePublication(ctx)
 		}
 
-		_, _ = w.service.Evict(ctx)
+		_, _ = w.service.Evict(ctx, today)
 		return nil
 	})
 }

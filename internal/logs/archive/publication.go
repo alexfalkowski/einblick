@@ -27,8 +27,9 @@ type ObjectStore interface {
 	// Create streams a file under key, failing if the key already exists.
 	Create(ctx context.Context, key, checksum string, file io.Reader, size int64) error
 
-	// List yields objects in a selected prefix and stops on the first error.
-	List(ctx context.Context, prefix string) iter.Seq2[Object, error]
+	// List yields objects in key order under prefix and after startAfter.
+	// It stops on the first error.
+	List(ctx context.Context, prefix, startAfter string) iter.Seq2[Object, error]
 
 	// URI returns the DuckDB location for a validated object key.
 	URI(key string) string
@@ -40,12 +41,12 @@ type ObjectStore interface {
 	CheckPublication(ctx context.Context, key, checksum string) (time.Time, error)
 }
 
-func (s *service) Evict(ctx context.Context) (string, error) {
-	if s.objects == nil || s.localRetention == 0 {
+func (s *service) Evict(ctx context.Context, today time.Time) (string, error) {
+	if s.objects == nil {
 		return strings.Empty, nil
 	}
 
-	batch, err := s.eviction.NextEviction(ctx, time.Now().Add(-s.localRetention.Duration()))
+	batch, err := s.eviction.NextEviction(ctx, LocalWindowStart(today))
 	if err != nil || strings.IsEmpty(batch.ID) {
 		return strings.Empty, err
 	}

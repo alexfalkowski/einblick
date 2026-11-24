@@ -98,16 +98,37 @@ module Einblick
       end
 
       def archive_object_response(incoming, response, body)
+        record_archive_verification(incoming, response)
         rack_response(response, body).tap do |_, headers, _|
           stored_at = @archive_object_times&.[](archive_key(incoming))
           headers['last-modified'] = stored_at.httpdate if stored_at && response.is_a?(Net::HTTPSuccess)
         end
       end
 
-      def wait_on_archive_read(incoming)
-        return unless @archive_read_gates && (incoming.head? || incoming.get?)
+      def record_archive_verification(incoming, response)
+        return unless response.is_a?(Net::HTTPSuccess) && archive_verification?(incoming) && @mode != :corrupt_verification
 
-        @archive_read_gates[archive_key(incoming)]&.pop
+        (@verified_archives ||= {})[archive_key(incoming)] = true
+      end
+
+      def archive_eviction_failure(incoming)
+        return unless @defer_archive_eviction && archive_verification?(incoming) && @verified_archives&.key?(archive_key(incoming))
+
+        [412, {}, []]
+      end
+
+      # The worker verifies the full object with If-Match. DuckDB requests ranges.
+      def archive_verification?(incoming)
+        incoming.get? && incoming.get_header('HTTP_IF_MATCH') && !incoming.get_header('HTTP_RANGE')
+      end
+
+      def intercept_archive_read(incoming)
+        return unless incoming.head? || incoming.get?
+
+        key = archive_key(incoming)
+        return [403, {}, []] if @unreadable_archives&.include?(key)
+
+        @archive_read_gates&.[](key)&.pop
       end
 
       def archive_key(incoming)

@@ -9,24 +9,20 @@ coverage and saved progress. Agent workflow and engineering guidance live in
 
 Say `Continue docs/review-and-plan.md`. Each continuation handles one step.
 
-**Current step:** E-10 — Improve historical log search performance.
+**Current step:** E-11 — Persist traces locally.
 
 **Status:** ready.
 
-**Next action:** After owner review of E-09, reproduce the 3-day and 7-day
-timeouts against a representative real R2 archive. Use the recorded pilot
-profile to measure listing and DuckDB archive reads separately, then verify
-that both search windows return correct results within the five-second budget.
+**Next action:** After owner review of E-10, record the trace fixtures,
+timestamp selection, supported shapes and duplicate policy for E-11.
 
 ### Resume context
 
-- Production still has 3-day and 7-day search timeouts. On 2026-11-23 a
-  disposable real R2 run with 9,457 synthetic objects, a Frankfurt pod limited
-  to 250 mCPU and 512 MiB, and a five-second budget returned HTTP 504 in all
-  nine attempts. For 15 minutes, 3 days and 7 days, listing took a median
-  0.62/1.87/3.50 s and DuckDB archive work including native Parquet reads
-  ran for 4.78/3.47/1.64 s until cancellation. The equivalent Floci searches
-  returned 200 with medians of 0.58/2.18/3.37 s before the outage.
+- Use the daily log archive as a reference for trace and metric sizing. On
+  real R2, the log worker archived 9,457 synthetic records as seven UTC-day
+  files totaling 33.36 MB. With 250 mCPU and 512 MiB, the cold 7-day first
+  page took 4.01 s and a full-range no-match search took 3.86 s. Account
+  for file count and full-range reads when sizing the next signals.
 - Preserve the [accepted DuckDB cancellation boundary](agents/accepted-design/archive.md#duckdb-remote-read-cancellation)
   when exercising remote reads and resource recovery.
 - [Response byte budgeting and admission through response completion](agents/accepted-design/log-queries.md#response-work-after-repository-admission)
@@ -77,7 +73,6 @@ that both search windows return correct results within the five-second budget.
 
 | Unit | Phase / entry | Remaining deliverable | Evidence to close |
 | --- | --- | --- | --- |
-| E-10 | P6; E-09 reviewed | Improve historical log search for the 3-day and 7-day Logs presets. Preserve filters, pagination, and complete archive coverage. | Successful 3-day and 7-day searches within the existing five-second budget on a representative real R2 archive. Compare end-to-end latency, listing, and DuckDB archive reads against the pilot baseline (AC-013/AC-020). |
 | E-11 | P7; E-10 reviewed and trace fixtures/time/support/duplicate policies recorded | Replace trace printing with bounded local persistence, preserving events/links and commit-backed responses. | Trace ingestion portions of AC-001–AC-003 and local-record AC-008; typed/nanosecond round-trip, restart and bounds. Query portions remain open until E-12. |
 | E-12 | P7; E-11 reviewed | Add fixed trace search/lookup, bounded waterfall/details and log correlation in the existing multilingual MVC application (WEB-017). | Local cross-service/midnight AC-005, trace query portions of AC-001/AC-013/AC-015, trace AC-027 and explicit incomplete/large-trace/context outcomes. |
 | E-13 | P7; E-12 reviewed | Extend the existing Parquet/R2 pipeline, historical queries, eviction and retention to traces. Move R2 store creation and DuckDB R2 setup from `internal/logs/archive.go` into shared startup wiring as traces begin using them. | Archived trace AC-003/AC-005 and trace portions of AC-007–AC-012/AC-019, including interruption, outage, duplicate/conflict and mixed log/trace resource scenarios. |
@@ -133,14 +128,13 @@ Partial local/signal evidence is not full archive/all-signal acceptance.
 | AC-010 | Repeat outage, visibility, capacity and backlog recovery checks for traces and metrics in E-13/E-16. Early log backpressure is deferred under OPS-004. |
 | AC-011 | Verify fresh-volume trace and metric archive discovery and reads in E-13/E-16. |
 | AC-012 | Extend retention, retry and expiration scenarios with trace and metric policies in E-13/E-16. |
-| AC-013 | Historical log search performance within the existing query budget in E-10. Trace and metric query coverage in E-12/E-13/E-15/E-16, browser completion in E-18. |
+| AC-013 | Trace and metric query coverage in E-12/E-13/E-15/E-16, browser completion in E-18. |
 | AC-014 | Reserved; no v1 work. |
 | AC-015 | E-12 adds trace rendering and correlation; E-18 completes navigation acceptance. |
 | AC-016 | Extend outage and recovery coverage in E-13/E-16. E-18 completes visible frontend outcomes. |
 | AC-017 | Check supported archive, schema and runtime upgrade and rollback paths when adding trace and metric persistence and archival. |
 | AC-018 | E-11/E-14 trace and metric recovery, shutdown and database reopen. Deployed runtime validation is owned by the operator. |
 | AC-019 | Complete-batch eviction and cleanup for traces and metrics in E-13/E-16. |
-| AC-020 | Representative real R2 historical log search timings in E-10. |
 | AC-021 | E-12/E-13/E-15/E-16 DuckDB query review and E-13/E-16 immutable export review. Preserve the shared CGO build default with each change. |
 | AC-022 | E-18 full browser-workflow evidence without site credentials or sessions. |
 | AC-023 | E-17 catalog behavior and uncatalogued queries, completed frontend evidence in E-18. |

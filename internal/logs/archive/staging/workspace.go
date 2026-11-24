@@ -156,8 +156,7 @@ func (w *workspace) Stage(ctx context.Context, b archive.Batch) (_ string, err e
 		return strings.Empty, err
 	}
 
-	// DuckDB opens its own pathname. Only the verified workspace has this
-	// attempt's private directory, and COPY cannot create the parent directory.
+	// Only the verified workspace has this attempt's private directory.
 	attempt := w.fs.Join(pendingDir, name)
 	if err := root.Mkdir(attempt, directoryMode); err != nil {
 		return strings.Empty, err

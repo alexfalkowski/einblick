@@ -16,6 +16,8 @@ const DayLayout = "2006-01-02"
 
 const parquetExtension = ".parquet"
 
+const logDayPrefix = "signal=logs/day="
+
 // Batch identifies an immutable set of logs for one UTC event day.
 type Batch struct {
 	// ID stays the same when a batch is retried.
@@ -39,7 +41,7 @@ func (b Batch) Key() string {
 }
 
 func dayPath(day string) string {
-	return strings.Concat("signal=logs/day=", day, "/")
+	return strings.Concat(logDayPrefix, day, "/")
 }
 
 func isBatchFilename(filename string) bool {
@@ -65,9 +67,8 @@ type Backlog struct {
 	// OldestReceivedAt is the earliest pending receipt time, or zero when the backlog is empty.
 	OldestReceivedAt time.Time
 
-	// LastPublishedAt is the latest known UTC confirmation time, the Unix epoch
-	// before any publication, or nil when only legacy confirmation times exist.
-	LastPublishedAt *time.Time
+	// LastPublishedAt is the latest UTC confirmation time, or the Unix epoch before any publication.
+	LastPublishedAt time.Time
 
 	// PendingRecords is the number of accepted records that are still awaiting publication.
 	PendingRecords int64
@@ -78,9 +79,10 @@ type Backlog struct {
 
 // BatchRepository owns batch membership and durable staging state.
 type BatchRepository interface {
-	// Next returns the oldest pending batch or claims new work using the target
-	// source byte size. A zero batch means there is no work to stage.
-	Next(ctx context.Context, batchBytes int64) (Batch, error)
+	// Next selects work in staging order and advances a batch's retry position.
+	// A new batch claims all eligible rows for one UTC event day using exclusive
+	// event and receipt cutoffs. A zero batch means there is no work to stage.
+	Next(ctx context.Context, eventBefore, receiptBefore time.Time) (Batch, error)
 
 	// VisitCompleted streams batches recorded as staged and stops on a visitor
 	// error. The visitor may requeue a batch that needs to be staged again.
@@ -117,8 +119,9 @@ type BatchRepository interface {
 // EvictionRepository selects and removes eligible complete local batches.
 type EvictionRepository interface {
 	// NextEviction advances the retry order for one confirmed and cleaned batch
-	// whose rows predate cutoff. A zero batch indicates no eligible work.
-	NextEviction(ctx context.Context, cutoff time.Time) (Publication, error)
+	// whose UTC event day predates eventBefore.
+	// A zero batch indicates no eligible work.
+	NextEviction(ctx context.Context, eventBefore time.Time) (Publication, error)
 
 	// Evict removes the selected batch's source rows and records the verified object timestamp atomically.
 	Evict(ctx context.Context, id string, storedAt time.Time) error

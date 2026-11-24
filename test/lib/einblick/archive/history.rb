@@ -7,12 +7,12 @@ module Einblick
       def prepare_paged_archive_query
         prepare_archive_storage
         prepare_searchable_logs
+        age_pending_archive_receipts
         prepare_first_log_page
       end
 
       def continue_across_eviction
         with_floci do
-          @query['search_scope'] = 'LOG_SEARCH_SCOPE_ALL_SOURCES'
           publish_searchable_logs { collect_log_pages(@first_log_page) }
           @overlap_query_logs = @query_logs
           with_archive_eviction { collect_log_pages(@first_log_page) }
@@ -46,21 +46,20 @@ module Einblick
         query_from_fresh_archive do
           @floci.pause_access if failure
           query_logs
-          search_fresh_volume_scopes unless failure
+          page_through_archived_logs unless failure
         end
       end
 
-      def search_fresh_volume_scopes
+      def page_through_archived_logs
         site = Einblick::Site::HTTP.new('http://localhost:11000')
         first = site.submit('/logs', @query.merge('page_size' => 1), 'en')
         next_page = Nokogiri::HTML5.fragment(first.body).at_css('a.next')['hx-put']
-        @archive_scope_fragment = site.submit(next_page, {}, 'en')
-        @local_scope_fragment = site.submit('/logs', @query.merge('search_scope' => 'local'), 'en')
+        @archive_next_page = site.submit(next_page, {}, 'en')
       end
 
       def query_duplicate_archive_ids
-        @foreign_receipt_windows = @query_receipt_windows.dup
         with_fresh_archive do
+          @foreign_receipt_windows = @query_receipt_windows.dup
           publish_searchable_logs(query_fixture('log_queries')) do
             @first_log_page = next_log_query_page('', page_size: 1)
             collect_matching_id_pages
@@ -104,9 +103,10 @@ module Einblick
       end
 
       def publish_searchable_logs(request = nil)
+        acknowledge_query_export(request) if request
+        age_pending_archive_receipts
         @archive_offset = File.size('reports/server.log')
-        with_server_profile('publication') do
-          acknowledge_query_export(request) if request
+        with_publication_profile do
           wait_for_publication
           yield if block_given?
         end

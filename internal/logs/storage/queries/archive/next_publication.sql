@@ -1,6 +1,5 @@
 UPDATE log_archive_batches
-SET publication_attempted_at = make_timestamp(epoch_us(current_timestamp)),
-    publication_order = nextval('log_archive_queue_order')
+SET publication_order = nextval('log_archive_queue_order')
 WHERE id = (
     SELECT id
     FROM log_archive_batches AS batch
