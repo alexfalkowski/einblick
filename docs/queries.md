@@ -27,10 +27,13 @@ in the `/logs` URL as RFC 3339 timestamps.
 
 Choose **Search scope → Local only** to search the current database volume during
 an archive outage. Local-only searches have their own query capacity while
-archive-inclusive searches wait on R2. The results label identifies the sources
-searched on each page, including empty pages. If the page fails to load, choose
-**Search local logs** or open `/logs?search_scope=local` directly to search the
-recent local window. Use **Local and archive** to include available history again.
+archive-inclusive searches wait on R2. The results show a local-only notice
+whenever the search covers only the current volume, including on empty pages.
+Archive results show their coverage if you select **Local only** before
+submitting the new search.
+If the page fails to load, choose **Search local logs** or open
+`/logs?search_scope=local` directly to search the recent local window. Use
+**Local and archive** to include available history again.
 
 The table shows UTC time to the second. When the producer omits event time,
 the **Log details** summary labels the observation or receipt time used in its

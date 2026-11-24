@@ -36,7 +36,6 @@ logs.loading: Loading logs…
 logs.request_failed: Couldn’t load logs
 logs.retry: Try again
 logs.results: Log query results
-logs.order: Newest first
 logs.timestamp: Event time (UTC)
 logs.message: Message
 logs.details: Log details
