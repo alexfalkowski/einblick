@@ -72,8 +72,17 @@ if (failure) {
   const filters = document.querySelector("#log-filters");
   const searchButtons = filters.querySelectorAll("[data-search-submit]");
   const searchWindow = filters.querySelector("#search-window");
+  const searchScope = filters.querySelector("#search-scope");
   const messageInput = document.querySelector("#text");
   const clearMessage = document.querySelector("#clear-message");
+  const updateArchiveCoverage = () => {
+    const archiveCoverage = document.querySelector("#archive-coverage");
+    if (archiveCoverage) {
+      archiveCoverage.hidden = searchScope.value !== "local";
+    }
+  };
+  searchScope.addEventListener("change", updateArchiveCoverage);
+  updateArchiveCoverage();
   const updateClearMessage = () => { clearMessage.hidden = !messageInput.value; };
   messageInput.addEventListener("input", updateClearMessage);
   filters.addEventListener("submit", (event) => {
@@ -153,6 +162,7 @@ if (failure) {
 
   document.addEventListener("htmx:after:swap", () => {
     closeLogDetails = setupLogDetails();
+    updateArchiveCoverage();
     const { startTime, endTime, window, recentWindow } = document.querySelector("#results").dataset;
     if (startTime && endTime) {
       document.querySelector("#start-time").value = startTime;

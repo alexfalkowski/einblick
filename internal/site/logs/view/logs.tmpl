@@ -35,6 +35,11 @@
           <button id="clear-message" type="submit" name="clear_message" value="1"
                   aria-label="{{.Localizer.Text "logs.clear_search"}}"{{if not .Model.Filters.MessageText}} hidden{{end}}>×</button>
         </div>
+        <label for="search-scope">{{.Localizer.Text "logs.search_scope"}}</label>
+        <select id="search-scope" class="select select-sm" name="search_scope">
+          <option value="local-and-archive">{{.Localizer.Text "logs.all_sources"}}</option>
+          <option value="local"{{if eq .Model.Filters.SearchScope "local"}} selected{{end}}>{{.Localizer.Text "logs.local_only"}}</option>
+        </select>
         <label for="severity">{{.Localizer.Text "logs.severity"}}</label>
         <select id="severity" class="select select-sm" name="severity">
           <option value="">{{.Localizer.Text "logs.all_severities"}}</option>
@@ -44,11 +49,6 @@
         </select>
         <label for="trace-id">{{.Localizer.Text "logs.trace_id"}}</label>
         <input id="trace-id" class="input input-sm" name="trace_id" value="{{.Model.Filters.TraceID}}" spellcheck="false">
-        <label for="search-scope">{{.Localizer.Text "logs.search_scope"}}</label>
-        <select id="search-scope" class="select select-sm" name="search_scope">
-          <option value="local-and-archive">{{.Localizer.Text "logs.all_sources"}}</option>
-          <option value="local"{{if eq .Model.Filters.SearchScope "local"}} selected{{end}}>{{.Localizer.Text "logs.local_only"}}</option>
-        </select>
         {{if .Model.Filters.PageSize}}<input type="hidden" name="page_size" value="{{.Model.Filters.PageSize}}">{{end}}
         <div class="actions">
           <a class="btn btn-outline btn-sm" href="/logs">{{.Localizer.Text "logs.reset"}}</a>
@@ -86,10 +86,9 @@
   {{if eq .Model.ResultScope "local"}}
   <p class="result-coverage">{{.Localizer.Text "logs.local_coverage"}}</p>
   {{else if eq .Model.ResultScope "local-and-archive"}}
-  <p class="result-coverage">{{.Localizer.Text "logs.archive_coverage"}}</p>
+  <p id="archive-coverage" class="result-coverage" hidden>{{.Localizer.Text "logs.archive_coverage"}}</p>
   {{end}}
   {{if .Model.Rows}}
-  <p class="result-header">{{.Localizer.Text "logs.order"}}</p>
   <div class="table-card" tabindex="0" role="region" aria-label="{{.Localizer.Text "logs.results"}}">
     <table class="table table-sm">
       <thead>

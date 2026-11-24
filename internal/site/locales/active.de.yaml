@@ -36,7 +36,6 @@ logs.loading: Protokolle werden geladen …
 logs.request_failed: Protokolle konnten nicht geladen werden
 logs.retry: Erneut versuchen
 logs.results: Ergebnisse der Protokollabfrage
-logs.order: Neueste zuerst
 logs.timestamp: Ereigniszeit (UTC)
 logs.message: Meldung
 logs.details: Protokolldetails

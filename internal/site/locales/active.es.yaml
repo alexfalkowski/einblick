@@ -36,7 +36,6 @@ logs.loading: Cargando registros…
 logs.request_failed: No se pudieron cargar los registros
 logs.retry: Volver a intentar
 logs.results: Resultados de la consulta de registros
-logs.order: Más recientes primero
 logs.timestamp: Hora del evento (UTC)
 logs.message: Mensaje
 logs.details: Detalles del registro

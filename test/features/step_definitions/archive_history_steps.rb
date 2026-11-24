@@ -151,9 +151,9 @@ Then('the fresh instance should leave the original archive objects unchanged') d
   expect(@discovered_archive_objects).to eq(@original_archive_objects)
 end
 
-Then('the Logs results should label the effective coverage for archive and local searches') do
+Then('the Logs results should show a coverage notice only for the local search') do
   expect(@archive_scope_fragment.code).to eq(200)
-  expect(@archive_scope_fragment).to label_log_coverage('Results cover logs on this database volume and in the archive.')
+  expect(@archive_scope_fragment).to label_log_coverage('Results cover logs on this database volume and in the archive.', hidden: true)
   expect(@local_scope_fragment.code).to eq(200)
   expect(@local_scope_fragment).to label_log_coverage('Results cover only logs on this database volume.', empty: true)
 end

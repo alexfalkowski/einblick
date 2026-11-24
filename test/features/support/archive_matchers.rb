@@ -53,10 +53,12 @@ RSpec::Matchers.define :have_cached_backlog_during_first_read do |diagnostics, p
   end
 end
 
-RSpec::Matchers.define :label_log_coverage do |label, empty: false|
+RSpec::Matchers.define :label_log_coverage do |label, empty: false, hidden: false|
   match(notify_expectation_failures: true) do |response|
     fragment = Nokogiri::HTML5.fragment(response.body)
-    expect(fragment.at_css('#results .result-coverage')&.text).to eq(label)
+    coverage = fragment.at_css('#results .result-coverage')
+    expect(coverage&.text).to eq(label)
+    expect(coverage.key?('hidden')).to eq(hidden)
     if empty
       expect(fragment.at_css('#results .empty-state')).not_to be_nil
     else

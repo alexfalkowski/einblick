@@ -52,7 +52,7 @@ Feature: Read acknowledged logs across local storage and the archive
     Given acknowledged logs are ready to archive
     When the archive is published and the client searches from a fresh database volume
     Then the archive should supply the complete matching logs
-    And the Logs results should label the effective coverage for archive and local searches
+    And the Logs results should show a coverage notice only for the local search
     And the fresh instance should leave the original archive objects unchanged
 
   Scenario: Page through matching IDs from different volumes across eviction

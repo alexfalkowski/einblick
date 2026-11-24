@@ -8,7 +8,7 @@ module LogView
       title: 'Logs · Einblick', heading: 'Logs', service: 'Service', submit: 'Search', reset: 'Reset', loading: 'Loading logs…',
       results: 'Log query results', message: 'Message', empty: 'No logs found',
       empty_hint: 'Try a wider time range or clear a filter.', structured: 'Structured message', no_message: 'No message',
-      timing: 'Timing and IDs', order: 'Newest first', search: 'Search messages', time_range: 'Time range', retry: 'Try again',
+      timing: 'Timing and IDs', search: 'Search messages', time_range: 'Time range', retry: 'Try again',
       'broken link': 'This search link couldn’t be opened.', open_logs: 'Open Logs',
       related_logs: 'Find related logs', details: 'Log details', close_details: 'Close details',
       'dates out of order': 'End time must be after start time.', 'wide date range': 'This time range exceeds the search limit.',
@@ -19,7 +19,7 @@ module LogView
       loading: 'Protokolle werden geladen …', results: 'Ergebnisse der Protokollabfrage', message: 'Meldung',
       empty: 'Keine Protokolle gefunden', empty_hint: 'Wähle einen größeren Zeitraum oder entferne einen Filter.',
       unavailable: 'Der Protokollspeicher ist nicht verfügbar', structured: 'Strukturierte Meldung',
-      no_message: 'Keine Meldung', timing: 'Zeitangaben und IDs', order: 'Neueste zuerst',
+      no_message: 'Keine Meldung', timing: 'Zeitangaben und IDs',
       search: 'Meldungen durchsuchen', time_range: 'Zeitraum', retry: 'Erneut versuchen',
       'dates out of order': 'Das Ende muss nach dem Beginn liegen.', related_logs: 'Zugehörige Protokolle finden',
       details: 'Protokolldetails', close_details: 'Details schließen'
@@ -29,7 +29,7 @@ module LogView
       loading: 'Cargando registros…', results: 'Resultados de la consulta de registros', message: 'Mensaje',
       empty: 'No se encontraron registros', empty_hint: 'Amplía el intervalo o quita un filtro.',
       timeout: 'La consulta de registros agotó el tiempo de espera', structured: 'Mensaje estructurado',
-      no_message: 'Sin mensaje', timing: 'Tiempos e identificadores', order: 'Más recientes primero',
+      no_message: 'Sin mensaje', timing: 'Tiempos e identificadores',
       search: 'Buscar mensajes', time_range: 'Intervalo', retry: 'Volver a intentar',
       'broken link': 'No se pudo abrir este enlace de búsqueda.', open_logs: 'Abrir registros',
       related_logs: 'Buscar registros relacionados', details: 'Detalles del registro', close_details: 'Cerrar detalles'
@@ -91,7 +91,7 @@ end
 RSpec::Matchers.define :show_log_results do |labels|
   match(notify_expectation_failures: true) do |results|
     expect(results.css('thead th').map(&:text)).to include(labels.fetch(:message)).and have_attributes(length: 4)
-    expect(results.at_css('.result-header').text).to eq(labels.fetch(:order))
+    expect(results.at_css('thead th')['aria-sort']).to eq('descending')
     panel = results.at_css('dialog.log-details-panel')
     expect(panel.at_css("##{panel['aria-labelledby']}").text).to eq(labels.fetch(:details))
     expect(panel.at_css('button[type=button]')['aria-label']).to eq(labels.fetch(:close_details))

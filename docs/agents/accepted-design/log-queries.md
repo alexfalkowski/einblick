@@ -15,6 +15,11 @@ Log searches use an explicit scope. The response reports which sources the
 search covered, including for empty results.
 [ListLogs protobuf contract](../../../api/einblick/v1/service.proto)
 
+The Logs page shows a coverage notice when the search covers only the current
+database volume. The **Local and archive** option identifies the full scope.
+Archive results also show their coverage when the form has an unsubmitted
+**Local only** selection.
+
 ## Search admission by scope
 
 Apply `queries.concurrency` independently to current-volume and archive-inclusive
