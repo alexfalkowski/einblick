@@ -20,6 +20,10 @@ Given('acknowledged log batches are staged for two archive days') do
   stage_two_archive_batches
 end
 
+Given('acknowledged log batches are staged for two archive days on the previous schema') do
+  stage_legacy_archive_batches
+end
+
 When('the service accepts and publishes a log export') do
   publish_log_archive
 end
@@ -106,6 +110,12 @@ end
 Then('both batches should be confirmed and only the later batch should be reclaimed') do
   expect(@interrupted_publication).to retain_only_earlier_staging(@earlier_key, @later_key, @staged_checksums, true)
   expect(@visible_objects).to match_archive_key_checksums(@staged_checksums, @earlier_key, @later_key)
+end
+
+Then('publication should complete the healthy batch before retrying the blocked one') do
+  expect(@publication_retry_diagnostics).to complete_archive_batch_before_retry(
+    'remote log archive publication', @evicted_batch_id, @retained_batch_id
+  )
 end
 
 Then('the corrupt staged file should have remained pending for cleanup after confirmation') do

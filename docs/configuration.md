@@ -82,6 +82,7 @@ archive:
       timeout: 5s
     bucket: einblick
     region: auto
+    retention: 168h
     access_key_id: file:/etc/secrets/einblick/r2-access-key-id
     secret_access_key: file:/etc/secrets/einblick/r2-secret-access-key
 ```
@@ -97,6 +98,12 @@ reads. Restart to apply credential changes.
 Use a dedicated bucket for the installation and restrict object writes to trusted
 publishers. Historical queries discover Parquet objects directly from the bucket,
 including on a fresh database volume. Give other consumers read-only access.
+
+Set `archive.r2.retention` to match the active Infraops bucket expiration rule.
+Einblick uses it to interpret missing archive objects. R2 applies the lifecycle
+rule and deletes eligible objects asynchronously. Omit `retention` or set it
+to `0s` to require all expected objects regardless of age.
+[Lifecycle changes](operations.md#-changing-archive-retention)
 
 With R2 enabled, Einblick installs and loads DuckDB's signed `httpfs` extension
 at startup. DuckDB downloads the matching binary from its extension repository
@@ -167,7 +174,9 @@ queries:
 `max_results` bounds each page and supplies its size when omitted or zero.
 It must be positive and leave room for the extra row used to detect another
 page. `max_range` is the largest selected event-time interval. `timeout`
-covers queue waits and database work; `concurrency` bounds active queries.
+covers queue waits and database work. `concurrency` bounds active queries
+separately for local-only and archive-inclusive searches. When both scopes are
+active, up to twice that many queries can execute on the shared DuckDB engine.
 Durations and concurrency must be positive.
 
 These are development tuning values, not measured production capacity. The

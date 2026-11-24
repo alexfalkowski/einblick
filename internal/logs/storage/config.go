@@ -13,6 +13,6 @@ type Config struct {
 	// Timeout bounds queueing and database work together.
 	Timeout time.Duration `yaml:"timeout,omitempty" json:"timeout,omitempty" toml:"timeout,omitempty" validate:"gt=0"`
 
-	// Concurrency is the maximum number of queries executing at once.
+	// Concurrency bounds active queries independently for local and archive searches.
 	Concurrency int `yaml:"concurrency,omitempty" json:"concurrency,omitempty" toml:"concurrency,omitempty" validate:"gt=0"`
 }

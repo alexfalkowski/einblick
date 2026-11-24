@@ -25,6 +25,10 @@ type Config struct {
 
 	// SecretAccessKey is a go-service source string read at startup.
 	SecretAccessKey string `yaml:"secret_access_key" json:"secret_access_key" toml:"secret_access_key" validate:"required"`
+
+	// Retention mirrors the bucket's object-age expiration rule. Zero
+	// leaves missing expected objects unavailable at any age.
+	Retention time.Duration `yaml:"retention" json:"retention" toml:"retention" validate:"gte=0"`
 }
 
 // BucketSettings contains the resolved S3 settings shared by the archive store and DuckDB.
@@ -46,6 +50,9 @@ type BucketSettings struct {
 
 	// Timeout is the effective per-request timeout of the Go S3 client.
 	Timeout time.Duration
+
+	// Retention is the bucket's configured object-age expiration duration.
+	Retention time.Duration
 }
 
 // Resolve loads the credential sources and combines them with the resolved HTTP settings.
@@ -67,6 +74,7 @@ func (c *Config) Resolve(fs *os.FS, endpoint *url.SecureURL, timeout time.Durati
 		AccessKeyID:     accessKeyID,
 		SecretAccessKey: secretAccessKey,
 		Timeout:         timeout,
+		Retention:       c.Retention,
 	}, nil
 }
 

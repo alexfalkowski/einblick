@@ -1,5 +1,6 @@
 UPDATE log_archive_batches
-SET eviction_attempted_at = current_timestamp
+SET eviction_attempted_at = make_timestamp(epoch_us(current_timestamp)),
+    eviction_order = nextval('log_archive_queue_order')
 WHERE id = (
     SELECT b.id
     FROM log_archive_batches b
@@ -11,7 +12,7 @@ WHERE id = (
           SELECT 1 FROM log_archive_members m
           JOIN logs l ON l.id = m.log_id
           WHERE m.batch_id = b.id AND l.received_timestamp_ns >= ?::HUGEINT)
-    ORDER BY coalesce(b.eviction_attempted_at, b.published_at), b.published_at, b.id
+    ORDER BY b.eviction_order
     LIMIT 1
 )
 RETURNING id::VARCHAR, archive_day::VARCHAR, published_sha256;

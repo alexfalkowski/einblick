@@ -1,5 +1,77 @@
 # frozen_string_literal: true
 
+RSpec::Matchers.define :complete_archive_batch_before_retry do |operation, healthy_id, blocked_id|
+  match(notify_expectation_failures: true) do |diagnostics|
+    completed = diagnostics.index(/#{Regexp.escape(operation)} completed.*batch_id=#{Regexp.escape(healthy_id)}/)
+    retried = diagnostics.index(/#{Regexp.escape(operation)} failed.*batch_id=#{Regexp.escape(blocked_id)}/)
+    expect(completed).not_to be_nil
+    expect(retried).not_to be_nil
+    expect(completed).to be < retried
+  end
+end
+
+RSpec::Matchers.define :omit_archive_backlog_gauges do
+  match(notify_expectation_failures: true) do |response|
+    expect(response.code).to eq(200)
+    expect(response.body).to have_duckdb_metric('einblick_db_sql_connection_open')
+    expect(response.body).not_to match(/^einblick_log_archive_(?:pending_|last_publication_)/)
+  end
+end
+
+# Extracts read intervals from the sampler's timeout diagnostics.
+module BacklogReadWindows
+  def self.from(diagnostics)
+    pattern = /^time=(\S+).*log archive backlog collection failed.*started_at=(\S+).*context deadline exceeded/
+    diagnostics.scan(pattern).map do |finished, started|
+      Time.iso8601(started)..Time.iso8601(finished)
+    end
+  end
+end
+
+RSpec::Matchers.define :have_backlog_refresh_failures do |count, interval: nil|
+  match(notify_expectation_failures: true) do |diagnostics|
+    reads = BacklogReadWindows.from(diagnostics)
+    expect(reads.size).to be >= count
+    next true unless interval
+
+    first_duration = reads.first.end - reads.first.begin
+    expect(first_duration).to be > interval
+    # The text logger records completion times to millisecond precision.
+    expect(reads[1].begin - reads.first.end).to be >= first_duration - 0.002
+  end
+end
+
+RSpec::Matchers.define :have_cached_backlog_during_first_read do |diagnostics, pending_records|
+  match(notify_expectation_failures: true) do |scrapes|
+    first_read = BacklogReadWindows.from(diagnostics).fetch(0)
+    metrics = scrapes.filter_map do |started, finished, response|
+      response.body if response.code == 200 && first_read.cover?(started) && first_read.cover?(finished)
+    end
+    expect(metrics).to include(
+      have_duckdb_metric('einblick_db_sql_connection_open').and(have_archive_backlog('pending_records' => pending_records))
+    )
+  end
+end
+
+RSpec::Matchers.define :label_log_coverage do |label, empty: false|
+  match(notify_expectation_failures: true) do |response|
+    fragment = Nokogiri::HTML5.fragment(response.body)
+    expect(fragment.at_css('#results .result-coverage')&.text).to eq(label)
+    if empty
+      expect(fragment.at_css('#results .empty-state')).not_to be_nil
+    else
+      expect(fragment.css('#results .log-row')).not_to be_empty
+    end
+  end
+end
+
+RSpec::Matchers.define :have_archive_backlog do |expected|
+  match(notify_expectation_failures: true) do |metrics|
+    gauges = metrics.scan(/^einblick_log_archive_(\w+)(?:\{[^\n]*\})? (\S+)/).to_h
+    expect(gauges.transform_values { |value| Float(value) }).to include(expected)
+  end
+end
+
 RSpec::Matchers.define :retain_archive_members do |batch, logs|
   match(notify_expectation_failures: true) do |members|
     expect(members).to match_array(logs.map { |row| [row.first, batch] })

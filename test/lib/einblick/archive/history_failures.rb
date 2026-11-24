@@ -45,7 +45,9 @@ module Einblick
 
       def query_after_archive_cancellation
         query_from_fresh_archive do
-          cancel_while_reading_archive(@floci.keys.fetch(0))
+          prepare_local_logs_during_archive_stall
+          archived_key = @original_archive_objects.keys.fetch(0)
+          cancel_while_reading_archive(archived_key)
           query_logs
         end
       end
@@ -54,12 +56,31 @@ module Einblick
         @floci.hold_archive_read(key)
         with_active_archive_query do |operation|
           wait_for { @floci.archive_read_waiting?(key) }.to be(true)
+          search_local_logs_during_archive_stall(key)
           operation.cancel
           search_while_cancelled_archive_query_drains
           wait_for_log_query_limit(1)
           @floci.release_archive_read(key)
           wait_for_log_query_limit(0)
         end
+      end
+
+      def prepare_local_logs_during_archive_stall
+        @local_stall_service = "local-#{@query_service}"
+        @local_stall_request = query_fixture('log_queries', service: @local_stall_service)
+        archive_receipts = @query_receipt_windows.dup
+        export_query_logs(@local_stall_request, @local_stall_request.class.encode(@local_stall_request))
+        @local_stall_receipts = @query_receipt_windows
+        @query_receipt_windows = archive_receipts
+        records = log_query_records(@local_stall_request)
+        @local_stall_records = [5, 4, 3, 2, 1].map { |index| records[index] }
+      end
+
+      def search_local_logs_during_archive_stall(key)
+        @local_stall_response = query_logs(
+          'service' => @local_stall_service, 'search_scope' => 'LOG_SEARCH_SCOPE_CURRENT_VOLUME'
+        )
+        @archive_read_remained_held = @floci.archive_read_waiting?(key)
       end
 
       def search_while_cancelled_archive_query_drains

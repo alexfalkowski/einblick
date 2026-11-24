@@ -118,6 +118,13 @@ Feature: Publish log archives to object storage
     Then both batches should be confirmed and only the later batch should be reclaimed
     And eviction should reclaim the later batch and retain the earlier batch locally
 
+  Scenario: Continue publication after upgrading a queue with blocked cleanup
+    Given acknowledged log batches are staged for two archive days on the previous schema
+    When the service publishes while the earlier staging directory is unwritable
+    Then both batches should be confirmed and only the later batch should be reclaimed
+    And publication should complete the healthy batch before retrying the blocked one
+    And eviction should reclaim the later batch and retain the earlier batch locally
+
   Scenario: Publish newly accepted logs while repair of an earlier batch is blocked
     Given an acknowledged log export staged in Parquet
     When a staged file is corrupted and its directory is unwritable as logs arrive for another day

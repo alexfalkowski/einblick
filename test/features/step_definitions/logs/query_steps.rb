@@ -123,6 +123,7 @@ end
 
 Then('the gRPC query should return complete matching logs latest first') do
   expect(@grpc_response).to be_a(Einblick::V1::ListLogsResponse)
+  expect(@grpc_response.search_scope).to eq(:LOG_SEARCH_SCOPE_CURRENT_VOLUME)
   expect(@grpc_response.logs).to have_queried_logs([@request], @expected_query_records, @query_receipt_windows)
   expect(@grpc_response.next_page_token).to eq('')
   expect(@grpc_response.meta['request_id']).to eq(@query_request_id)

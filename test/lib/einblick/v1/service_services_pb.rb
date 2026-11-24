@@ -17,7 +17,7 @@ module Einblick
         self.service_name = 'einblick.v1.Service'
 
         # ListLogs reads acknowledged logs within explicit absolute bounds. When an
-        # archive is configured, it includes matching archived logs.
+        # archive is configured, it includes matching archived logs by default.
         # InvalidArgument identifies invalid bounds, filters or tokens. Cancellation
         # and deadlines propagate through queueing and database work. An active
         # remote read may finish after cancellation. Storage failures return

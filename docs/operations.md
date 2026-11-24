@@ -101,12 +101,27 @@ pending after confirmation until the staged file has been removed or is absent.
 
 For publication failures, inspect `component=log_archive` diagnostics, the
 configured endpoint and bucket permissions, and the remaining staging
-capacity. Unconfirmed batches retain their source rows. On each tick the worker
-selects the eligible batch that has waited longest since creation or the last
-attempt, so another batch can proceed while a failed upload, reconciliation, or
-cleanup remains pending. The worker retries damaged staging in the same
-publication rotation. A blocked repair leaves the export slot available for
-new logs on other days. If the key contains conflicting bytes, investigate the
+capacity. The archive exports these OpenTelemetry gauges.
+
+| Metric | Unit | Meaning |
+| --- | --- | --- |
+| `log_archive.pending.records` | `{record}` | Accepted records awaiting publication. |
+| `log_archive.pending.size` | `By` | Pending record JSON size, excluding shared OTLP headers and Parquet encoding overhead. |
+| `log_archive.pending.oldest_age` | `s` | Age of the oldest pending record since receipt. |
+| `log_archive.last_publication.timestamp` | `s` | Unix timestamp of the latest confirmed publication. |
+
+An empty backlog reports zero pending records, bytes and age. An archive with
+no confirmed publication reports a zero timestamp. A database with only legacy
+confirmations omits the publication timestamp until a UTC confirmation is recorded.
+Metrics collections use the latest sample from the background sampler.
+Each read uses `queries.timeout`. After it returns, the sampler rests for the
+longer of `archive.interval` and the time spent reading. Until a sample
+succeeds, or after a failed refresh, these gauges are omitted. Unconfirmed batches
+retain their source rows. Publication and eviction attempts move each batch to
+the end of its durable retry queue. Existing queues preserve their relative
+order at upgrade. The worker retries damaged staging in the same publication
+rotation. A blocked repair leaves the export slot available for new logs on
+other days. If the key contains conflicting bytes, investigate the
 bucket and key ownership before changing the object. The worker preserves an
 existing object and leaves the batch pending when verification fails. If
 verification repeatedly times out, check that `archive.r2.client.timeout`
@@ -128,7 +143,10 @@ soon as it can reach the configured bucket. Keep the same bucket when reopening
 a database that has evicted batches.
 
 Historical reads include existing `v1` Parquet objects. The local migration
-adds eviction state without changing archived files. Use the
+records object upload time at eviction without changing archived files. For
+batches evicted by an older binary, Einblick uses the timestamp from the R2
+listing. When a search starts with an older batch already missing and its
+upload time is unknown, the search reports unavailable history. Use the
 [schema rollback guidance](#-log-storage-and-recovery) for the database volume.
 
 When [local retention](configuration.md#-r2-log-archives) is enabled, the worker
@@ -140,6 +158,29 @@ eligible batches stay local. A missing, unavailable or changed object leaves its
 source rows in DuckDB. The worker continues with other eligible batches and
 retries the blocked batch. A failed historical query reports unavailable storage.
 Restore access to the bucket and retry the same absolute interval.
+
+When `archive.r2.retention` is set, a successful archive listing can
+omit an expected object that has reached the configured age. Einblick reads
+eligible objects that R2 still lists until the bucket removes them. Missing
+objects within the retention guarantee and failed listings report unavailable
+storage. Queries use the listing timestamp when available. For an unlisted
+object, Einblick allows for the one-second precision of the recorded R2
+`Last-Modified` before treating it as expired. If an eligible listed object
+disappears during a read, Einblick refreshes the listing and retries the search
+once after confirming the object is gone. During an outage, **Search scope →
+Local only** searches the current volume.
+
+## ♻️ Changing archive retention
+
+Update the bucket lifecycle in Infraops and verify the effective remote rule
+before matching `archive.r2.retention` and restarting Einblick. R2 applies
+changes asynchronously. Increasing retention or disabling expiration cannot
+restore deleted objects, and the new guarantee can make previously expired
+objects show as unavailable. Use the Infraops procedure to explicitly remove
+or disable the remote lifecycle rule and verify the result. Removing the
+setting from either configuration leaves no evidence that the remote rule
+stopped running.
+[Infraops R2 object expiration](https://github.com/alexfalkowski/infraops#-r2-object-expiration)
 
 ## 🚢 Deployment
 

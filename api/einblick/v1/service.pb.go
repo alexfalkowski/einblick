@@ -23,6 +23,59 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// LogSearchScope describes the sources of a log search. New sources may be added.
+type LogSearchScope int32
+
+const (
+	// Use the configured sources when the caller omits the scope.
+	LogSearchScope_LOG_SEARCH_SCOPE_UNSPECIFIED LogSearchScope = 0
+	// Search the current database volume and any configured archive.
+	LogSearchScope_LOG_SEARCH_SCOPE_ALL_SOURCES LogSearchScope = 1
+	// Search the current database volume only.
+	LogSearchScope_LOG_SEARCH_SCOPE_CURRENT_VOLUME LogSearchScope = 2
+)
+
+// Enum value maps for LogSearchScope.
+var (
+	LogSearchScope_name = map[int32]string{
+		0: "LOG_SEARCH_SCOPE_UNSPECIFIED",
+		1: "LOG_SEARCH_SCOPE_ALL_SOURCES",
+		2: "LOG_SEARCH_SCOPE_CURRENT_VOLUME",
+	}
+	LogSearchScope_value = map[string]int32{
+		"LOG_SEARCH_SCOPE_UNSPECIFIED":    0,
+		"LOG_SEARCH_SCOPE_ALL_SOURCES":    1,
+		"LOG_SEARCH_SCOPE_CURRENT_VOLUME": 2,
+	}
+)
+
+func (x LogSearchScope) Enum() *LogSearchScope {
+	p := new(LogSearchScope)
+	*p = x
+	return p
+}
+
+func (x LogSearchScope) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (LogSearchScope) Descriptor() protoreflect.EnumDescriptor {
+	return file_einblick_v1_service_proto_enumTypes[0].Descriptor()
+}
+
+func (LogSearchScope) Type() protoreflect.EnumType {
+	return &file_einblick_v1_service_proto_enumTypes[0]
+}
+
+func (x LogSearchScope) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use LogSearchScope.Descriptor instead.
+func (LogSearchScope) EnumDescriptor() ([]byte, []int) {
+	return file_einblick_v1_service_proto_rawDescGZIP(), []int{0}
+}
+
 // ListLogsRequest selects a bounded page of committed logs.
 // Filters are conjunctive and remain fixed across continuation requests.
 type ListLogsRequest struct {
@@ -32,21 +85,24 @@ type ListLogsRequest struct {
 	// end_time is the required exclusive absolute event-time boundary.
 	// The interval must fit the configured maximum range and unsigned OTLP times.
 	EndTime *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=end_time,json=endTime,proto3" json:"end_time,omitempty"`
+	// search_scope selects the data sources to search. Continue subsequent pages
+	// with the same scope.
+	SearchScope LogSearchScope `protobuf:"varint,3,opt,name=search_scope,json=searchScope,proto3,enum=einblick.v1.LogSearchScope" json:"search_scope,omitempty"`
 	// service exactly matches resource service.name; empty selects all services.
-	Service string `protobuf:"bytes,3,opt,name=service,proto3" json:"service,omitempty"`
+	Service string `protobuf:"bytes,4,opt,name=service,proto3" json:"service,omitempty"`
 	// severity exactly matches an OTLP suffix such as INFO, ERROR or UNSPECIFIED.
 	// Empty selects all severities.
-	Severity string `protobuf:"bytes,4,opt,name=severity,proto3" json:"severity,omitempty"`
+	Severity string `protobuf:"bytes,5,opt,name=severity,proto3" json:"severity,omitempty"`
 	// text is a case-sensitive literal substring of string bodies only.
 	// Empty selects all bodies; attributes and non-string bodies are not searched.
-	Text string `protobuf:"bytes,5,opt,name=text,proto3" json:"text,omitempty"`
+	Text string `protobuf:"bytes,6,opt,name=text,proto3" json:"text,omitempty"`
 	// trace_id is a 32-character hexadecimal trace ID; empty selects all records.
-	TraceId string `protobuf:"bytes,6,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	TraceId string `protobuf:"bytes,7,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
 	// page_size is positive and no greater than the configured result limit.
 	// Zero uses that limit; negative values are invalid.
-	PageSize int32 `protobuf:"varint,7,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageSize int32 `protobuf:"varint,8,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	// page_token continues a previous page with identical filters and page size.
-	PageToken     string `protobuf:"bytes,8,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	PageToken     string `protobuf:"bytes,9,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -93,6 +149,13 @@ func (x *ListLogsRequest) GetEndTime() *timestamppb.Timestamp {
 		return x.EndTime
 	}
 	return nil
+}
+
+func (x *ListLogsRequest) GetSearchScope() LogSearchScope {
+	if x != nil {
+		return x.SearchScope
+	}
+	return LogSearchScope_LOG_SEARCH_SCOPE_UNSPECIFIED
 }
 
 func (x *ListLogsRequest) GetService() string {
@@ -233,15 +296,17 @@ type ListLogsResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// meta contains infrastructure metadata such as request_id and user_agent.
 	Meta map[string]string `protobuf:"bytes,1,rep,name=meta,proto3" json:"meta,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// search_scope identifies the sources searched, including for an empty page.
+	SearchScope LogSearchScope `protobuf:"varint,2,opt,name=search_scope,json=searchScope,proto3,enum=einblick.v1.LogSearchScope" json:"search_scope,omitempty"`
 	// logs orders records by event_time descending, then id descending.
 	// Archive records with identical time and ID from different volumes have a
 	// stable additional tie-breaker carried by the opaque page token.
-	Logs []*Log `protobuf:"bytes,2,rep,name=logs,proto3" json:"logs,omitempty"`
+	Logs []*Log `protobuf:"bytes,3,rep,name=logs,proto3" json:"logs,omitempty"`
 	// next_page_token is empty at exhaustion. Membership is not frozen: newly
 	// committed records behind the cursor may enter later pages; refresh for
 	// arrivals ahead. Existing records do not repeat. Tokens survive restart and
 	// local eviction on the same database volume.
-	NextPageToken string `protobuf:"bytes,3,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	NextPageToken string `protobuf:"bytes,4,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -283,6 +348,13 @@ func (x *ListLogsResponse) GetMeta() map[string]string {
 	return nil
 }
 
+func (x *ListLogsResponse) GetSearchScope() LogSearchScope {
+	if x != nil {
+		return x.SearchScope
+	}
+	return LogSearchScope_LOG_SEARCH_SCOPE_UNSPECIFIED
+}
+
 func (x *ListLogsResponse) GetLogs() []*Log {
 	if x != nil {
 		return x.Logs
@@ -301,18 +373,19 @@ var File_einblick_v1_service_proto protoreflect.FileDescriptor
 
 const file_einblick_v1_service_proto_rawDesc = "" +
 	"\n" +
-	"\x19einblick/v1/service.proto\x12\veinblick.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a&opentelemetry/proto/logs/v1/logs.proto\"\xa4\x02\n" +
+	"\x19einblick/v1/service.proto\x12\veinblick.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a&opentelemetry/proto/logs/v1/logs.proto\"\xe4\x02\n" +
 	"\x0fListLogsRequest\x129\n" +
 	"\n" +
 	"start_time\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\tstartTime\x125\n" +
-	"\bend_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\aendTime\x12\x18\n" +
-	"\aservice\x18\x03 \x01(\tR\aservice\x12\x1a\n" +
-	"\bseverity\x18\x04 \x01(\tR\bseverity\x12\x12\n" +
-	"\x04text\x18\x05 \x01(\tR\x04text\x12\x19\n" +
-	"\btrace_id\x18\x06 \x01(\tR\atraceId\x12\x1b\n" +
-	"\tpage_size\x18\a \x01(\x05R\bpageSize\x12\x1d\n" +
+	"\bend_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\aendTime\x12>\n" +
+	"\fsearch_scope\x18\x03 \x01(\x0e2\x1b.einblick.v1.LogSearchScopeR\vsearchScope\x12\x18\n" +
+	"\aservice\x18\x04 \x01(\tR\aservice\x12\x1a\n" +
+	"\bseverity\x18\x05 \x01(\tR\bseverity\x12\x12\n" +
+	"\x04text\x18\x06 \x01(\tR\x04text\x12\x19\n" +
+	"\btrace_id\x18\a \x01(\tR\atraceId\x12\x1b\n" +
+	"\tpage_size\x18\b \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +
-	"page_token\x18\b \x01(\tR\tpageToken\"\xd4\x02\n" +
+	"page_token\x18\t \x01(\tR\tpageToken\"\xd4\x02\n" +
 	"\x03Log\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x129\n" +
 	"\n" +
@@ -320,14 +393,19 @@ const file_einblick_v1_service_proto_rawDesc = "" +
 	"\freceive_time\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\vreceiveTime\x12E\n" +
 	"\bresource\x18\x04 \x01(\v2).opentelemetry.proto.logs.v1.ResourceLogsR\bresource\x12<\n" +
 	"\x05scope\x18\x05 \x01(\v2&.opentelemetry.proto.logs.v1.ScopeLogsR\x05scope\x12>\n" +
-	"\x06record\x18\x06 \x01(\v2&.opentelemetry.proto.logs.v1.LogRecordR\x06record\"\xd6\x01\n" +
+	"\x06record\x18\x06 \x01(\v2&.opentelemetry.proto.logs.v1.LogRecordR\x06record\"\x96\x02\n" +
 	"\x10ListLogsResponse\x12;\n" +
-	"\x04meta\x18\x01 \x03(\v2'.einblick.v1.ListLogsResponse.MetaEntryR\x04meta\x12$\n" +
-	"\x04logs\x18\x02 \x03(\v2\x10.einblick.v1.LogR\x04logs\x12&\n" +
-	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken\x1a7\n" +
+	"\x04meta\x18\x01 \x03(\v2'.einblick.v1.ListLogsResponse.MetaEntryR\x04meta\x12>\n" +
+	"\fsearch_scope\x18\x02 \x01(\x0e2\x1b.einblick.v1.LogSearchScopeR\vsearchScope\x12$\n" +
+	"\x04logs\x18\x03 \x03(\v2\x10.einblick.v1.LogR\x04logs\x12&\n" +
+	"\x0fnext_page_token\x18\x04 \x01(\tR\rnextPageToken\x1a7\n" +
 	"\tMetaEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x012T\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01*y\n" +
+	"\x0eLogSearchScope\x12 \n" +
+	"\x1cLOG_SEARCH_SCOPE_UNSPECIFIED\x10\x00\x12 \n" +
+	"\x1cLOG_SEARCH_SCOPE_ALL_SOURCES\x10\x01\x12#\n" +
+	"\x1fLOG_SEARCH_SCOPE_CURRENT_VOLUME\x10\x022T\n" +
 	"\aService\x12I\n" +
 	"\bListLogs\x12\x1c.einblick.v1.ListLogsRequest\x1a\x1d.einblick.v1.ListLogsResponse\"\x00BBZ1github.com/alexfalkowski/einblick/api/einblick/v1\xea\x02\fEinblick::V1b\x06proto3"
 
@@ -343,34 +421,38 @@ func file_einblick_v1_service_proto_rawDescGZIP() []byte {
 	return file_einblick_v1_service_proto_rawDescData
 }
 
+var file_einblick_v1_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_einblick_v1_service_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_einblick_v1_service_proto_goTypes = []any{
-	(*ListLogsRequest)(nil),       // 0: einblick.v1.ListLogsRequest
-	(*Log)(nil),                   // 1: einblick.v1.Log
-	(*ListLogsResponse)(nil),      // 2: einblick.v1.ListLogsResponse
-	nil,                           // 3: einblick.v1.ListLogsResponse.MetaEntry
-	(*timestamppb.Timestamp)(nil), // 4: google.protobuf.Timestamp
-	(*v1.ResourceLogs)(nil),       // 5: opentelemetry.proto.logs.v1.ResourceLogs
-	(*v1.ScopeLogs)(nil),          // 6: opentelemetry.proto.logs.v1.ScopeLogs
-	(*v1.LogRecord)(nil),          // 7: opentelemetry.proto.logs.v1.LogRecord
+	(LogSearchScope)(0),           // 0: einblick.v1.LogSearchScope
+	(*ListLogsRequest)(nil),       // 1: einblick.v1.ListLogsRequest
+	(*Log)(nil),                   // 2: einblick.v1.Log
+	(*ListLogsResponse)(nil),      // 3: einblick.v1.ListLogsResponse
+	nil,                           // 4: einblick.v1.ListLogsResponse.MetaEntry
+	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
+	(*v1.ResourceLogs)(nil),       // 6: opentelemetry.proto.logs.v1.ResourceLogs
+	(*v1.ScopeLogs)(nil),          // 7: opentelemetry.proto.logs.v1.ScopeLogs
+	(*v1.LogRecord)(nil),          // 8: opentelemetry.proto.logs.v1.LogRecord
 }
 var file_einblick_v1_service_proto_depIdxs = []int32{
-	4,  // 0: einblick.v1.ListLogsRequest.start_time:type_name -> google.protobuf.Timestamp
-	4,  // 1: einblick.v1.ListLogsRequest.end_time:type_name -> google.protobuf.Timestamp
-	4,  // 2: einblick.v1.Log.event_time:type_name -> google.protobuf.Timestamp
-	4,  // 3: einblick.v1.Log.receive_time:type_name -> google.protobuf.Timestamp
-	5,  // 4: einblick.v1.Log.resource:type_name -> opentelemetry.proto.logs.v1.ResourceLogs
-	6,  // 5: einblick.v1.Log.scope:type_name -> opentelemetry.proto.logs.v1.ScopeLogs
-	7,  // 6: einblick.v1.Log.record:type_name -> opentelemetry.proto.logs.v1.LogRecord
-	3,  // 7: einblick.v1.ListLogsResponse.meta:type_name -> einblick.v1.ListLogsResponse.MetaEntry
-	1,  // 8: einblick.v1.ListLogsResponse.logs:type_name -> einblick.v1.Log
-	0,  // 9: einblick.v1.Service.ListLogs:input_type -> einblick.v1.ListLogsRequest
-	2,  // 10: einblick.v1.Service.ListLogs:output_type -> einblick.v1.ListLogsResponse
-	10, // [10:11] is the sub-list for method output_type
-	9,  // [9:10] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	5,  // 0: einblick.v1.ListLogsRequest.start_time:type_name -> google.protobuf.Timestamp
+	5,  // 1: einblick.v1.ListLogsRequest.end_time:type_name -> google.protobuf.Timestamp
+	0,  // 2: einblick.v1.ListLogsRequest.search_scope:type_name -> einblick.v1.LogSearchScope
+	5,  // 3: einblick.v1.Log.event_time:type_name -> google.protobuf.Timestamp
+	5,  // 4: einblick.v1.Log.receive_time:type_name -> google.protobuf.Timestamp
+	6,  // 5: einblick.v1.Log.resource:type_name -> opentelemetry.proto.logs.v1.ResourceLogs
+	7,  // 6: einblick.v1.Log.scope:type_name -> opentelemetry.proto.logs.v1.ScopeLogs
+	8,  // 7: einblick.v1.Log.record:type_name -> opentelemetry.proto.logs.v1.LogRecord
+	4,  // 8: einblick.v1.ListLogsResponse.meta:type_name -> einblick.v1.ListLogsResponse.MetaEntry
+	0,  // 9: einblick.v1.ListLogsResponse.search_scope:type_name -> einblick.v1.LogSearchScope
+	2,  // 10: einblick.v1.ListLogsResponse.logs:type_name -> einblick.v1.Log
+	1,  // 11: einblick.v1.Service.ListLogs:input_type -> einblick.v1.ListLogsRequest
+	3,  // 12: einblick.v1.Service.ListLogs:output_type -> einblick.v1.ListLogsResponse
+	12, // [12:13] is the sub-list for method output_type
+	11, // [11:12] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_einblick_v1_service_proto_init() }
@@ -383,13 +465,14 @@ func file_einblick_v1_service_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_einblick_v1_service_proto_rawDesc), len(file_einblick_v1_service_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_einblick_v1_service_proto_goTypes,
 		DependencyIndexes: file_einblick_v1_service_proto_depIdxs,
+		EnumInfos:         file_einblick_v1_service_proto_enumTypes,
 		MessageInfos:      file_einblick_v1_service_proto_msgTypes,
 	}.Build()
 	File_einblick_v1_service_proto = out.File

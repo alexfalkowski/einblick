@@ -14,7 +14,10 @@ module Einblick
         stage_log_archive(@archive_request, 1)
         @original_archive_batches = @archive_batches
         @original_archive_members = @archive_members
-        with_log_database { |connection| connection.query(File.read('fixtures/drop_publication_schema.sql')) }
+        with_log_database do |connection|
+          connection.query(File.read('fixtures/drop_archive_retention_schema.sql'))
+          connection.query(File.read('fixtures/drop_publication_schema.sql'))
+        end
       end
 
       def publish_log_archive
@@ -79,9 +82,13 @@ module Einblick
         @archive_offset = File.size('reports/server.log')
         with_server_profile(profile) do
           yield if block_given?
-          wait_for { archive_diagnostics }.to include('remote log archive publication completed')
+          wait_for_publication
           query_during_archive_recovery
         end
+      end
+
+      def wait_for_publication
+        wait(timeout: 10).for { archive_diagnostics }.to include('remote log archive publication completed')
       end
 
       def observe_publication_failure(failure)

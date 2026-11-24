@@ -23,6 +23,9 @@ var archivedLogsQuery string
 //go:embed queries/archive/sources.sql
 var archiveSourcesQuery string
 
+//go:embed queries/archive/backlog.sql
+var archiveBacklogQuery string
+
 //go:embed queries/archive/next_batch.sql
 var nextBatchQuery string
 

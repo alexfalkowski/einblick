@@ -64,7 +64,9 @@ module Einblick
 
       def wait_for_archive_evictions(*keys)
         ids = keys.map { |key| File.basename(key, '.parquet') }
-        wait_for { archive_diagnostics.scan(/local log archive eviction completed.*batch_id=([\w-]+)/).flatten }.to include(*ids)
+        wait(timeout: 10).for do
+          archive_diagnostics.scan(/local log archive eviction completed.*batch_id=([\w-]+)/).flatten
+        end.to include(*ids)
       end
 
       def inspect_eviction

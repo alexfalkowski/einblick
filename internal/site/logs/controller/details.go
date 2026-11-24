@@ -72,10 +72,14 @@ func receiptOffset(event, received time.Time) (string, string) {
 
 	// A time.Duration saturates for part of the supported OTLP timestamp range.
 	seconds := float64(received.Unix()-event.Unix()) + float64(received.Nanosecond()-event.Nanosecond())/float64(time.Second)
-	label := "logs.received_later"
+
+	var label string
 	if received.Before(event) {
 		label = "logs.received_earlier"
+	} else {
+		label = "logs.received_later"
 	}
+
 	return durationText(math.Abs(seconds), 0), label
 }
 
@@ -123,6 +127,7 @@ func durationText(seconds float64, precision int) string {
 	default:
 		value, unit = seconds, "s"
 	}
+
 	if value > 0 && value < 1 && unit == "ms" {
 		return "<1 ms"
 	}
@@ -132,10 +137,15 @@ func durationText(seconds float64, precision int) string {
 func logFields(attributes []*common.KeyValue) []model.LogField {
 	fields := make([]model.LogField, 0, len(attributes))
 	for _, attribute := range attributes {
-		name := attribute.GetKey()
-		if strings.IsEmpty(name) && attribute.GetKeyStrindex() != 0 {
+		key := attribute.GetKey()
+
+		var name string
+		if strings.IsEmpty(key) && attribute.GetKeyStrindex() != 0 {
 			name = "#" + strconv.FormatInt(int64(attribute.GetKeyStrindex()), 10)
+		} else {
+			name = key
 		}
+
 		fields = append(fields, model.LogField{Name: name, Value: logValue(attribute.GetValue())})
 	}
 	return fields
@@ -229,6 +239,7 @@ func appendEntityKeys(fields []model.LogField, label string, keys []string) []mo
 	if len(keys) == 0 {
 		return fields
 	}
+
 	items := make([]model.LogValue, 0, len(keys))
 	for _, key := range keys {
 		items = append(items, model.LogValue{Text: key})

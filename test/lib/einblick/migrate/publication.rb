@@ -8,6 +8,7 @@ module Einblick
         prepare_acknowledged_log_export
         Nonnative.stop
         log_database do |connection|
+          connection.query(File.read('fixtures/drop_archive_retention_schema.sql'))
           connection.query(File.read('fixtures/drop_publication_schema.sql'))
           @schema_data_before, @migration_history_before = migration_snapshot(connection)
         end

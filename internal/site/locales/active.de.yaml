@@ -1,6 +1,12 @@
 site.title: Protokolle · Einblick
 site.skip: Zu den Protokollen
 logs.heading: Protokolle
+logs.all_sources: Lokal und Archiv
+logs.search_scope: Suchbereich
+logs.local_only: Nur lokal
+logs.search_local: Lokale Protokolle suchen
+logs.local_coverage: Die Ergebnisse umfassen nur Protokolle auf diesem Datenbankvolume.
+logs.archive_coverage: Die Ergebnisse umfassen Protokolle auf diesem Datenbankvolume und im Archiv.
 logs.scope: Protokolle im lokalen Speicher und in konfigurierten Archiven suchen
 logs.service: Dienst
 logs.all_services: Alle Dienste

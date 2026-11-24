@@ -1,1 +1,3 @@
-UPDATE log_archive_batches SET evicted_at = current_timestamp WHERE id = ?::UUID;
+UPDATE log_archive_batches
+SET evicted_at = make_timestamp(epoch_us(current_timestamp)), object_stored_at = ?::TIMESTAMP
+WHERE id = ?::UUID;

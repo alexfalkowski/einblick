@@ -60,6 +60,22 @@ type StagedBatch struct {
 	Checksum string
 }
 
+// Backlog describes accepted records awaiting publication and the latest confirmed publication.
+type Backlog struct {
+	// OldestReceivedAt is the earliest pending receipt time, or zero when the backlog is empty.
+	OldestReceivedAt time.Time
+
+	// LastPublishedAt is the latest known UTC confirmation time, the Unix epoch
+	// before any publication, or nil when only legacy confirmation times exist.
+	LastPublishedAt *time.Time
+
+	// PendingRecords is the number of accepted records that are still awaiting publication.
+	PendingRecords int64
+
+	// PendingRecordBytes counts stored record JSON bytes, excluding shared OTLP headers.
+	PendingRecordBytes int64
+}
+
 // BatchRepository owns batch membership and durable staging state.
 type BatchRepository interface {
 	// Next returns the oldest pending batch or claims new work using the target
@@ -104,8 +120,8 @@ type EvictionRepository interface {
 	// whose rows predate cutoff. A zero batch indicates no eligible work.
 	NextEviction(ctx context.Context, cutoff time.Time) (Publication, error)
 
-	// Evict removes the selected batch's source rows and marks it evicted atomically.
-	Evict(ctx context.Context, id string) error
+	// Evict removes the selected batch's source rows and records the verified object timestamp atomically.
+	Evict(ctx context.Context, id string, storedAt time.Time) error
 }
 
 // BatchWriter produces and verifies Parquet for a claimed batch.
