@@ -19,7 +19,7 @@ func register(name env.Name, srv *server.Server, cfg *Config, db *sql.DB) {
 }
 
 func httpHealthObserver(name env.Name, server *server.Server) error {
-	return server.Observe(name.String(), "healthz", "online")
+	return server.Observe(name.String(), "healthz", "online", "duckdb")
 }
 
 func httpLivenessObserver(name env.Name, server *server.Server) error {

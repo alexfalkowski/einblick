@@ -6,7 +6,7 @@
 
 | HTTP endpoint | Meaning |
 | --- | --- |
-| `/einblick/healthz` | External connectivity. |
+| `/einblick/healthz` | External and DuckDB connectivity. Returns HTTP 503 if either check fails. |
 | `/einblick/livez` | Process liveness, independent of the database. |
 | `/einblick/readyz` | Database connectivity after startup recovery and migrations. |
 
