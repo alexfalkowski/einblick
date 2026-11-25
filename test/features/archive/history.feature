@@ -61,11 +61,13 @@ Feature: Read acknowledged logs across local storage and the archive
     When a fresh volume accepts the same logs and evicts them after the client reads the first page
     Then pagination should include both copies of every matching log
 
+  @archive_history_availability
   Scenario: Report unavailable history distinctly from an empty page
     Given acknowledged logs are ready to archive
     When the archive is published and the client searches during an object store outage
     Then the log query should report unavailable history
 
+  @archive_history_availability
   Scenario: Show unavailable history after reopening an archived database without R2
     Given acknowledged logs are ready to archive
     When the worker evicts the archived logs and the operator reopens the database without R2
@@ -73,6 +75,7 @@ Feature: Read acknowledged logs across local storage and the archive
     And the API should report unavailable history for the older range
     And the default recent search should still succeed
 
+  @archive_history_availability
   Scenario: Retry an older search after an archive outage
     Given acknowledged logs are ready to archive
     When the operator searches during an archive outage and retries after recovery
@@ -81,13 +84,14 @@ Feature: Read acknowledged logs across local storage and the archive
     And the API should report unavailable history for the older range
     And publication recovery should drain the visible log backlog
 
+  @archive_history_availability
   Scenario: Search the last 24 hours during an archive outage
     Given acknowledged recent logs on the server
     When the operator searches the last 24 hours during an archive outage
     Then the Logs page should show the recent logs
     And the API should return each matching recent log across pages
 
-  @native_query_work
+  @archive_history_availability @native_query_work
   Scenario: Keep metrics available when slow backlog reads time out
     Given acknowledged logs are ready to archive
     And backlog reads can be slowed within the running service
@@ -96,6 +100,7 @@ Feature: Read acknowledged logs across local storage and the archive
     And the metrics endpoint should withdraw the previous backlog sample after the timeout
     And the sampler should rest after a slow read
 
+  @archive_history_availability
   Scenario: Keep available history readable when an older archive expires
     Given acknowledged logs are ready to archive
     When archive objects disappear and the operator changes the query retention setting
@@ -103,27 +108,32 @@ Feature: Read acknowledged logs across local storage and the archive
     And disabling query expiration should require the missing object again
     And a missing object still within retention should report unavailable history
 
+  @archive_history_availability
   Scenario: Report unavailable history when a follow-up listing fails
     Given acknowledged logs are ready to archive
     When an eligible archive object disappears and the follow-up listing fails
     Then the active search should report unavailable history
 
+  @archive_history_availability
   Scenario: Preserve coverage when a younger object disappears during expiration retry
     Given acknowledged logs are ready to archive
     When a fresh volume searches while an expired object and a younger object disappear
     Then the search should report unavailable history after refreshing the archive listing
 
+  @archive_history_availability
   Scenario: Search archived logs after a transient listing failure
     Given acknowledged logs are ready to archive
     When the archive is published and the client searches while the object store briefly fails to list archives
     Then the archive should supply the complete matching logs
 
+  @archive_history_availability
   Scenario: Use the listing timestamp when the stored object age is unknown
     Given acknowledged logs are ready to archive
     When an older evicted batch expires during an archive search and the operator searches again
     Then the active search should return the remaining history
     And the later search should report unavailable history when the missing object's age is unknown
 
+  @archive_history_availability
   Scenario: Publish logs while archive listings are unavailable
     Given log archival is configured for a disposable object store
     When the worker publishes ready logs after a listing failure opens the search circuit breaker
@@ -131,12 +141,14 @@ Feature: Read acknowledged logs across local storage and the archive
     And the object store should contain one Parquet batch with the accepted logs
     And the published batch should be recorded and its staging file reclaimed
 
+  @archive_history_availability
   Scenario: Report unavailable history when an evicted archive object is missing
     Given acknowledged logs are ready to archive
     When the client searches the same volume after one matching evicted archive object disappears
     Then the log query should report unavailable history
     And the search should have returned both copies of the matching logs before the loss
 
+  @archive_history_availability
   Scenario: Retry after cancelling an archive query
     Given acknowledged logs are ready to archive
     When the client cancels an active archive query, searches while it drains, and retries

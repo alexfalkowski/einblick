@@ -44,7 +44,7 @@ make features-service
 for local Parquet staging and `make features-archive-publication` for all R2 scenarios.
 `make features-archive-upload` runs upload and publication recovery scenarios.
 `make features-archive-history` runs historical search and eviction scenarios.
-Both R2 groups use Floci from the shared stack on port `4566`, with the
+The R2 groups use Floci from the shared stack on port `4566`, with the
 test relay on port `4567`. Set `EINBLICK_FLOCI_PORT` if your local emulator
 listens on a different port. The scenarios create and delete objects in a
 disposable test bucket. CI pins its Floci image in the
@@ -59,8 +59,18 @@ The storage group includes migrations. The service group covers health, metric
 and trace receipt, and scenarios outside the four tagged groups. Put each new
 scenario in at most one of `@storage`, `@archive`, `@queries`, and `@site`.
 Add `@publication` to archive scenarios that require Floci. Add `@archive_history`
-when the scenario covers historical searches or local eviction. `make features`
-runs all feature scenarios.
+when the scenario covers historical searches or local eviction. Use the CI
+partition targets to run a smaller group locally.
+
+| Make target | Scenarios |
+| --- | --- |
+| `make features-archive-upload-transfer` | Uploads, multipart, and acknowledgement recovery |
+| `make features-archive-upload-recovery` | Staging repair, cleanup, and publication scheduling (`@archive_publication_recovery`) |
+| `make features-archive-history-reads` | Historical reads, pagination, and eviction |
+| `make features-archive-history-availability` | Archive outages, retention, and cancellation (`@archive_history_availability`) |
+
+The upload and history targets without a suffix each run both of their
+partitions. `make features` runs all feature scenarios.
 Use `make features tags=@printing` or `make features feature=features/migrate`
 to narrow a local run. Run groups one at a time locally because they share ports
 and the test database. Run `make coverage` to merge the profiles in `test/reports/`
