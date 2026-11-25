@@ -11,21 +11,27 @@ Feature: Stage closed local log archives
     And each Parquet file should match its durable batch
     And the acknowledged logs should remain in DuckDB
 
-  Scenario: Stage an accepted row larger than the batch target
-    Given an accepted-size log body larger than the Parquet batch target
+  Scenario: Archive a day with a large accepted log body
+    Given a log export with a large body
     When the service stages that log export
-    Then the larger row should have its own batch and retain its original content
+    Then one Parquet batch should preserve the entire day
 
-  Scenario Outline: Split a same-day export that exceeds the batch target
-    Given three same-day logs with large "<content>" that fit the batch target only two at a time
+  Scenario Outline: Archive a complete day with large content
+    Given three same-day logs with large "<content>"
     When the service stages that log export
-    Then one Parquet batch should contain two logs and the other should contain one
+    Then one Parquet batch should preserve the entire day
     And each Parquet file should match its durable batch
 
     Examples:
       | content        |
       | bodies         |
       | shared context |
+
+  Scenario: Archive a complete day with many records and large shared context
+    Given 130 distinct same-day logs share a large resource
+    When the service stages that log export
+    Then one Parquet batch should preserve the entire day
+    And each Parquet file should match its durable batch
 
   Scenario: Restrict a previously shared export directory to the service user
     Given an archive workspace with a publicly accessible export directory
@@ -34,7 +40,7 @@ Feature: Stage closed local log archives
 
   Scenario: Export late logs to an already staged UTC day
     Given a log export for an earlier UTC day
-    When the logs arrive twice with the same worker running and the first batch already staged
+    When the service stages a later arrival for that day
     Then the UTC day should have two distinct complete batches
     And the first completed Parquet file should be unchanged
 
@@ -55,7 +61,7 @@ Feature: Stage closed local log archives
 
   Scenario: Retry publication after permissions are restored
     Given a log export for an earlier UTC day
-    When the service accepts that export while the destination day is unwritable and write access returns
+    When the worker tries to stage that export while the destination day is unwritable and write access returns
     Then the failed publication should leave no temporary or completed files
     And the original export should be staged without another request
     And the retry should complete the original batch
@@ -63,13 +69,14 @@ Feature: Stage closed local log archives
 
   Scenario: Pause staging when the workspace is replaced
     Given a log export for an earlier UTC day
-    When the service accepts that export with a replacement workspace and the original workspace returns
+    When the worker tries to stage that export with a replacement workspace and the original workspace returns
     Then the replacement workspace should receive no archive files
     And the original export should be staged without another request
     And each Parquet file should match its durable batch
 
   Scenario: Accept logs while recovery cannot read a staged file
     Given an acknowledged log export staged in Parquet
+    And another acknowledged export is ready to archive
     When the service restarts with an unreadable staged file and receives another log export
     Then the service should defer further staging until read access is restored
     And the newly accepted logs should be queryable during recovery

@@ -5,22 +5,17 @@ These entries are part of the [accepted-design index](../accepted-design.md).
 ## Initial browser search window
 
 The Logs page opens on the last hour, capped by the configured query limit.
-This narrows archive discovery on initial navigation. Longer searches are
-available through the time presets and absolute links within the configured limit.
+Choose a time preset or use an absolute link for longer searches.
 [Log queries](../../queries.md#-investigate-logs-in-the-browser)
 
-## Search scope
+## Search sources
 
-Log searches use an explicit scope. The response reports which sources the
-search covered, including for empty results.
+The query API and the Logs page choose sources from the time bounds. Ranges
+covered by the current database volume use local query capacity. Searches
+that need unavailable archive history return an error in both interfaces.
 [ListLogs protobuf contract](../../../api/einblick/v1/service.proto)
 
-The Logs page shows a coverage notice when the search covers only the current
-database volume. The **Local and archive** option identifies the full scope.
-Archive results also show their coverage when the form has an unsubmitted
-**Local only** selection.
-
-## Search admission by scope
+## Search admission by source
 
 Apply `queries.concurrency` independently to current-volume and archive-inclusive
 searches. A stalled native archive read keeps its archive slot until cleanup

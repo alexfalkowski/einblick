@@ -10,6 +10,8 @@ module Einblick
 
       BUCKET = '/einblick-publication-feature'
 
+      attr_writer :defer_archive_eviction, :unreadable_archives
+
       def start
         @server = Nonnative::HTTPServer.new(method(:forward), server_config)
         @server.start
@@ -93,7 +95,7 @@ module Einblick
 
       def forward(env)
         incoming = Rack::Request.new(env)
-        intercepted = intercept(incoming, env) || archive_listing_failure(incoming) || multipart_initiation_failure(incoming)
+        intercepted = intercepted_request(incoming, env)
         return intercepted if intercepted
 
         listing = archive_listing?(incoming)
@@ -102,6 +104,11 @@ module Einblick
         return archive_listing_response(incoming, response) if listing && response.is_a?(Net::HTTPSuccess)
 
         respond(incoming, response)
+      end
+
+      def intercepted_request(incoming, env)
+        intercept_archive_read(incoming) || intercept(incoming, env) || archive_listing_failure(incoming) ||
+          archive_eviction_failure(incoming) || multipart_initiation_failure(incoming)
       end
 
       def rack_response(response, body)

@@ -17,22 +17,9 @@ module Einblick
         inspect_eviction
       end
 
-      def evict_batches_with_mixed_receipt_ages
-        @retained_archive_record_count = @query_record_count
-        with_floci do
-          age_unbatched_archive_logs(keep_latest: true)
-          publish_searchable_logs
-          earlier_key = @floci.keys.fetch(0)
-          publish_older_archive_logs
-          record_eviction_pair(earlier_key)
-          with_archive_eviction('history_retention')
-        end
-        inspect_eviction
-      end
-
       def prepare_shared_context_batches
         prepare_archive_storage
-        stage_log_archive(shared_archive_context_fixture, 2)
+        stage_log_archive(shared_archive_context_fixture(next_day: true), 2)
         @evicted_batch_id, @retained_batch_id = @archive_batches.map(&:first)
         @sibling_archive_key = staged_archive_key(@retained_batch_id)
         times = @stored_archive_logs.map(&:last)
@@ -96,23 +83,6 @@ module Einblick
         when 'checksum changed' then @floci.replace_archive(key)
         when 'contents changed without checksum' then @floci.replace_archive(key, keep_checksum: true)
         else raise ArgumentError, "Unknown archive fault: #{fault}"
-        end
-      end
-
-      def publish_older_archive_logs
-        acknowledge_query_export(query_fixture('log_queries'))
-        age_unbatched_archive_logs
-        publish_searchable_logs
-      end
-
-      def age_unbatched_archive_logs(keep_latest: false)
-        older_receipt = (Time.now - (2 * 3600)).to_i * 1_000_000_000
-        with_log_database do |connection|
-          connection.query(<<~SQL, older_receipt, keep_latest)
-            UPDATE logs SET received_timestamp_ns = ?
-            WHERE id NOT IN (SELECT log_id FROM log_archive_members)
-              AND (NOT ?::BOOLEAN OR id <> (SELECT max(id) FROM logs))
-          SQL
         end
       end
     end

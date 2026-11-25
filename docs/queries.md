@@ -25,15 +25,11 @@ duration. A bookmarked range outside the presets is labeled **Current range**.
 For a custom interval within the limit, supply both `start_time` and `end_time`
 in the `/logs` URL as RFC 3339 timestamps.
 
-Choose **Search scope → Local only** to search the current database volume during
-an archive outage. Local-only searches have their own query capacity while
-archive-inclusive searches wait on R2. The results show a local-only notice
-whenever the search covers only the current volume, including on empty pages.
-Archive results show their coverage if you select **Local only** before
-submitting the new search.
-If the page fails to load, choose **Search local logs** or open
-`/logs?search_scope=local` directly to search the recent local window. Use
-**Local and archive** to include available history again.
+The Logs page chooses where to search based on the selected time range.
+Recent ranges covered by the current database volume can load during an R2
+outage. If a search needs unavailable archive history, the page shows a
+storage error. Choose a recent time preset or retry the same range after
+the archive recovers.
 
 The table shows UTC time to the second. When the producer omits event time,
 the **Log details** summary labels the observation or receipt time used in its
@@ -77,11 +73,10 @@ first or expect an empty page. Use `application/pbjson` for canonical protobuf
 JSON, including RFC 3339 Timestamp strings. The shared HTTP RPC transport owns
 content negotiation. Generated gRPC clients call `ListLogs` on port `12000`.
 
-Regenerate binary protobuf clients from the current schema before using this
-version of `ListLogs`. The new search scope changes the field numbers assigned
-to filters, pagination and response logs. Regenerate strict protobuf JSON
-bindings too, or configure their decoders to accept unknown fields until they
-can read the new `searchScope` response field.
+Regenerate Go and Ruby protobuf clients from the current schema and remove
+`searchScope` from requests. The server chooses sources from the time bounds.
+With R2 configured, a range that can include evicted logs also searches the
+archive. If that history is unavailable, the API returns an error.
 
 ## 🕒 Time and filter scope
 
@@ -102,7 +97,6 @@ All supplied filters must match:
 
 | Parameter | Meaning |
 | --- | --- |
-| `search_scope` | `LOG_SEARCH_SCOPE_ALL_SOURCES` searches the current database volume and any configured archive. `LOG_SEARCH_SCOPE_CURRENT_VOLUME` searches the current volume only. Omission and `LOG_SEARCH_SCOPE_UNSPECIFIED` use the configured sources. |
 | `service` | Exact string `service.name` resource attribute; omitted/empty selects all services. |
 | `severity` | Exact OTLP severity suffix, such as `INFO`, `ERROR`, `WARN2` or `UNSPECIFIED`; omitted/empty selects all severities. This is not a minimum threshold. |
 | `text` | Case-sensitive literal substring of string bodies only. Attributes, resource/scope fields and non-string bodies are outside text-search scope. SQL and wildcard characters remain literal. |
@@ -112,15 +106,14 @@ All supplied filters must match:
 
 ## 📄 Results and pagination
 
-The response contains `meta`, `logs`, `next_page_token` and `search_scope`.
-The reported scope identifies the sources searched, including when there are
-zero matches. `meta` carries shared request metadata such as `request_id` and
+The response contains `meta`, `logs` and `next_page_token`.
+`meta` carries shared request metadata such as `request_id` and
 `user_agent`. Each log includes a volume-local `id`, protobuf `event_time` and
 `receive_time` Timestamps, and typed OTLP
 `resource`, `scope` and `record` messages.
 
 Canonical protobuf JSON uses camelCase field names: `startTime`, `endTime`,
-`traceId`, `searchScope`, `pageSize`, `pageToken`, `nextPageToken`, `eventTime` and `receiveTime`.
+`traceId`, `pageSize`, `pageToken`, `nextPageToken`, `eventTime` and `receiveTime`.
 The decoder also accepts the proto's snake_case names shown in the filter table.
 Response IDs and other 64-bit integers are decimal strings; bytes use base64.
 Timestamps are UTC RFC 3339 strings preserving nanoseconds. These messages retain
@@ -149,6 +142,10 @@ Each page reads the committed records visible to that request. New records
 behind the cursor can appear on later pages. Records ahead of it, including
 equal-time arrivals with higher IDs, require a fresh query. Existing records
 appear once across pages.
+
+Archive-inclusive searches discover Parquet files for the remaining UTC
+days in the selected range. A continuation excludes days newer than its
+last returned record.
 
 An empty token means exhaustion. Token size is independent of filter length.
 An empty first page means no matches. Protobuf JSON omits default-valued fields, so

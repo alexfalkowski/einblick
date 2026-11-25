@@ -23,11 +23,17 @@ var archivedLogsQuery string
 //go:embed queries/archive/sources.sql
 var archiveSourcesQuery string
 
+//go:embed queries/archive/evictions.sql
+var archiveEvictionsQuery string
+
 //go:embed queries/archive/backlog.sql
 var archiveBacklogQuery string
 
 //go:embed queries/archive/next_batch.sql
 var nextBatchQuery string
+
+//go:embed queries/archive/rotate_staging.sql
+var rotateStagingQuery string
 
 //go:embed queries/archive/next_day.sql
 var nextDayQuery string
@@ -40,6 +46,9 @@ var sourceRowsQuery string
 
 //go:embed queries/archive/insert_batch.sql
 var insertBatchQuery string
+
+//go:embed queries/archive/seal_batch.sql
+var sealBatchQuery string
 
 //go:embed queries/archive/complete_batch.sql
 var completeBatchQuery string
@@ -86,8 +95,17 @@ var evictMembersQuery string
 //go:embed queries/archive/mark_evicted.sql
 var markEvictedQuery string
 
-//go:embed queries/parquet/copy_batch.sql
-var copyBatchQuery string
-
 //go:embed queries/parquet/parquet_rows.sql
 var parquetRowsQuery string
+
+//go:embed queries/archive/digest_page.sql
+var digestPageQuery string
+
+//go:embed queries/archive/source_position.sql
+var sourcePositionQuery string
+
+//go:embed queries/parquet/parquet_count.sql
+var parquetCountQuery string
+
+//go:embed queries/archive/digest_page_sizes.sql
+var digestPageSizesQuery string

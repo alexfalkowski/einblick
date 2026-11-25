@@ -62,10 +62,10 @@ type Store struct {
 	retention   time.Duration
 }
 
-// List yields objects with the given prefix and stops on the first error.
-func (s *Store) List(ctx context.Context, prefix string) iter.Seq2[archive.Object, error] {
+// List yields objects in key order under prefix and after startAfter.
+func (s *Store) List(ctx context.Context, prefix, startAfter string) iter.Seq2[archive.Object, error] {
 	return func(yield func(archive.Object, error) bool) {
-		for entry, err := range s.discovery.List(ctx, s.bucket, &client.ListOptions{Prefix: prefix}) {
+		for entry, err := range s.discovery.List(ctx, s.bucket, &client.ListOptions{Prefix: prefix, StartAfter: startAfter}) {
 			if err != nil {
 				yield(archive.Object{}, err)
 				return

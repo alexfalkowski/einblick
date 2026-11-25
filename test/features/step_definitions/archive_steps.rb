@@ -4,12 +4,16 @@ Given('typed logs spanning UTC midnight and using both timestamp fallbacks') do
   @archive_request = archive_timestamp_fixture
 end
 
-Given('an accepted-size log body larger than the Parquet batch target') do
+Given('a log export with a large body') do
   @archive_request = large_archive_fixture
 end
 
-Given('three same-day logs with large {string} that fit the batch target only two at a time') do |content|
+Given('three same-day logs with large {string}') do |content|
   @archive_request = content == 'bodies' ? same_day_archive_fixture : shared_archive_context_fixture
+end
+
+Given('{int} distinct same-day logs share a large resource') do |count|
+  @archive_request = large_archive_resource_fixture(count)
 end
 
 Given('a log export for an earlier UTC day') do
@@ -47,6 +51,10 @@ Given('an acknowledged export with {string} staging') do |state|
   prepare_archive_recovery(state)
 end
 
+Given('another acknowledged export is ready to archive') do
+  commit_archive_fixture(@archive_request)
+end
+
 When('the service stages the acknowledged logs') do
   prepare_archive_storage
   stage_log_archive(@archive_request, 4)
@@ -54,10 +62,10 @@ end
 
 When('the service stages that log export') do
   prepare_archive_storage
-  stage_log_archive(@archive_request, 2)
+  stage_log_archive(@archive_request, 1)
 end
 
-When('the logs arrive twice with the same worker running and the first batch already staged') do
+When('the service stages a later arrival for that day') do
   stage_late_log_archive
 end
 
@@ -65,11 +73,11 @@ When('the service attempts to start with local archival enabled') do
   attempt_archive_start
 end
 
-When('the service accepts that export while the destination day is unwritable and write access returns') do
+When('the worker tries to stage that export while the destination day is unwritable and write access returns') do
   retry_archive_publication
 end
 
-When('the service accepts that export with a replacement workspace and the original workspace returns') do
+When('the worker tries to stage that export with a replacement workspace and the original workspace returns') do
   stage_after_workspace_returns
 end
 
@@ -95,7 +103,7 @@ Then('the Parquet files should preserve the complete log export and exact timest
 end
 
 Then('each Parquet file should contain records for its UTC event day') do
-  expect(@archive_partitions).to contain_partitioned_log_days('1970-01-01', '1970-01-02', '2554-07-21', archive_receipt_day)
+  expect(@archive_partitions).to contain_partitioned_log_days('1970-01-01', '1970-01-02', '1970-01-03', archive_receipt_day)
 end
 
 Then('the acknowledged logs should remain in DuckDB') do
@@ -103,14 +111,8 @@ Then('the acknowledged logs should remain in DuckDB') do
   expect(@stored_archive_logs).to eq(@archive_rows)
 end
 
-Then('the larger row should have its own batch and retain its original content') do
-  expect(@archive_members.map(&:last).tally.values).to contain_exactly(1, 1)
-  expect(@archive_rows).to have_stored_log_export(@archive_request)
-end
-
-Then('one Parquet batch should contain two logs and the other should contain one') do
-  expect(@archive_partitions.values.map(&:size)).to contain_exactly(2, 1)
-  expect(@archive_members.map(&:last).tally.values).to contain_exactly(2, 1)
+Then('one Parquet batch should preserve the entire day') do
+  expect(@archive_partitions.size).to eq(1)
   expect(@archive_rows).to have_stored_log_export(@archive_request)
 end
 
@@ -137,7 +139,7 @@ end
 Then('the newly accepted logs should be queryable during recovery') do
   expect(@archive_query_response.code).to eq(200)
   page = Einblick::V1::ListLogsResponse.decode_json(@archive_query_response.body)
-  expect(page.logs.map(&:record)).to match_array(log_query_records(@archive_request) * 2)
+  expect(page.logs.map(&:record)).to match_array(log_query_records(@archive_request) * 3)
 end
 
 Then('each Parquet file should match its durable batch') do

@@ -8,12 +8,13 @@ import (
 	"math/big"
 	"strconv"
 
+	"github.com/alexfalkowski/einblick/internal/logs/archive"
 	"github.com/alexfalkowski/go-service/v3/context"
 	"github.com/alexfalkowski/go-service/v3/database/sql"
 	"github.com/alexfalkowski/go-service/v3/encoding/json"
 	"github.com/alexfalkowski/go-service/v3/errors"
 	"github.com/alexfalkowski/go-service/v3/strings"
-	"github.com/alexfalkowski/go-sync"
+	"github.com/alexfalkowski/go-service/v3/time"
 	logs "go.opentelemetry.io/proto/otlp/logs/v1"
 )
 
@@ -55,12 +56,12 @@ func (r *repository) List(ctx context.Context, query Query) (*Page, error) {
 		return nil, err
 	}
 
-	var scope SearchScope
-	var admission *sync.Semaphore
-	if r.store != nil && query.SearchScope != ScopeCurrentVolume {
-		scope, admission = ScopeAllSources, r.archiveQueries
-	} else {
-		scope, admission = ScopeCurrentVolume, r.localQueries
+	// Use the deadline so ranges read locally stay local across midnight UTC.
+	deadline, _ := ctx.Deadline()
+	mayIncludeEvictions := query.StartTime.Before(archive.LocalWindowStart(deadline))
+	admission := r.localQueries
+	if mayIncludeEvictions && r.store != nil {
+		admission = r.archiveQueries
 	}
 	if err := admission.Acquire(ctx, 1); err != nil {
 		return nil, err
@@ -72,21 +73,26 @@ func (r *repository) List(ctx context.Context, query Query) (*Page, error) {
 		return nil, err
 	}
 
-	page, err := r.readPage(ctx, query, position, scope)
-	if ctx.Err() != nil {
-		return nil, ctx.Err()
+	page, err := r.readPage(ctx, query, position, mayIncludeEvictions)
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		err = ctxErr
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	page.SearchScope = scope
 	return page, nil
 }
 
-func (r *repository) readPage(ctx context.Context, query Query, position *cursor, scope SearchScope) (*Page, error) {
-	if scope == ScopeAllSources {
-		return r.readHistory(ctx, query, *position)
+func (r *repository) readPage(ctx context.Context, query Query, position *cursor, mayIncludeEvictions bool) (*Page, error) {
+	if mayIncludeEvictions {
+		query.EndTime = archivePageEnd(query, *position)
+		if r.store != nil {
+			return r.readHistory(ctx, query, *position)
+		}
+		if err := r.checkLocalHistory(ctx, query); err != nil {
+			return nil, err
+		}
 	}
 
 	rows, err := r.db.QueryContext(ctx, logPageSQL(strings.Empty), pageArgs(query, *position)...)
@@ -94,6 +100,18 @@ func (r *repository) readPage(ctx context.Context, query Query, position *cursor
 		return nil, err
 	}
 	return scanPage(ctx, rows, query.PageSize, position)
+}
+
+func (r *repository) checkLocalHistory(ctx context.Context, query Query) error {
+	startDay, endDay := archiveDays(query)
+	var evicted bool
+	if err := r.db.QueryRowContext(ctx, archiveEvictionsQuery, startDay, endDay).Scan(&evicted); err != nil {
+		return err
+	}
+	if evicted {
+		return errors.New("log archive is unavailable for the requested range")
+	}
+	return nil
 }
 
 func pageArgs(query Query, position cursor) []any {
@@ -107,7 +125,7 @@ func pageArgs(query Query, position cursor) []any {
 	}
 
 	return []any{
-		unixNanoseconds(query.StartTime).String(), unixNanoseconds(query.EndTime).String(),
+		unixNanoseconds(query.StartTime).String(), unixNanoseconds(query.EndTime.Add(-time.Nanosecond.Duration())).String(),
 		position.BeforeNS, position.BeforeNS, position.BeforeID, position.BeforeID, position.BeforeSource,
 		query.Service, query.Service, severity, severity, query.Text, query.Text,
 		query.TraceID, base64.StdEncoding.EncodeToString(trace), query.PageSize + 1,
@@ -162,12 +180,6 @@ func (r *repository) validateQuery(query Query) error {
 		return err
 	}
 
-	switch query.SearchScope {
-	case ScopeDefault, ScopeAllSources, ScopeCurrentVolume:
-	default:
-		return ErrInvalidQuery
-	}
-
 	if query.PageSize < 1 || query.PageSize > r.config.MaxResults {
 		return ErrInvalidQuery
 	}
@@ -209,10 +221,6 @@ func queryCursor(query Query) (*cursor, error) {
 	}
 
 	query.PageToken = strings.Empty
-	if query.SearchScope == ScopeAllSources {
-		query.SearchScope = ScopeDefault
-	}
-
 	content, err := json.Marshal(query)
 	if err != nil {
 		return nil, err

@@ -7,6 +7,7 @@ require (
 	github.com/alexfalkowski/go-service/v3 v3.17.0
 	github.com/alexfalkowski/go-signal/v2 v2.1.0
 	github.com/alexfalkowski/go-sync v1.40.0
+	github.com/apache/arrow-go/v18 v18.5.1
 	github.com/duckdb/duckdb-go/v2 v2.20000.0
 	github.com/pressly/goose/v3 v3.30.1
 	github.com/termermc/go-micro-s3/client v0.0.0-20261107140028-4c9c7292e8c2
@@ -25,7 +26,8 @@ require (
 	github.com/KimMachineGun/automemlimit v1.0.2 // indirect
 	github.com/XSAM/otelsql v0.44.0 // indirect
 	github.com/aead/cmac v0.0.0-20160719120800-7af84192f0b1 // indirect
-	github.com/apache/arrow-go/v18 v18.5.1 // indirect
+	github.com/andybalholm/brotli v1.3.0 // indirect
+	github.com/apache/thrift v0.22.0 // indirect
 	github.com/arl/statsviz v0.8.2 // indirect
 	github.com/avfs/avfs v0.35.0 // indirect
 	github.com/beevik/ntp v1.6.0 // indirect
@@ -54,6 +56,7 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
+	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/flatbuffers v25.12.19+incompatible // indirect
 	github.com/google/pprof v0.0.0-20261111065629-49901cbc7227 // indirect
 	github.com/google/uuid v1.6.0 // indirect
@@ -70,6 +73,7 @@ require (
 	github.com/jackc/puddle/v2 v2.2.3 // indirect
 	github.com/jellydator/ttlcache/v3 v3.4.1 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/klauspost/asmfmt v1.3.2 // indirect
 	github.com/klauspost/compress v1.20.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/leodido/go-urn v1.5.0 // indirect
@@ -77,6 +81,8 @@ require (
 	github.com/lufia/plan9stats v0.0.0-20261101121723-be84dd9509a0 // indirect
 	github.com/matoous/go-nanoid v1.5.1 // indirect
 	github.com/mfridman/interpolate v0.2.0 // indirect
+	github.com/minio/asm2plan9s v0.0.0-20200509001527-cdd76441f9d8 // indirect
+	github.com/minio/c2goasm v0.0.0-20190812172519-36a3d3bbc4f3 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect

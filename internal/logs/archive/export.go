@@ -16,9 +16,9 @@ type Service interface {
 	// Recover verifies completed files and requeues absent or damaged files.
 	Recover(ctx context.Context) error
 
-	// Export stages the next batch and records completion. It returns the batch
-	// ID when claimed and an empty ID when there is no work.
-	Export(ctx context.Context) (string, error)
+	// Export stages the next batch using today at midnight UTC. It returns
+	// the batch ID when claimed and an empty ID when there is no work.
+	Export(ctx context.Context, today time.Time) (string, error)
 
 	// Publish reconciles or uploads one batch and reclaims its confirmed file.
 	// It returns the batch ID after cleanup or when processing that batch fails.
@@ -28,8 +28,8 @@ type Service interface {
 	// It leaves absent remote objects pending for Publish and reports IDs as Publish does.
 	ReconcilePublication(ctx context.Context) (string, error)
 
-	// Evict releases one batch eligible for local eviction.
-	Evict(ctx context.Context) (string, error)
+	// Evict releases one batch eligible for local eviction as of today in UTC.
+	Evict(ctx context.Context, today time.Time) (string, error)
 }
 
 // ServiceParams supplies the injected dependencies for archive export.
@@ -46,31 +46,26 @@ type ServiceParams struct {
 // NewService composes durable batch state, local staging, publication and diagnostics.
 // A nil configuration disables archive export.
 func NewService(params ServiceParams) Service {
-	cfg := params.Config
-	if cfg == nil {
+	if params.Config == nil {
 		return nil
 	}
 
 	return &loggingService{
 		Service: &service{
-			batches:        params.Batches,
-			eviction:       params.Eviction,
-			files:          params.Files,
-			objects:        params.Objects,
-			batchBytes:     cfg.BatchSize.Bytes(),
-			localRetention: cfg.LocalRetention,
+			batches:  params.Batches,
+			eviction: params.Eviction,
+			files:    params.Files,
+			objects:  params.Objects,
 		},
 		logger: params.Logger,
 	}
 }
 
 type service struct {
-	batches        BatchRepository
-	eviction       EvictionRepository
-	files          StagedFiles
-	objects        ObjectStore
-	batchBytes     int64
-	localRetention time.Duration
+	batches  BatchRepository
+	eviction EvictionRepository
+	files    StagedFiles
+	objects  ObjectStore
 }
 
 func (s *service) Prepare() error {
@@ -88,10 +83,11 @@ func (s *service) Recover(ctx context.Context) error {
 	})
 }
 
-func (s *service) Export(ctx context.Context) (string, error) {
-	batch, err := s.batches.Next(ctx, s.batchBytes)
+func (s *service) Export(ctx context.Context, today time.Time) (string, error) {
+	// Leave today and yesterday local, and group supplements after their receipt day ends.
+	batch, err := s.batches.Next(ctx, LocalWindowStart(today), today)
 	if err != nil || strings.IsEmpty(batch.ID) {
-		return strings.Empty, err
+		return batch.ID, err
 	}
 
 	return batch.ID, s.stage(ctx, batch)

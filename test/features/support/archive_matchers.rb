@@ -1,15 +1,5 @@
 # frozen_string_literal: true
 
-RSpec::Matchers.define :complete_archive_batch_before_retry do |operation, healthy_id, blocked_id|
-  match(notify_expectation_failures: true) do |diagnostics|
-    completed = diagnostics.index(/#{Regexp.escape(operation)} completed.*batch_id=#{Regexp.escape(healthy_id)}/)
-    retried = diagnostics.index(/#{Regexp.escape(operation)} failed.*batch_id=#{Regexp.escape(blocked_id)}/)
-    expect(completed).not_to be_nil
-    expect(retried).not_to be_nil
-    expect(completed).to be < retried
-  end
-end
-
 RSpec::Matchers.define :omit_archive_backlog_gauges do
   match(notify_expectation_failures: true) do |response|
     expect(response.code).to eq(200)
@@ -50,20 +40,6 @@ RSpec::Matchers.define :have_cached_backlog_during_first_read do |diagnostics, p
     expect(metrics).to include(
       have_duckdb_metric('einblick_db_sql_connection_open').and(have_archive_backlog('pending_records' => pending_records))
     )
-  end
-end
-
-RSpec::Matchers.define :label_log_coverage do |label, empty: false, hidden: false|
-  match(notify_expectation_failures: true) do |response|
-    fragment = Nokogiri::HTML5.fragment(response.body)
-    coverage = fragment.at_css('#results .result-coverage')
-    expect(coverage&.text).to eq(label)
-    expect(coverage.key?('hidden')).to eq(hidden)
-    if empty
-      expect(fragment.at_css('#results .empty-state')).not_to be_nil
-    else
-      expect(fragment.css('#results .log-row')).not_to be_empty
-    end
   end
 end
 

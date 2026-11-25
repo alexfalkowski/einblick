@@ -124,7 +124,7 @@ in the package that owns the behavior.
 | Package | Owns |
 | --- | --- |
 | [archive](../internal/logs/archive) | Batch identity, export and publication policy. |
-| [storage](../internal/logs/storage) | Durable batch and upload state and native DuckDB Parquet writes. |
+| [storage](../internal/logs/storage) | Durable batch and upload state, Parquet export and DuckDB verification. |
 | [staging](../internal/logs/archive/staging) | Workspace recovery, temporary files, checksums, final rename and file cleanup. |
 | [r2](../internal/r2) | R2 connection settings, conditional S3 writes and streamed content verification. |
 | [worker](../internal/logs/archive/worker) | Workspace preparation and scheduling of recovery, exports and publication. |

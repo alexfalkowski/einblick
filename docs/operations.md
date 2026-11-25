@@ -67,20 +67,22 @@ flowchart TD
     Verify -->|Recovery complete| Stage[Stage one batch per tick]
 ```
 
-DuckDB retains the batch's exact members and logical digest. The exporter
-verifies the written rows, renames the file, and records its byte checksum.
+DuckDB records the batch's exact members before computing the logical digest.
+The exporter verifies the written rows, renames the file, and records its
+byte checksum.
 Recovery uses the retained rows to regenerate files while ingestion and recent
 queries stay available.
 
-When the staging mount fills, new export attempts fail and are retried at the
-configured interval. Inspect `component=log_archive` diagnostics and available
-workspace capacity. Increase or restore writable capacity and allow the next
-export attempt to run. Keep the database and staging mount accessible at startup
-when export is enabled. If the worker reports that the prepared workspace is
-missing or changed, restore the original mount and its `v1` directory so the
-worker can retry. After intentionally replacing the workspace, mount the
-replacement and restart Einblick. Startup initializes the export directory on
-the new filesystem so the worker can regenerate missing files from retained logs.
+When a batch fails to stage, it retains its identity and source rows and moves
+behind work already waiting. A daily file that exceeds the staging capacity
+can remain pending while smaller batches proceed. Inspect `component=log_archive`
+diagnostics and restore enough writable capacity for the blocked file. Keep the
+database and staging mount accessible at startup when export is enabled. If
+the prepared workspace is missing or changed, restore the original mount and
+its `v1` directory so the worker can retry. After intentionally replacing the
+workspace, mount the replacement and restart Einblick. Startup initializes the
+export directory on the new filesystem so the worker can regenerate missing
+files from retained logs.
 
 ## ☁️ R2 publication and recovery
 
@@ -111,17 +113,15 @@ capacity. The archive exports these OpenTelemetry gauges.
 | `log_archive.last_publication.timestamp` | `s` | Unix timestamp of the latest confirmed publication. |
 
 An empty backlog reports zero pending records, bytes and age. An archive with
-no confirmed publication reports a zero timestamp. A database with only legacy
-confirmations omits the publication timestamp until a UTC confirmation is recorded.
-Metrics collections use the latest sample from the background sampler.
+no confirmed publication reports a zero timestamp. Metrics collections use the
+latest sample from the background sampler.
 Each read uses `queries.timeout`. After it returns, the sampler rests for the
 longer of `archive.interval` and the time spent reading. Until a sample
 succeeds, or after a failed refresh, these gauges are omitted. Unconfirmed batches
 retain their source rows. Publication and eviction attempts move each batch to
-the end of its durable retry queue. Existing queues preserve their relative
-order at upgrade. The worker retries damaged staging in the same publication
-rotation. A blocked repair leaves the export slot available for new logs on
-other days. If the key contains conflicting bytes, investigate the
+the end of its durable retry queue. The worker retries damaged staging in the
+same publication rotation. A blocked repair leaves the export slot available
+for new logs on other days. If the key contains conflicting bytes, investigate the
 bucket and key ownership before changing the object. The worker preserves an
 existing object and leaves the batch pending when verification fails. If
 verification repeatedly times out, check that `archive.r2.client.timeout`
@@ -140,18 +140,19 @@ policy.
 When R2 is configured, the query API and Logs page discover Parquet objects in
 the selected UTC days. A fresh database volume can query existing objects as
 soon as it can reach the configured bucket. Keep the same bucket when reopening
-a database that has evicted batches.
+a database that has evicted batches. If R2 is unconfigured on that volume,
+searches overlapping UTC days with evicted batches report unavailable storage.
 
-Historical reads include existing `v1` Parquet objects. The local migration
-records object upload time at eviction without changing archived files. For
-batches evicted by an older binary, Einblick uses the timestamp from the R2
-listing. When a search starts with an older batch already missing and its
-upload time is unknown, the search reports unavailable history. Use the
-[schema rollback guidance](#-log-storage-and-recovery) for the database volume.
+Historical reads include existing `v1` Parquet objects. Einblick records object
+upload time at eviction and can also use the timestamp from the R2 listing.
+If a search requires a missing object and its upload time is unknown, the search
+reports unavailable history. For the database volume, follow the
+[schema rollback guidance](#-log-storage-and-recovery).
 
-When [local retention](configuration.md#-r2-log-archives) is enabled, the worker
-downloads the confirmed object and verifies its checksum before deleting the
-batch's local source rows. Count this GET in the
+With [R2 configured](configuration.md#-r2-log-archives), the worker downloads a
+confirmed object and verifies its checksum before deleting the batch's local
+source rows. The current and previous UTC event days remain local. Count this
+GET in the
 [R2 Class B operation budget](https://developers.cloudflare.com/r2/pricing/#class-b-operations).
 Look for `local log archive eviction failed` under `component=log_archive` when
 eligible batches stay local. A missing, unavailable or changed object leaves its
@@ -167,8 +168,9 @@ storage. Queries use the listing timestamp when available. For an unlisted
 object, Einblick allows for the one-second precision of the recorded R2
 `Last-Modified` before treating it as expired. If an eligible listed object
 disappears during a read, Einblick refreshes the listing and retries the search
-once after confirming the object is gone. During an outage, **Search scope →
-Local only** searches the current volume.
+once after confirming the object is gone. During an outage, choose a recent
+time preset or select **Open Logs** to return to the default recent range.
+Retry the original range after archive access returns.
 
 ## ♻️ Changing archive retention
 

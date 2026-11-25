@@ -12,11 +12,13 @@ module Einblick
       end
 
       def publish_while_archive_listings_are_unavailable
+        stage_log_archive(@archive_request, 1)
         with_floci do
+          key = hold_staged_archive
           @floci.fail_next_archive_listing
-          run_publication('publication_breaker') do
+          run_publication('publication_breaker', query_local: false) do
             query_during_archive_recovery
-            acknowledge_archive_logs(@archive_request)
+            @floci.release_archive_read(key)
           end
           inspect_publication
         end
@@ -27,18 +29,18 @@ module Einblick
           publish_searchable_logs
           archived_key = @floci.keys.fetch(0)
           with_archive_eviction
+          stage_log_archive(query_fixture('log_queries'), 1)
+          later_key = hold_staged_archive
           @floci.hold_archive_listing(archived_key)
-          with_eviction_profile { publish_after_archive_listing(archived_key) }
+          with_eviction_profile { publish_after_archive_listing(later_key) }
         end
       end
 
-      def publish_after_archive_listing(archived_key)
+      def publish_after_archive_listing(later_key)
         with_active_archive_query do
           wait_for { @floci.archive_listing_waiting? }.to be(true)
-          acknowledge_query_export(query_fixture('log_queries'))
-          later_keys = []
-          wait_for { later_keys = @floci.keys - [archived_key] }.not_to be_empty
-          wait_for_archive_evictions(*later_keys)
+          @floci.release_archive_read(later_key)
+          wait_for_archive_evictions(later_key)
           @floci.release_archive_listing
         end
       end
@@ -68,6 +70,7 @@ module Einblick
       def prepare_local_logs_during_archive_stall
         @local_stall_service = "local-#{@query_service}"
         @local_stall_request = query_fixture('log_queries', service: @local_stall_service)
+        @local_stall_bounds = move_logs_to_recent_window(@local_stall_request)
         archive_receipts = @query_receipt_windows.dup
         export_query_logs(@local_stall_request, @local_stall_request.class.encode(@local_stall_request))
         @local_stall_receipts = @query_receipt_windows
@@ -77,9 +80,7 @@ module Einblick
       end
 
       def search_local_logs_during_archive_stall(key)
-        @local_stall_response = query_logs(
-          'service' => @local_stall_service, 'search_scope' => 'LOG_SEARCH_SCOPE_CURRENT_VOLUME'
-        )
+        @local_stall_response = query_logs(@local_stall_bounds.merge('service' => @local_stall_service))
         @archive_read_remained_held = @floci.archive_read_waiting?(key)
       end
 

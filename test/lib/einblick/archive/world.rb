@@ -23,12 +23,31 @@ module Einblick
       end
 
       def stage_log_archive(request, file_count)
-        existing = archive_files.size
-        with_server_profile('archive') do
-          acknowledge_archive_logs(request)
-          wait_for_archive(file_count, existing)
-        end
+        commit_archive_fixture(request)
+        stage_ready_archive(file_count, archive_files.size)
         inspect_archive
+      end
+
+      def stage_ready_archive(file_count, existing)
+        @archive_offset = File.size('reports/server.log')
+        with_server_profile('archive') { wait_for_archive(file_count, existing) }
+      end
+
+      def commit_archive_fixture(request)
+        acknowledge_archive_logs(request)
+        age_pending_archive_receipts
+      end
+
+      def age_pending_archive_receipts
+        cutoff = daily_midnight
+        shift = 3 * DAY_NANOSECONDS
+        with_log_database do |connection|
+          connection.query(File.read('fixtures/age_archive_receipts.sql'), shift, shift, cutoff)
+        end
+        @export_started_ns -= shift if @export_started_ns && @export_started_ns >= cutoff
+        @query_receipt_windows&.transform_values! do |window|
+          window.begin >= cutoff ? (window.begin - shift)..(window.end - shift) : window
+        end
       end
 
       def wait_for_archive(file_count, existing)
@@ -38,43 +57,45 @@ module Einblick
       end
 
       def stage_late_log_archive
-        @archive_offset = File.size('reports/server.log')
-        with_server_profile('archive') do
-          acknowledge_archive_logs(@archive_request)
-          wait_for_archive(1, 0)
-          @first_archive_path = archive_files.fetch(0)
-          @first_archive_checksum = Digest::SHA256.file(@first_archive_path).hexdigest
-          acknowledge_archive_logs(@archive_request)
-          wait_for_archive(2, 0)
-        end
-        inspect_archive
+        stage_log_archive(@archive_request, 1)
+        @first_archive_path = archive_files.fetch(0)
+        @first_archive_checksum = Digest::SHA256.file(@first_archive_path).hexdigest
+        stage_log_archive(@archive_request, 2)
       end
 
       def stage_after_workspace_returns
-        with_server_profile('archive') do
-          with_replaced_archive_workspace do
-            acknowledge_archive_logs(@archive_request)
-            wait_for { archive_diagnostics.scan('log archive workspace changed since startup').size }.to be >= 2
-            @replacement_archive_contents = Dir.children(WORKSPACE).sort
-            @replacement_archive_version_contents = Dir.children(ARCHIVE_DIRECTORY)
-          end
-          wait_for_archive(1, 0)
+        commit_archive_fixture(@archive_request)
+        day = prepare_archive_day_directory
+        with_unwritable_directory(day) do |permissions|
+          with_server_profile('archive') { resume_after_workspace_returns(day, permissions) }
         end
         inspect_archive
+      end
+
+      def resume_after_workspace_returns(day, permissions)
+        with_replaced_archive_workspace do
+          wait_for { archive_diagnostics.scan('log archive workspace changed since startup').size }.to be >= 2
+          @replacement_archive_contents = Dir.children(WORKSPACE).sort
+          @replacement_archive_version_contents = Dir.children(ARCHIVE_DIRECTORY)
+        end
+        File.chmod(permissions, day)
+        wait_for_archive(1, 0)
       end
 
       def retry_archive_publication
-        day = File.join(ARCHIVE_DIRECTORY, 'signal=logs', "day=#{archive_event_day}")
-        FileUtils.mkdir_p(day)
-        with_server_profile('archive') do
-          with_unwritable_directory(day) { observe_failed_publication }
-          wait_for_archive(1, 0)
+        commit_archive_fixture(@archive_request)
+        with_unwritable_directory(prepare_archive_day_directory) do
+          with_server_profile('archive') { observe_failed_publication }
         end
+        stage_ready_archive(1, 0)
         inspect_archive
       end
 
+      def prepare_archive_day_directory(day = archive_event_day)
+        File.join(ARCHIVE_DIRECTORY, 'signal=logs', "day=#{day}").tap { |path| FileUtils.mkdir_p(path) }
+      end
+
       def observe_failed_publication
-        acknowledge_archive_logs(@archive_request)
         failure = /local log archive export failed.*batch_id=([\w-]+).*renameat (\S+) /
         wait_for { archive_diagnostics }.to match(failure)
         _, @failed_publication_batch_id, partial = archive_diagnostics.match(failure).to_a

@@ -18,8 +18,8 @@ Feature: Publish log archives to object storage
     And the acknowledged logs should still be queryable locally
 
   Scenario: Enable publication for a database that already contains staged logs
-    Given a log batch staged on the previous database schema
-    When the upgraded service publishes the staged batch
+    Given a log batch was staged before object storage was configured
+    When the service publishes the staged batch
     Then the original batch identity and membership should be preserved
     And the object store should contain one Parquet batch with the accepted logs
     And the published batch should be recorded and its staging file reclaimed
@@ -118,14 +118,19 @@ Feature: Publish log archives to object storage
     Then both batches should be confirmed and only the later batch should be reclaimed
     And eviction should reclaim the later batch and retain the earlier batch locally
 
-  Scenario: Continue publication after upgrading a queue with blocked cleanup
-    Given acknowledged log batches are staged for two archive days on the previous schema
-    When the service publishes while the earlier staging directory is unwritable
-    Then both batches should be confirmed and only the later batch should be reclaimed
-    And publication should complete the healthy batch before retrying the blocked one
-    And eviction should reclaim the later batch and retain the earlier batch locally
-
   Scenario: Publish newly accepted logs while repair of an earlier batch is blocked
     Given an acknowledged log export staged in Parquet
-    When a staged file is corrupted and its directory is unwritable as logs arrive for another day
-    Then only the newly accepted logs should be published and the blocked staging file should remain
+    When a staged file is corrupted and its directory is unwritable while another day is ready to archive
+    Then only the healthy day's logs should be published and the blocked staging file should remain
+
+  Scenario: Publish another day while staging an earlier day is blocked
+    Given acknowledged logs are waiting to be staged for two archive days
+    When the earlier staging directory is unwritable and later becomes writable
+    Then the later day should be published while staging is blocked for the earlier day
+    And the earlier day should publish under its original batch key after access returns
+
+  Scenario: Recover a claimed day after its source digest fails
+    Given acknowledged logs are waiting to be staged for two archive days
+    When the source read for the earlier day fails and the service restarts after repair
+    Then the later day should be published while staging is blocked for the earlier day
+    And the earlier archive should contain the original batch members under the original key

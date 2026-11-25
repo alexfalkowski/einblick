@@ -7,6 +7,7 @@ module LogView
     'en' => {
       title: 'Logs · Einblick', heading: 'Logs', service: 'Service', submit: 'Search', reset: 'Reset', loading: 'Loading logs…',
       results: 'Log query results', message: 'Message', empty: 'No logs found',
+      unavailable: 'Log storage is unavailable',
       empty_hint: 'Try a wider time range or clear a filter.', structured: 'Structured message', no_message: 'No message',
       timing: 'Timing and IDs', search: 'Search messages', time_range: 'Time range', retry: 'Try again',
       'broken link': 'This search link couldn’t be opened.', open_logs: 'Open Logs',

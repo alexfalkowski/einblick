@@ -4,11 +4,19 @@ module Einblick
   module Archive
     # Synthetic log inputs exercise calendar boundaries and archive sizing.
     module World
+      def prepare_two_pending_archive_days
+        prepare_archive_publication
+        commit_archive_fixture(@archive_request)
+        later_request = next_day_archive_request
+        commit_archive_fixture(later_request)
+        @later_archive_day = archive_event_day(later_request)
+      end
+
       def archive_timestamp_fixture
         request = representative_export('logs')
         add_archive_context(request)
         midnight = 86_400_000_000_000
-        times = [[midnight - 1, 1], [midnight, 0], [midnight, 0], [midnight, 0], [0, 18_446_744_073_709_551_615], [0, 0]]
+        times = [[midnight - 1, 1], [midnight, 0], [midnight, 0], [midnight, 0], [0, midnight * 2], [0, 0]]
         log_query_records(request).zip(times).each { |record, times| record.time_unix_nano, record.observed_time_unix_nano = times }
         request
       end
@@ -51,19 +59,25 @@ module Einblick
         request
       end
 
-      def shared_archive_context_fixture
+      def shared_archive_context_fixture(next_day: false)
         request = representative_export('logs')
         resource = request.resource_logs.first
         scope = resource.scope_logs.first
         add_archive_context_bytes(resource.resource, 9000)
         add_archive_context_bytes(scope.scope, 9000)
-        scope.log_records << scope.log_records.first.dup
+        records = scope.log_records
+        records << records.first.dup
+        records.last.time_unix_nano += DAY_NANOSECONDS if next_day
         request
       end
 
       def add_archive_context_bytes(header, size)
+        add_archive_context_attribute(header, Random.new(1).bytes(size))
+      end
+
+      def add_archive_context_attribute(header, bytes)
         common = Opentelemetry::Proto::Common::V1
-        value = common::AnyValue.new(bytes_value: Random.new(1).bytes(size))
+        value = common::AnyValue.new(bytes_value: bytes)
         header.attributes << common::KeyValue.new(key: 'archive.context', value: value)
       end
 

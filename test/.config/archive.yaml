@@ -2,7 +2,6 @@ environment: development
 archive:
   workspace: reports/archive/resource=main
   interval: 100ms
-  batch_size: 65536B
 queries:
   max_results: 100
   max_range: 168h

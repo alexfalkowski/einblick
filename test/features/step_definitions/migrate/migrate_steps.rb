@@ -10,21 +10,12 @@ Given('acknowledged logs in the previous schema') do
   expect(@response.partial_success).to be_nil
 end
 
-Given('acknowledged logs in the staging schema') do
-  prepare_staging_log_schema
-  expect(@response.partial_success).to be_nil
-end
-
 When('the server upgrades the log database') do
   upgrade_log_schema
 end
 
 When('a schema conflict interrupts the archival upgrade and is repaired') do
   retry_archive_migration
-end
-
-When('a schema conflict interrupts the publication upgrade and is repaired') do
-  retry_publication_migration
 end
 
 When('the server reopens an up-to-date schema') do
@@ -64,15 +55,9 @@ Then('the failed archival upgrade should leave the previous schema and logs inta
   expect(@startup_status).not_to be_success, @startup_output
   expect(@startup_output).to include('migration', 'log_archive_rows')
   expect(@failed_schema_tables).to be_empty
+  expect(@failed_schema_sequences).to be_empty
   expect(@failed_archive_history).to eq(@migration_history_before)
   expect(@failed_archive_schema_data).to eq(@schema_data_before)
-end
-
-Then('the failed publication upgrade should leave the staging schema and logs intact') do
-  expect(@startup_status).not_to be_success, @startup_output
-  expect(@startup_output).to include('migration', 'log_archive_uploads')
-  expect(@failed_publication_columns).to be_empty
-  expect(@failed_publication_snapshot).to eq([@schema_data_before, @migration_history_before])
 end
 
 Then("startup should fail without committing the migration's schema changes") do

@@ -8,11 +8,12 @@ import (
 	"github.com/alexfalkowski/go-service/v3/time"
 )
 
-// NextEviction records an attempt on the longest-waiting eligible batch.
+// NextEviction records an attempt on the longest-waiting confirmed and cleaned
+// batch whose UTC event day predates eventBefore.
 // A zero value indicates no eligible batch.
-func (r *Archive) NextEviction(ctx context.Context, cutoff time.Time) (archive.Publication, error) {
+func (r *Archive) NextEviction(ctx context.Context, eventBefore time.Time) (archive.Publication, error) {
 	var batch archive.Publication
-	row := r.db.QueryRowContext(ctx, nextEvictionQuery, unixNanoseconds(cutoff).String())
+	row := r.db.QueryRowContext(ctx, nextEvictionQuery, eventBefore.Format(archive.DayLayout))
 	err := row.Scan(&batch.ID, &batch.Day, &batch.PublishedChecksum)
 	if errors.Is(err, sql.ErrNoRows) {
 		return archive.Publication{}, nil

@@ -2,48 +2,8 @@
 
 module Einblick
   module Archive
-    # Searches local logs during an outage and archive history after expiration.
+    # Searches archived logs while objects expire.
     module World
-      def search_local_logs_during_archive_outage
-        with_floci do
-          @floci.pause_access
-          with_server_profile('publication') do
-            open_local_log_searches
-            read_local_log_pages
-            capture_pending_archive_backlog
-            capture_archive_backlog_recovery
-          end
-        end
-      end
-
-      def open_local_log_searches
-        site = Einblick::Site::HTTP.new('http://localhost:11000')
-        @archive_outage_view = site.open("/logs?#{URI.encode_www_form(@query)}", 'en')
-        fallback = Nokogiri::HTML5(@archive_outage_view.body).at_css('.query-alert a[href*="search_scope=local"]')
-        @local_fallback_view = site.open(fallback['href'], 'en')
-        search = URI.encode_www_form(@query.merge('search_scope' => 'local', 'page_size' => 1))
-        @local_logs_view = site.open("/logs?#{search}", 'en')
-        @local_logs_next_view = site.open_next_page(@local_logs_view, 'en')
-        @local_form_view = site.submit_log_form(@local_logs_view, 'en')
-      end
-
-      def read_local_log_pages
-        scope = 'LOG_SEARCH_SCOPE_CURRENT_VOLUME'
-        @local_logs_page = next_log_query_page('', page_size: 1, 'search_scope' => scope)
-        token = @local_logs_page.next_page_token
-        @local_logs_next_page = next_log_query_page(token, page_size: 1, 'search_scope' => scope)
-        @changed_scope_response = query_logs(
-          'search_scope' => 'LOG_SEARCH_SCOPE_ALL_SOURCES', 'page_size' => 1, 'page_token' => token
-        )
-        @invalid_scope_response = query_logs('search_scope' => 100)
-        @oversized_token_response = query_logs('search_scope' => scope, 'page_size' => 1, 'page_token' => padded_page_token(token))
-      end
-
-      def padded_page_token(token)
-        json = Base64.urlsafe_decode64(token)
-        Base64.urlsafe_encode64(json + (' ' * json.bytesize), padding: false)
-      end
-
       def search_after_archive_expiration
         with_floci do
           expired_key, remaining_key = publish_expiring_archive_pair
@@ -51,6 +11,27 @@ module Einblick
           with_eviction_profile { @retention_disabled_response = query_logs }
           @floci.delete_archive(remaining_key)
           with_eviction_profile('history_retention') { query_logs }
+        end
+      end
+
+      def search_with_unknown_archive_age
+        with_floci do
+          expired_key, = publish_expiring_archive_pair
+          clear_archive_object_age(expired_key)
+          with_eviction_profile('history_retention') do
+            search_while_archive_expires(expired_key)
+            query_logs
+          end
+        end
+      end
+
+      def clear_archive_object_age(key)
+        with_log_database do |connection|
+          connection.query(<<~SQL, File.basename(key, '.parquet'))
+            UPDATE log_archive_batches
+            SET object_stored_at = NULL, published_at = published_at - INTERVAL '8 days'
+            WHERE id = ?::UUID AND evicted_at IS NOT NULL
+          SQL
         end
       end
 

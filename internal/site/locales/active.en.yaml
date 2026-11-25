@@ -1,13 +1,6 @@
 site.title: Logs · Einblick
 site.skip: Skip to logs
 logs.heading: Logs
-logs.scope: Search logs in local storage and any configured archive
-logs.all_sources: Local and archive
-logs.search_scope: Search scope
-logs.local_only: Local only
-logs.search_local: Search local logs
-logs.local_coverage: Results cover only logs on this database volume.
-logs.archive_coverage: Results cover logs on this database volume and in the archive.
 logs.service: Service
 logs.all_services: All services
 logs.time_range: Time range

@@ -9,12 +9,25 @@ Given('acknowledged logs are ready to archive') do
   prepare_searchable_logs
 end
 
+Given('acknowledged recent logs on the server') do
+  prepare_archive_storage
+  prepare_recent_filtered_logs
+end
+
 Given('an acknowledged export was split into batches that share resource and scope context') do
   prepare_shared_context_batches
 end
 
 Given('backlog reads can be slowed within the running service') do
   prepare_backlog_query_work
+end
+
+Given('acknowledged logs span the daily archive cutoff and include a late arrival') do
+  prepare_daily_logs
+end
+
+Given('{int} acknowledged logs for a closed day share a large resource') do |count|
+  prepare_large_daily_logs(count)
 end
 
 When('the client continues the search during publication overlap and after local eviction') do
@@ -29,8 +42,16 @@ When('the archive is published and the client searches during an object store ou
   query_fresh_archive(failure: true)
 end
 
-When('the object store is unavailable and the operator searches local logs') do
-  search_local_logs_during_archive_outage
+When('the operator searches the last 24 hours during an archive outage') do
+  search_recent_logs_during_archive_outage
+end
+
+When('the operator searches during an archive outage and retries after recovery') do
+  search_history_during_archive_outage
+end
+
+When('the worker evicts the archived logs and the operator reopens the database without R2') do
+  search_after_removing_archive_configuration
 end
 
 When('a slow backlog read times out after the operator has seen pending records') do
@@ -50,14 +71,14 @@ When('a fresh volume searches while an expired object and a younger object disap
 end
 
 When('an older evicted batch expires during an archive search and the operator searches again') do
-  search_after_legacy_archive_expiration
+  search_with_unknown_archive_age
 end
 
 When('the archive is published and the client searches while the object store briefly fails to list archives') do
   query_after_archive_listing_failure
 end
 
-When('the service accepts logs after a listing failure opens the search circuit breaker') do
+When('the worker publishes ready logs after a listing failure opens the search circuit breaker') do
   publish_while_archive_listings_are_unavailable
 end
 
@@ -81,20 +102,42 @@ When('the first published archive object is {string} before local eviction and t
   evict_with_unverified_archive(fault)
 end
 
-When('the worker evicts eligible batches and the earlier batch has a recent receipt') do
-  evict_batches_with_mixed_receipt_ages
-end
-
-When('the upgraded service retries eviction after an archive object changes and publishes a new batch') do
-  evict_past_legacy_verification_failure
-end
-
 When('one batch is evicted while the other is waiting to publish') do
   query_with_local_sibling_batch
 end
 
 When('the client searches the same volume after one matching evicted archive object disappears') do
   query_after_archive_loss
+end
+
+When('the worker archives the late arrival and the newer archives become unreadable after the first page') do
+  publish_daily_logs
+end
+
+When('the worker archives the day with local eviction enabled') do
+  publish_large_daily_logs
+end
+
+Then('one remote Parquet file should contain every acknowledged log for the day') do
+  expect(@large_daily_archive_keys.size).to eq(1)
+  expect(@large_daily_archive_timestamps).to eq(log_query_records(@archive_request).map(&:time_unix_nano))
+end
+
+Then('the archive file should use bounded Parquet row groups') do
+  expect(@largest_daily_archive_group).to be <= 7
+end
+
+Then('the first page should find the archived days with one listing request') do
+  expect(@daily_initial_listings).to eq(1)
+end
+
+Then('a paginated search should include every acknowledged log once') do
+  expect(@query_logs.map(&:record)).to match_array(@daily_records)
+end
+
+Then('the late arrival should remain local until it can be archived') do
+  expect(@daily_events_before_supplement).to match_array(@daily_records.last(3).map(&:time_unix_nano))
+  expect(@daily_events_after_supplement).to match_array(@daily_records.last(2).map(&:time_unix_nano))
 end
 
 Then('the client should read each matching typed log once in the same order') do
@@ -137,7 +180,6 @@ end
 Then('the archive should supply the complete matching logs') do
   expect(@response.code).to eq(200)
   page = Einblick::V1::ListLogsResponse.decode_json(@response.body)
-  expect(page.search_scope).to eq(:LOG_SEARCH_SCOPE_ALL_SOURCES)
   expect(page.logs).to have_queried_logs([@request], @expected_query_records, @query_receipt_windows)
 end
 
@@ -151,42 +193,44 @@ Then('the fresh instance should leave the original archive objects unchanged') d
   expect(@discovered_archive_objects).to eq(@original_archive_objects)
 end
 
-Then('the Logs results should show a coverage notice only for the local search') do
-  expect(@archive_scope_fragment.code).to eq(200)
-  expect(@archive_scope_fragment).to label_log_coverage('Results cover logs on this database volume and in the archive.', hidden: true)
-  expect(@local_scope_fragment.code).to eq(200)
-  expect(@local_scope_fragment).to label_log_coverage('Results cover only logs on this database volume.', empty: true)
+Then('the Logs page should continue to the next archived log') do
+  expect(@archive_next_page.code).to eq(200)
+  expect(@archive_next_page).to show_selected_logs(@query_service, @expected_query_records[1, 1], @query_receipt_windows)
 end
 
 Then('the log query should report unavailable history') do
   expect(@response.code).to eq(503)
 end
 
-Then('the Logs page should show local-only coverage across the rendered pages') do
-  expect(@archive_outage_view.code).to eq(503)
-  expect(@local_fallback_view.code).to eq(200)
-  expect(@local_fallback_view.body).to include('Results cover only logs on this database volume.')
-  [@local_logs_view, @local_logs_next_view].each_with_index do |page, index|
-    expect(page.code).to eq(200)
-    expect(page.body).to include('Results cover only logs on this database volume.')
-    expect(page).to show_selected_logs(@query_service, @expected_query_records[index, 1], @query_receipt_windows)
-  end
+Then('the Logs page should report that log storage is unavailable') do
+  expect(@archive_outage_view).to show_log_view('full', 'en', 503)
+  expect(@archive_outage_fragment).to show_log_view('partial', 'en', 503).and show_log_outcome('unavailable', 'en')
 end
 
-Then('the query client should receive local-only results across pages') do
-  expect(@local_logs_page.search_scope).to eq(:LOG_SEARCH_SCOPE_CURRENT_VOLUME)
-  expect(@local_logs_next_page.search_scope).to eq(:LOG_SEARCH_SCOPE_CURRENT_VOLUME)
-  results = @local_logs_page.logs.to_a + @local_logs_next_page.logs.to_a
-  expect(results).to have_queried_logs([@request], @expected_query_records.take(2), @query_receipt_windows)
-  expect(@changed_scope_response.code).to eq(400)
-  expect(@invalid_scope_response.code).to eq(400)
+Then('the API should report unavailable history for the older range') do
+  expect(@archive_outage_api_response.code).to eq(503)
+end
+
+Then('the default recent search should still succeed') do
+  expect(@recent_logs_view).to show_log_view('full', 'en', 200)
+end
+
+Then('the retried search should return the matching logs') do
+  expect(@recovered_history_view.code).to eq(200)
+  expect(@recovered_history_view).to show_selected_logs(@query_service, @expected_query_records.take(1), @query_receipt_windows)
+end
+
+Then('the Logs page should show the recent logs') do
+  expect(@recent_logs_view.code).to eq(200)
+  expect(@recent_logs_view).to show_selected_logs(@query_service, [@expected_query_records.fetch(3)], @query_receipt_windows)
+end
+
+Then('the API should return each matching recent log across pages') do
+  expect(@recent_log_page.next_page_token).not_to be_empty
+  expect(@recent_log_next_page.next_page_token).to be_empty
+  results = @recent_log_page.logs.to_a + @recent_log_next_page.logs.to_a
+  expect(results).to have_queried_logs([@request], @expected_query_records.last(2), @query_receipt_windows)
   expect(@oversized_token_response.code).to eq(400)
-end
-
-Then('submitting the rendered form should keep the search local-only') do
-  expect(@local_form_view.code).to eq(200)
-  expect(@local_form_view).to label_log_coverage('Results cover only logs on this database volume.')
-  expect(@local_form_view).to show_selected_logs(@query_service, @expected_query_records.take(1), @query_receipt_windows)
 end
 
 Then('publication recovery should drain the visible log backlog') do
@@ -204,22 +248,6 @@ end
 Then('the metrics endpoint should withdraw the previous backlog sample after the timeout') do
   expect(@archive_metrics_during_outage).to have_archive_backlog('pending_records' => @query_record_count)
   expect(@metrics_after_backlog_timeout).to omit_archive_backlog_gauges
-end
-
-Then('the metrics endpoint should omit the legacy publication timestamp') do
-  expect(@legacy_archive_metrics).to have_archive_backlog('pending_records' => 0)
-  expect(@legacy_archive_metrics).not_to match(/^einblick_log_archive_last_publication_timestamp_seconds(?:\{| )/)
-end
-
-Then('the metrics endpoint should report the new publication timestamp') do
-  published_after_upgrade = be_between(@upgraded_publication_window.begin, @upgraded_publication_window.end)
-  expect(@upgraded_archive_metrics).to have_archive_backlog('last_publication_timestamp_seconds' => published_after_upgrade)
-end
-
-Then('eviction should complete the healthy batch before retrying the blocked one') do
-  expect(@eviction_retry_diagnostics).to complete_archive_batch_before_retry(
-    'local log archive eviction', @evicted_batch_id, @retained_batch_id
-  )
 end
 
 Then('the sampler should rest after a slow read') do
@@ -273,11 +301,10 @@ Then('the cancelled archive query should return gRPC cancelled') do
   expect(@grpc_response).to be_a(GRPC::Cancelled)
 end
 
-Then('the local-only search should return its records while the archive read is still held') do
+Then('the recent search should return its records while the archive read is still held') do
   expect(@archive_read_remained_held).to be(true)
   expect(@local_stall_response.code).to eq(200)
   page = Einblick::V1::ListLogsResponse.decode_json(@local_stall_response.body)
-  expect(page.search_scope).to eq(:LOG_SEARCH_SCOPE_CURRENT_VOLUME)
   expect(page.logs).to have_queried_logs([@local_stall_request], @local_stall_records, @local_stall_receipts)
 end
 

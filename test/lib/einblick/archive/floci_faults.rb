@@ -48,6 +48,7 @@ module Einblick
         release_acknowledgement
         release_archive_read
         release_archive_listing
+        @unreadable_archives = nil
         @part_gate&.close
         @part_gate = nil
         @mode = nil
@@ -64,7 +65,6 @@ module Einblick
       private
 
       def intercept(incoming, env)
-        wait_on_archive_read(incoming)
         return [503, {}, []] if @mode == :unavailable || wait_on_part?(incoming)
         return unless commit_request?(incoming)
 

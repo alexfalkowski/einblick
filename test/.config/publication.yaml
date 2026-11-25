@@ -2,7 +2,6 @@ environment: development
 archive:
   workspace: reports/archive/resource=main
   interval: 100ms
-  batch_size: 65536B
   r2:
     client:
       endpoint: http://127.0.0.1:4567

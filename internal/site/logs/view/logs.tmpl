@@ -11,7 +11,6 @@
            hx-disable:inherited="#log-filters [type=submit], button[form=log-filters]">
     <header>
       <h1 id="logs-heading">{{.Localizer.Text "logs.heading"}}</h1>
-      <p>{{.Localizer.Text "logs.scope"}}</p>
     </header>
     <form id="log-filters" action="/logs" method="get" hx-put="/logs" hx-target="#results" hx-swap="outerHTML"
           hx-indicator="#query-progress" hx-sync="#main:drop">
@@ -35,11 +34,6 @@
           <button id="clear-message" type="submit" name="clear_message" value="1"
                   aria-label="{{.Localizer.Text "logs.clear_search"}}"{{if not .Model.Filters.MessageText}} hidden{{end}}>×</button>
         </div>
-        <label for="search-scope">{{.Localizer.Text "logs.search_scope"}}</label>
-        <select id="search-scope" class="select select-sm" name="search_scope">
-          <option value="local-and-archive">{{.Localizer.Text "logs.all_sources"}}</option>
-          <option value="local"{{if eq .Model.Filters.SearchScope "local"}} selected{{end}}>{{.Localizer.Text "logs.local_only"}}</option>
-        </select>
         <label for="severity">{{.Localizer.Text "logs.severity"}}</label>
         <select id="severity" class="select select-sm" name="severity">
           <option value="">{{.Localizer.Text "logs.all_severities"}}</option>
@@ -83,11 +77,6 @@
          data-end-time="{{.Model.Filters.EndTime.Format $exactTime}}"
          data-window="{{.Model.Filters.SelectedWindow}}"
          data-recent-window="{{.Model.Filters.RecentWindow}}">
-  {{if eq .Model.ResultScope "local"}}
-  <p class="result-coverage">{{.Localizer.Text "logs.local_coverage"}}</p>
-  {{else if eq .Model.ResultScope "local-and-archive"}}
-  <p id="archive-coverage" class="result-coverage" hidden>{{.Localizer.Text "logs.archive_coverage"}}</p>
-  {{end}}
   {{if .Model.Rows}}
   <div class="table-card" tabindex="0" role="region" aria-label="{{.Localizer.Text "logs.results"}}">
     <table class="table table-sm">

@@ -14,15 +14,12 @@ module Einblick
         stage_log_archive(@archive_request, 1)
         @original_archive_batches = @archive_batches
         @original_archive_members = @archive_members
-        with_log_database do |connection|
-          connection.query(File.read('fixtures/drop_archive_retention_schema.sql'))
-          connection.query(File.read('fixtures/drop_publication_schema.sql'))
-        end
       end
 
       def publish_log_archive
+        commit_archive_fixture(@archive_request)
         with_floci do
-          run_publication { acknowledge_archive_logs(@archive_request) }
+          run_publication
           inspect_publication
         end
       end
@@ -70,6 +67,10 @@ module Einblick
         @floci.keys.to_h { |key| [key, Digest::SHA256.hexdigest(@floci.download(key))] }
       end
 
+      def hold_staged_archive
+        archive_files.fetch(0).delete_prefix("#{WORKSPACE}/").tap { |key| @floci.hold_archive_read(key) }
+      end
+
       def with_floci
         @floci = Floci.new
         @floci.start
@@ -78,13 +79,20 @@ module Einblick
         @floci.stop
       end
 
-      def run_publication(profile = 'publication')
+      def run_publication(profile = 'publication', query_local: true)
         @archive_offset = File.size('reports/server.log')
-        with_server_profile(profile) do
+        with_publication_profile(profile) do
           yield if block_given?
           wait_for_publication
-          query_during_archive_recovery
         end
+        query_during_archive_recovery if query_local
+      end
+
+      def with_publication_profile(profile = 'publication', &)
+        @floci.defer_archive_eviction = true
+        with_server_profile(profile, &)
+      ensure
+        @floci.defer_archive_eviction = false
       end
 
       def wait_for_publication

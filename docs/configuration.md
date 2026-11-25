@@ -41,7 +41,6 @@ duckdb:
 archive:
   workspace: /staging
   interval: 1s
-  batch_size: 65536B
 ```
 
 | Example location | Mount | Holds |
@@ -61,21 +60,45 @@ preparation fails. Reserve workspace write access for this instance and its
 operators. Begin with 1 GiB for testing and measure staged files and spill
 before sizing production.
 
-The worker attempts one batch per interval after recovery, prioritizing
-interrupted work. Set `batch_size` to a positive decimal size such as `65KB`
-(65,000 bytes) or `65536B`. It targets uncompressed projected row bytes.
-A larger accepted row gets its own batch. Allow room for the largest such file
-and the completed files retained on the workspace. See [staging and recovery](operations.md#-local-parquet-staging).
+The worker attempts one batch per interval after recovery. A failed batch
+goes behind work already waiting. Size the workspace for the largest expected
+daily Parquet file and for completed files retained during an outage.
+[Staging and recovery](operations.md#-local-parquet-staging)
+
+## 📅 Daily log archives
+
+Daily export keeps today and yesterday's UTC event days in DuckDB. At the
+first worker tick after midnight UTC on Wednesday, Monday becomes eligible
+for one Parquet file. This gives the day 24 hours to collect delayed records.
+Later arrivals remain searchable locally and can become a supplemental file
+in their original event partition after their UTC receipt day closes.
+
+Start this rollout with a fresh DuckDB database, an empty staging workspace,
+and an empty archive bucket. Reset them together while Einblick is stopped.
+This discards pre-cutover logs. Startup creates the consolidated database schema.
+Remove the retired `archive.batch_size` and `archive.local_retention` keys
+from the deployment configuration before starting this version. Verify the
+bucket protection below before enabling R2.
+
+Plan for 24–48 hours of unarchived logs on the database volume in normal
+operation, and more during an R2 outage. Reserve staging space and allow enough
+time for an entire day's file to upload and verify.
+[R2 eviction and request settings](#-r2-log-archives)
 
 ## ☁️ R2 log archives
 
-Add `r2` under the existing `archive` section to publish staged log batches:
+Before enabling R2, verify that the bucket prevents deletes and overwrites
+throughout the required archive retention period. Check the scope and remaining
+duration of protection against the bucket's expiration policy. Keep `r2` absent
+for local-only staging until bucket protection is in place.
+[Cloudflare R2 bucket locks](https://developers.cloudflare.com/r2/buckets/bucket-locks/)
+
+Add `r2` under the existing `archive` section to publish staged log batches.
 
 ```yaml
 archive:
   workspace: /staging
   interval: 1s
-  batch_size: 65536B
   r2:
     client:
       endpoint: https://ACCOUNT_ID.r2.cloudflarestorage.com
@@ -112,16 +135,9 @@ Give the service user a writable home and allow access to the extension
 repository for an empty cache.
 [Container setup](development.md#-container-builds)
 
-With R2 enabled, positive `local_retention` sets how long to keep each accepted
-row locally, measured from server receipt. All rows must be old enough and the
-batch must be confirmed and cleaned before eviction. Omit the setting or use
-`0s` to keep the local copies. Export cadence is independent of this window.
-Before setting a positive value, verify that R2 enforces protection against
-deletes and overwrites throughout the required archive retention period,
-including when the worker evicts the local copy. Check the scope and remaining
-duration of protection against the bucket's expiration policy. Keep eviction
-disabled until that protection is in place.
-[Cloudflare R2 bucket locks](https://developers.cloudflare.com/r2/buckets/bucket-locks/)
+With R2 enabled, the worker evicts batches from older UTC event days after
+publication, staged file cleanup, and remote checksum verification. Logs from
+the current and previous UTC event days remain in DuckDB.
 
 The worker attempts one publication per interval. The client streams uploads
 and checksum verification, switching to multipart for large files.

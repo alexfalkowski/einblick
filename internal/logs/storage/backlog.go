@@ -10,16 +10,12 @@ import (
 func (r *Archive) Backlog(ctx context.Context) (archive.Backlog, error) {
 	var backlog archive.Backlog
 	var oldest sql.Null[uint64]
-	var last sql.NullTime
 	row := r.db.QueryRowContext(ctx, archiveBacklogQuery)
-	if err := row.Scan(&backlog.PendingRecords, &backlog.PendingRecordBytes, &oldest, &last); err != nil {
+	if err := row.Scan(&backlog.PendingRecords, &backlog.PendingRecordBytes, &oldest, &backlog.LastPublishedAt); err != nil {
 		return archive.Backlog{}, err
 	}
 	if oldest.Valid {
 		backlog.OldestReceivedAt = timestamp(oldest.V)
-	}
-	if last.Valid {
-		backlog.LastPublishedAt = &last.Time
 	}
 	return backlog, nil
 }
