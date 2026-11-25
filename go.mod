@@ -8,7 +8,7 @@ require (
 	github.com/alexfalkowski/go-signal/v2 v2.1.0
 	github.com/alexfalkowski/go-sync v1.40.0
 	github.com/apache/arrow-go/v18 v18.9.0
-	github.com/duckdb/duckdb-go/v2 v2.20000.0
+	github.com/duckdb/duckdb-go/v2 v2.20001.0
 	github.com/pressly/goose/v3 v3.30.1
 	github.com/termermc/go-micro-s3/client v0.0.0-20261107140028-4c9c7292e8c2
 	go.opentelemetry.io/proto/otlp v1.11.1
@@ -41,7 +41,7 @@ require (
 	github.com/cloudevents/sdk-go/v2 v2.16.2 // indirect
 	github.com/cristalhq/acmd v0.12.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/duckdb/duckdb-go-bindings v0.20000.0 // indirect
+	github.com/duckdb/duckdb-go-bindings v0.20001.0 // indirect
 	github.com/ebitengine/purego v0.11.3 // indirect
 	github.com/felixge/fgprof v0.9.5 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
@@ -113,11 +113,11 @@ require (
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
-	go.duckdb.org/libduckdb/darwin-amd64 v0.20000.0 // indirect
-	go.duckdb.org/libduckdb/darwin-arm64 v0.20000.0 // indirect
-	go.duckdb.org/libduckdb/linux-amd64 v0.20000.0 // indirect
-	go.duckdb.org/libduckdb/linux-arm64 v0.20000.0 // indirect
-	go.duckdb.org/libduckdb/windows-amd64 v0.20000.0 // indirect
+	go.duckdb.org/libduckdb/darwin-amd64 v0.20001.0 // indirect
+	go.duckdb.org/libduckdb/darwin-arm64 v0.20001.0 // indirect
+	go.duckdb.org/libduckdb/linux-amd64 v0.20001.0 // indirect
+	go.duckdb.org/libduckdb/linux-arm64 v0.20001.0 // indirect
+	go.duckdb.org/libduckdb/windows-amd64 v0.20001.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/bridges/otelslog v0.21.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.72.0 // indirect
