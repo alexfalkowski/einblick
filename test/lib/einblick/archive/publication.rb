@@ -99,11 +99,11 @@ module Einblick
         wait(timeout: 10).for { archive_diagnostics }.to include('remote log archive publication completed')
       end
 
-      def observe_publication_failure(failure)
+      def observe_publication_failure(failure, timeout: nil)
         @archive_offset = File.size('reports/server.log')
         with_server_profile('publication') do
           yield if block_given?
-          wait_for { archive_diagnostics }.to match(failure)
+          wait(timeout:).for { archive_diagnostics }.to match(failure)
         end
       end
 

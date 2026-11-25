@@ -32,7 +32,7 @@ module Einblick
       def publish_against_competing_object(metadata)
         with_floci do
           @floci.compete_on_completion(archive_files.fetch(0), metadata)
-          observe_publication_failure(competing_object_failure(metadata))
+          observe_publication_failure(competing_object_failure(metadata), timeout: 10)
           inspect_interrupted_publication
           @competing_checksum = @floci.competing_checksum
           @visible_objects = remote_archive_checksums
