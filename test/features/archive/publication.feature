@@ -72,6 +72,7 @@ Feature: Publish log archives to object storage
     And the object store should contain one Parquet batch with the accepted logs
     And the published batch should be recorded and its staging file reclaimed
 
+  @archive_publication_recovery
   Scenario: Resume cleanup after a confirmed batch's staging directory becomes writable
     Given an acknowledged log batch staged with a different Parquet encoding
     When staging cleanup fails and the service restarts after write access returns
@@ -79,6 +80,7 @@ Feature: Publish log archives to object storage
     And the original archive object should remain unchanged
     And the published batch should be recorded and its staging file reclaimed
 
+  @archive_publication_recovery
   Scenario: Reconcile an existing archive while restaging is blocked
     Given an acknowledged log batch staged with a different Parquet encoding
     When the service restarts after an unacknowledged commit and cannot recreate the lost staged file
@@ -86,6 +88,7 @@ Feature: Publish log archives to object storage
     And the original archive object should remain unchanged
     And the published batch should be recorded and its staging file reclaimed
 
+  @archive_publication_recovery
   Scenario: Retry cleanup of a corrupt staged file after reconciling the remote object
     Given an acknowledged log batch staged with a different Parquet encoding
     When startup reconciles an unacknowledged upload while removal of its corrupt staged file is blocked
@@ -93,6 +96,7 @@ Feature: Publish log archives to object storage
     And the original archive object should remain unchanged
     And the published batch should be recorded and its staging file reclaimed
 
+  @archive_publication_recovery
   Scenario: Reconcile an existing archive when the staged file cannot be read
     Given an acknowledged log batch staged with a different Parquet encoding
     When the service restarts after an unacknowledged commit with the staged file still unreadable
@@ -100,6 +104,7 @@ Feature: Publish log archives to object storage
     And the published batch should be recorded and its staging file reclaimed
     And the acknowledged logs should still be queryable locally
 
+  @archive_publication_recovery
   Scenario: Regenerate corrupt staging while publication is running
     Given log archival is configured for a disposable object store
     When the staged file is corrupted during a store outage and access returns
@@ -107,28 +112,33 @@ Feature: Publish log archives to object storage
     And the object store should contain one Parquet batch with the accepted logs
     And the published batch should be recorded and its staging file reclaimed
 
+  @archive_publication_recovery
   Scenario: Reconcile a later committed batch while an earlier upload is missing
     Given acknowledged log batches are staged for two archive days
     When the service starts with an unreadable staged batch and only the later upload committed
     Then the earlier batch should remain unconfirmed and the later batch should be reclaimed
 
+  @archive_publication_recovery
   Scenario: Continue publishing and evicting while cleanup of an earlier batch is blocked
     Given acknowledged log batches are staged for two archive days
     When the service publishes while the earlier staging directory is unwritable
     Then both batches should be confirmed and only the later batch should be reclaimed
     And eviction should reclaim the later batch and retain the earlier batch locally
 
+  @archive_publication_recovery
   Scenario: Publish newly accepted logs while repair of an earlier batch is blocked
     Given an acknowledged log export staged in Parquet
     When a staged file is corrupted and its directory is unwritable while another day is ready to archive
     Then only the healthy day's logs should be published and the blocked staging file should remain
 
+  @archive_publication_recovery
   Scenario: Publish another day while staging an earlier day is blocked
     Given acknowledged logs are waiting to be staged for two archive days
     When the earlier staging directory is unwritable and later becomes writable
     Then the later day should be published while staging is blocked for the earlier day
     And the earlier day should publish under its original batch key after access returns
 
+  @archive_publication_recovery
   Scenario: Recover a claimed day after its source digest fails
     Given acknowledged logs are waiting to be staged for two archive days
     When the source read for the earlier day fails and the service restarts after repair

@@ -99,7 +99,16 @@ jobs:
         default: go
       partition:
         type: enum
-        enum: [storage, archive-staging, archive-upload, archive-history, queries, site, service]
+        enum:
+          - storage
+          - archive-staging
+          - archive-upload-transfer
+          - archive-upload-recovery
+          - archive-history-reads
+          - archive-history-availability
+          - queries
+          - site
+          - service
     executor: << parameters.runtime >>
     working_directory: ~/einblick
     steps:
@@ -266,7 +275,11 @@ workflows:
           matrix:
             alias: archive-feature-groups
             parameters:
-              partition: [archive-upload, archive-history]
+              partition:
+                - archive-upload-transfer
+                - archive-upload-recovery
+                - archive-history-reads
+                - archive-history-availability
           requires:
             - build-features
       - coverage:

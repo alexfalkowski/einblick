@@ -9,9 +9,12 @@ readonly workspace_directory="/tmp/einblick-reports"
 case "${1:-}" in
   stage)
     case "${2:-}" in
-      storage | archive | archive-staging | archive-publication | archive-upload | archive-history | queries | site | service) ;;
+      storage | archive | archive-staging | archive-publication | archive-upload | archive-history | queries | site | service | \
+      archive-upload-transfer | archive-upload-recovery | archive-history-reads | archive-history-availability) ;;
       *)
-        printf '%s\n' 'partition must be storage, archive, archive-staging, archive-publication, archive-upload, archive-history, queries, site, or service' >&2
+        printf '%s %s %s\n' 'partition must be storage, archive, archive-staging, archive-publication, archive-upload,' \
+          'archive-history, queries, site, service, archive-upload-transfer, archive-upload-recovery,' \
+          'archive-history-reads, or archive-history-availability' >&2
         exit 1
         ;;
     esac

@@ -8,7 +8,9 @@ include bin/build/make/claude.mak
 include bin/build/make/codex.mak
 
 .PHONY: features-storage features-archive features-archive-staging features-archive-publication \
-	features-archive-upload features-archive-history features-queries features-site features-service \
+	features-archive-upload features-archive-upload-transfer features-archive-upload-recovery \
+	features-archive-history features-archive-history-reads features-archive-history-availability \
+	features-queries features-site features-service \
 	coverage-workspace-stage coverage-workspace-restore
 
 override export partition := $(value partition)
@@ -33,9 +35,25 @@ features-archive-publication:
 features-archive-upload:
 	@$(MAKE) features tags="@archive and @publication and not @archive_history"
 
+# Run archive transfers, multipart uploads, and acknowledgement recovery with Floci.
+features-archive-upload-transfer:
+	@$(MAKE) features tags="@archive and @publication and not @archive_history and not @archive_publication_recovery"
+
+# Run archive staging repair, cleanup, and publication scheduling with Floci.
+features-archive-upload-recovery:
+	@$(MAKE) features tags="@archive and @publication and not @archive_history and @archive_publication_recovery"
+
 # Run R2-backed historical log queries and local eviction features with Floci.
 features-archive-history:
 	@$(MAKE) features tags="@archive and @publication and @archive_history"
+
+# Run archive reads, pagination, and local eviction features with Floci.
+features-archive-history-reads:
+	@$(MAKE) features tags="@archive and @publication and @archive_history and not @archive_history_availability"
+
+# Run archive outage, retention, and cancellation features with Floci.
+features-archive-history-availability:
+	@$(MAKE) features tags="@archive and @publication and @archive_history and @archive_history_availability"
 
 # Run recent log query features.
 features-queries:
