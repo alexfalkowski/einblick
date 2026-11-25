@@ -9,7 +9,7 @@ require (
 	github.com/alexfalkowski/go-sync v1.40.0
 	github.com/apache/arrow-go/v18 v18.9.0
 	github.com/duckdb/duckdb-go/v2 v2.20001.0
-	github.com/pressly/goose/v3 v3.30.1
+	github.com/pressly/goose/v3 v3.30.2
 	github.com/termermc/go-micro-s3/client v0.0.0-20261107140028-4c9c7292e8c2
 	go.opentelemetry.io/proto/otlp v1.11.1
 	golang.org/x/text v0.44.0
