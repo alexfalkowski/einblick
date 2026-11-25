@@ -61,7 +61,7 @@ a.brand { display: block; width: fit-content; margin: 0 0 2rem; color: #fff; fon
   background: var(--color-base-100);
 }
 #log-filters { padding: 1rem; }
-.filters { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr); align-items: center; gap: .65rem .85rem; }
+.filters { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: .65rem .85rem; }
 .time-presets { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
 .time-presets button {
   appearance: none;
@@ -354,7 +354,6 @@ html:has(.log-details-panel:modal) { overflow: hidden; }
 .empty-state button { margin-top: .65rem; }
 
 @media (max-width: 64rem) {
-  .filters { grid-template-columns: max-content minmax(0, 1fr); }
   .log-details-panel { width: 100%; }
 }
 @media (max-width: 43rem) {
