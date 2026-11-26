@@ -7,9 +7,9 @@
 and [historical log reads and local eviction](operations.md#-historical-log-availability)
 are implemented. Metrics and traces remain print-only.
 
-**Revision:** 0.26
+**Revision:** 0.27
 
-**Last updated:** 2026-11-22
+**Last updated:** 2026-11-26
 
 **Audience:** Implementing agents, reviewers, product owner, and operators.
 
@@ -255,7 +255,7 @@ The exact SQL schema and typed-attribute representation are implementation desig
 
 - **QRY-001 — Time and service selection.** Support an explicit time range and service selection through a versioned protobuf API exposed over gRPC and HTTP RPC. Recent-log ranges use start-inclusive and end-exclusive protobuf Timestamps, represented as RFC 3339 with nanosecond precision in protobuf JSON. Preserve exact absolute bounds in saved browser searches, pagination and later historical workflows. MVC controllers reuse the unversioned query operation directly. See the [query contract](queries.md).
 - **QRY-002 — Logs.** Support service, severity, text, and trace-ID filtering, a latest-first result order, and bounded stable pagination using event-time/ID keysets. New committed records behind the cursor may enter later pages; records ahead require a fresh query. Existing records must not repeat across pages. Pagination does not freeze membership or coordinate with ingestion.
-- **QRY-003 — Traces.** Support trace-ID lookup and basic service, duration, and error selection. Assemble spans across services and the day partitions covered by the lookup's search range.
+- **QRY-003 — Traces.** Expose bounded trace-ID lookup and basic service, duration, and error selection through the versioned query API over gRPC and HTTP RPC. Assemble spans across services and the day partitions covered by the lookup's search range.
 - **QRY-004 — Trace completeness.** Make bounded trace-search scope visible. Do not imply a trace is complete when its parent or other spans may fall outside the selected range, retention, or available data.
 - **QRY-005 — Metrics.** Support basic gauge charts, counter rates, and histogram-based distributions/percentiles for the supported metric types. Separate instances and stream identities before applying the appropriate aggregation.
 - **QRY-006 — Metric correctness.** Respect cumulative versus delta temporality, counter resets/start times, gaps, and compatible histogram boundaries. Do not average precomputed percentiles or treat bucket counts as ordinary observations. Fetch any lookback points needed for rate calculations.
@@ -312,7 +312,7 @@ Initial archive compaction and a remote manifest service are unnecessary for an 
 - **WEB-012 — Auth deferred.** V1 must run its site without a login page, mounted UI credential file, or browser-session subsystem. Future site authentication is separate shared go-service work. This does not remove R2 credentials or decide internal ingestion TLS/authentication.
 - **WEB-013 — Ready-made service views.** Every configured service has Overview, Logs, and Traces views. Render the standard protocol panels automatically from its catalog entry. Users do not author SQL, panels, or dashboards to obtain the initial experience.
 - **WEB-014 — Chart behavior.** Show units and aggregation scope, use a shared time axis, support hover values and selecting a narrower time range, and provide a route into matching logs/traces. Bound/downsample chart results on the server; never send all raw metric points merely to draw a small chart.
-- **WEB-015 — Log and trace details.** Show bounded, latest-first log results. Open a selected log in a responsive details drawer with the complete message, available request status and duration, structured attributes and source details, exact timestamps, and correlation IDs. Let users find related logs in the same search window using the record's trace ID. Show trace search results with duration/status and an inspectable span waterfall, selected-span attributes/events, and related-log navigation. Trace details must remain usable without loading an unbounded number of spans.
+- **WEB-015 — Log and trace details.** Show bounded, latest-first log results. Open a selected log in a responsive details drawer with the complete message, available request status and duration, structured attributes and source details, exact timestamps, and correlation IDs. Let users find related logs in the same search window using the record's trace ID. At `/traces`, show trace search results with duration/status and an inspectable span waterfall, selected-span attributes/events, and related-log navigation. Trace details must remain usable without loading an unbounded number of spans.
 - **WEB-016 — Interpretable states.** Distinguish no samples, zero values, query errors, incomplete coverage, and stale signals. Preserve visible selection context across navigation. Use responsive layouts, labelled controls, readable contrast, and keyboard-operable navigation; charts must have textual labels and current-value context.
 - **WEB-017 — Multilingual pages.** Follow Web's go-service i18n/MVC pattern: embed English, German and Spanish translation catalogs, negotiate the browser's preferred language, and use English as the fallback. Localize page titles, navigation, controls, chart labels, accessibility text and loading/empty/error/status messages in full pages and partial views. Keep telemetry content, service identities and technical identifiers in their original form. Verify supported languages, fallback and response language/cache metadata through the existing feature harness as each page is introduced.
 
@@ -568,6 +568,16 @@ no permanent discard mode or second backend is planned.
 Trace and metric receipt is verified in P0. Their storage/query policies and
 full recovery/archive evidence follow in P7/P8.
 
+For P7, reuse a two-service trace whose parent spans midnight and whose child
+starts on the next UTC day and arrives first. Check full span content after
+local restart in E-11. In E-12, assemble the trace with a range covering both
+span starts and check the missing-parent outcome with a range covering only
+the child's start. In E-13, repeat the lookup with one span local and one
+archived, including a replay after eviction. Use the daily log archive as the
+sizing baseline. Measure objects per UTC day, bytes read for a trace-ID lookup,
+and peak memory with representative trace data before choosing trace archive
+file sizing.
+
 ## 15. Open-decision register
 
 | ID | Decision | Suggested starting point / consequence | Needed by |
@@ -575,9 +585,9 @@ full recovery/archive evidence follow in P7/P8.
 | O-001 | Installation ingress identity | Service and module are einblick. Choose the ingress domain and deployment references. | Before configuring ingress |
 | O-002 | Internal ingestion authentication, TLS, certificate provisioning, and client trust | Reuse go-service mechanisms. Header-bearing remote OTLP/gRPC requires TLS under the current exporter contract. | Before a deployed client connects |
 | O-003 | Public meaning of archive retention | Selected R2 object-age expiration through Infraops. Document asynchronous deletion, complete-rule ownership, and explicit remote-rule removal when disabling it. | P6 implementation |
-| O-004 | Backend event-day selection, accepted lateness, missing timestamps, and future clock skew | Logs: preserve both original nanosecond timestamps and separate receipt time; select Timestamp, then ObservedTimestamp, then server receipt time. Use that selection's UTC day for archival. Accept late and future timestamps without cutoffs. | Traces in P7; metrics in P8 |
-| O-005 | Duplicate policy per signal | Logs: retain repeated exports as additional records, including identical messages; no deduplication index or horizon. This log policy is agreed. Candidate for later signals: identify duplicate spans by trace/span IDs and metric points by complete stream identity and point timestamps. Validate counter/histogram semantics before adoption. | Traces in P7; metrics in P8 |
-| O-006 | Supported OTLP subset and its database mapping | Logs: preserve complete content from the pinned OTLP protobuf, including typed bodies/attributes, resource/scope context, correlation and original nanosecond timestamps; this support policy is agreed. Derive physical schema from these contracts and verify representative go-service payloads. Trace/metric support and mapping remain open; document unsupported shapes/omissions explicitly. A handwritten copy of the OTel schema is unnecessary. | Log verification in P1; trace storage in P7; metric storage in P8 |
+| O-004 | Backend event-day selection, accepted lateness, missing timestamps, and future clock skew | Logs: preserve both original nanosecond timestamps and separate receipt time; select Timestamp, then ObservedTimestamp, then server receipt time. Use that selection's UTC day for archival. Accept late and future timestamps without cutoffs. See [recommended trace policies](#recommended-trace-policies). | Traces in E-11 and metrics in P8 |
+| O-005 | Duplicate policy per signal | Logs: retain repeated exports as additional records, including identical messages; no deduplication index or horizon. This log policy is agreed. The metric candidate uses complete stream identity and point timestamps. Validate counter/histogram semantics before adoption. See [recommended trace policies](#recommended-trace-policies). | Traces in E-11 and metrics in P8 |
+| O-006 | Supported OTLP subset and its database mapping | Logs: preserve complete content from the pinned OTLP protobuf, including typed bodies/attributes, resource/scope context, correlation and original nanosecond timestamps; this support policy is agreed. Derive physical schema from these contracts and verify representative go-service payloads. Document unsupported shapes and omissions explicitly. A handwritten copy of the OTel schema is unnecessary. See [recommended trace policies](#recommended-trace-policies). | Log verification in P1, trace storage in E-11 and metric storage in P8 |
 | O-007 | R2 bucket and persistent-volume ownership/configuration | Reuse infraops' delivered protected-PVC and optional R2 expiration capabilities; choose capacity, path, provisioning profile, backing-volume reclaim policy and operational ownership. Verify actual release-tooling execution and storage preservation before activating storage. | Local storage path in P1; runtime settings before use |
 | O-008 | Concrete resource and query bounds | Log export uses one active batch and a separate quota-limited staging filesystem. DuckDB uses its default spill limit unless configured explicitly. Use 1 GiB as a starting point for testing the staging filesystem. Measure one-application ingestion and representative queries to size memory/native headroom, export batches, staging capacity and the persistent outage budget. | Bound each capability as introduced in P0–P8; refine with workload measurements |
 | O-009 | Reserved: site authentication | Outside v1 under D-012/WEB-012. | No v1 work |
@@ -586,6 +596,39 @@ full recovery/archive evidence follow in P7/P8.
 | O-013 | Frontend library versions and visual refinement | The [full-page layout](../internal/site/root/layout/full.tmpl) pins htmx and daisyUI. A local theme applies Einblick’s colors and density to the shared controls. Confirm the chart dependency and refine the working views as panels are added. | Full frontend in P9 |
 
 Open tuning values do not require new infrastructure or repeated approval requests. Material changes to durability, authentication boundaries, supported data, or deployment scope should be raised with their concrete consequences.
+
+### Recommended trace policies
+
+- **O-004 — Time.** Preserve the original start and end timestamps at
+  nanosecond precision and store server receipt time separately. Use the span
+  start's UTC day for archival. Accept valid late and future-dated spans, as
+  with logs. A future-dated span stays local until its start day is eligible for
+  export. Reject missing timestamps or an end before the start as permanent
+  input errors.
+  For trace-ID lookup, select spans whose start falls in the requested range,
+  including the lower bound and excluding the upper bound. Show the lookup
+  range and any missing parents under QRY-004.
+- **O-005 — Retries.** Identify a span by its trace ID and span ID. While the
+  original is local, acknowledge an identical replay without inserting a
+  second span. Reject changed content for the same identity and keep the
+  original. For a mixed export, commit the accepted spans before returning
+  OTLP partial success with the rejected-span count.
+- **O-006 — Supported content.** Persist completed spans independently as
+  they arrive, including when a parent has yet to arrive. Preserve parent IDs,
+  status, events, links, typed attributes, and resource and instrumentation
+  scope context from the pinned OTLP schema. Verify support against
+  representative go-service exports.
+
+The recommended write-time duplicate guarantee lasts while the original span
+is local. The go-service exporter retries within its export timeout. With daily
+export, a late span received just before its receipt day closes could still be
+evicted before a retry. After eviction, accept a replay as another arrival.
+E-13 lookup returns one span per identity among copies within the selected
+coverage, preferring the earliest stored receipt time and breaking ties
+consistently. Requiring conflict rejection for the full archive retention
+period would require identity state that survives eviction or archive reads
+during intake. The recommended policy keeps local commits independent of R2
+availability.
 
 ## 16. Definition of first-version readiness
 
