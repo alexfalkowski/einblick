@@ -48,6 +48,10 @@ When('I repeat a search for the {string} range after a new log arrives in the {s
   repeat_search_after_log_arrives(range, layout)
 end
 
+When('I reload the {string} search link after a new log arrives') do |range|
+  repeat_search_after_log_arrives(range, 'full', reload: true)
+end
+
 When('I clear the message filter before rerunning a one-hour search after a new log arrives') do
   clear_message_then_refresh
 end
@@ -84,16 +88,20 @@ When('I read the selected logs in two-record pages') do
   read_log_pages
 end
 
-When('I choose the last hour and follow Next page without htmx') do
+When('I choose the last 15 minutes and follow Next page without htmx') do
   search_and_page_without_htmx
 end
 
-When('I rerun the paged search after a matching log arrives') do
+When('I reload the paged search link after a matching log arrives') do
   refresh_paged_search
 end
 
 When('I find related logs from a later page of an active message and severity search') do
   find_related_logs
+end
+
+When('I find related logs from a 15-minute search') do
+  find_recent_related_logs
 end
 
 When('I investigate with {string} in a {string} view with browser languages {string}') do |outcome, layout, languages|
@@ -125,8 +133,8 @@ Then('I should see the Einblick icon in the browser tab') do
   expect(@favicon).to serve_png_icon
 end
 
-Then('the query link should fix the {string} window of {int} hours ending now for the selected service') do |preset, hours|
-  expect(@response).to preserve_recent_window(preset, hours * 3600, @preset_started..@preset_finished, @query.slice('service'))
+Then('the query link should preserve the {string} window of {int} minutes ending now for the selected service') do |preset, minutes|
+  expect(@response).to preserve_recent_window(preset, minutes * 60, @preset_started..@preset_finished, @query.slice('service'))
 end
 
 Then('{string} should be the only available preset and should search the last {int} minutes') do |preset, minutes|
@@ -134,7 +142,7 @@ Then('{string} should be the only available preset and should search the last {i
   expect(@response).to preserve_recent_window(preset, minutes * 60, @preset_started..@preset_finished)
 end
 
-Then('the query link should retain the original fractional seconds') do
+Then('the results should retain the original fractional seconds') do
   expect(@response).to preserve_log_filters(@query)
 end
 
@@ -144,8 +152,14 @@ Then('the new log should appear in a refreshed {string} window of {int} hours') 
   expect(@response).to preserve_recent_window(preset, hours * 3600, @search_time, @arrival_filters, @search_layout)
 end
 
+Then('the new log should appear in the last 15 minutes') do
+  expect(@search_before_arrival).to show_log_messages
+  expect(@response).to show_log_messages(Einblick::Site::ARRIVING_MESSAGE)
+  expect(@response).to preserve_recent_window('15 min', 900, @search_time, @arrival_filters, 'full')
+end
+
 Then('clearing the filter should keep the exact time bounds') do
-  expect(@cleared_search).to keep_log_time_bounds(@empty_message_search, 'full')
+  expect(@cleared_search).to keep_log_time_bounds(@empty_message_search)
 end
 
 Then('the next search should show the new log in a refreshed one-hour window') do
@@ -182,7 +196,7 @@ Then('I should only see the log message {string} with severity {string}') do |me
   expect(@response).to show_log_messages(message).and show_log_severity(severity)
 end
 
-Then('the query link should preserve the submitted filters and absolute time range') do
+Then('the results should keep the exact range and the link should preserve the submitted filters') do
   expect(@response).to preserve_log_filters(@query.merge(@browser_filters))
 end
 
@@ -213,18 +227,22 @@ end
 
 Then('the full pages should show {string} followed by {string} in the same filtered search') do |first_message, next_message|
   filters = @query.except('start_time', 'end_time')
-  expect(@native_pages.first).to preserve_recent_window('1 hour', 3600, @preset_started..@preset_finished, filters, 'full')
+  expect(@native_pages.first).to preserve_recent_window('15 min', 900, @preset_started..@preset_finished, filters, 'full')
   expect(@native_pages).to continue_full_page_log_search(first_message, next_message)
 end
 
-Then('the next search should show the new matching log in a refreshed one-hour window') do
+Then('reloading should show the new matching log in a refreshed 15-minute window') do
   expect(@response).to show_log_messages(Einblick::Site::PAGED_ARRIVAL_MESSAGE)
-  expect(@response).to preserve_recent_window('1 hour', 3600, @search_time, @query.except('start_time', 'end_time'), 'full')
+  expect(@response).to preserve_recent_window('15 min', 900, @search_time, @query.except('start_time', 'end_time'), 'full')
 end
 
 Then('I should see the matching trace with the same time range and filters') do
   filters = @query.merge(Einblick::Site::RELATED_LOG_FILTERS, 'trace_id' => Einblick::Site::FIXTURE_TRACE_ID)
   expect(@response).to show_related_log_search(filters).and show_log_messages('same-time first').and exhaust_log_search
+end
+
+Then('the related search should keep the exact interval and reload with the default window') do
+  expect(@response).to keep_log_time_bounds(@related_log_source).and offer_default_log_reload
 end
 
 Then('the inspector should distinguish observation time from receipt time and show the exact timestamps') do

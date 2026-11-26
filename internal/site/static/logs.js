@@ -64,6 +64,7 @@ const failure = document.querySelector("#query-failure");
 if (failure) {
   let closeLogDetails = setupLogDetails();
   let failedQuery;
+  let manualQueryFailed = false;
 
   const timePresets = document.querySelectorAll(".time-presets button");
   const currentRange = document.querySelector("#current-range");
@@ -74,6 +75,7 @@ if (failure) {
   const searchWindow = filters.querySelector("#search-window");
   const messageInput = document.querySelector("#text");
   const clearMessage = document.querySelector("#clear-message");
+  const refreshInterval = document.querySelector("#refresh-interval");
   const updateClearMessage = () => { clearMessage.hidden = !messageInput.value; };
   messageInput.addEventListener("input", updateClearMessage);
   filters.addEventListener("submit", (event) => {
@@ -90,10 +92,26 @@ if (failure) {
     }
   });
 
-  const locationQuery = new URLSearchParams(location.search);
-  const queryURL = document.querySelector("#results").dataset.queryUrl;
-  if (queryURL && ["window", "search_window", "start_utc", "end_utc", "clear_message"].some((name) => locationQuery.has(name))) {
-    history.replaceState(history.state, "", queryURL);
+  let queryURL = document.querySelector("#results").dataset.queryUrl;
+  if (queryURL !== location.pathname + location.search) {
+    history.replaceState(history.state, "", queryURL + location.hash);
+  }
+
+  const logDetailsOpen = () => document.querySelector(".log-details-panel[open]");
+  if (window.htmx) {
+    let timer;
+    refreshInterval.closest(".refresh-control").hidden = false;
+    refreshInterval.addEventListener("change", () => {
+      clearInterval(timer);
+      const interval = htmx.parseInterval(refreshInterval.value);
+      if (interval) {
+        timer = setInterval(() => {
+          if (!logDetailsOpen() && !manualQueryFailed) {
+            htmx.ajax("PUT", queryURL, { source: refreshInterval });
+          }
+        }, interval);
+      }
+    });
   }
 
   retryButton.addEventListener("click", () => {
@@ -102,6 +120,9 @@ if (failure) {
   });
 
   const showFailure = (reason, ctx) => {
+    if (ctx?.sourceElement && ctx.sourceElement !== refreshInterval) {
+      manualQueryFailed = true;
+    }
     closeLogDetails?.(false);
     failureMessage.textContent = failure.dataset[reason];
     failedQuery = undefined;
@@ -130,13 +151,27 @@ if (failure) {
     document.querySelector(".pagination")?.removeAttribute("inert");
   });
 
+  document.addEventListener("htmx:before:history:update", (event) => {
+    const { history: update, sourceElement } = event.detail;
+    if (sourceElement === refreshInterval || update.path === location.pathname + location.search) {
+      event.preventDefault();
+    }
+  });
+
   document.addEventListener("htmx:after:request", (event) => {
     const { ctx } = event.detail;
+    if (ctx.sourceElement === refreshInterval && logDetailsOpen()) {
+      event.preventDefault();
+      return;
+    }
     const { response, text } = ctx;
     // Gateways can return HTML error pages. Only swap Einblick's fragment.
     const isLogFragment = response.headers.get("Einblick-View") === "logs-results" &&
       response.headers.get("Content-Type")?.startsWith("text/html") && text.trim();
     if (isLogFragment) {
+      if (ctx.sourceElement !== refreshInterval) {
+        manualQueryFailed = response.status >= 400;
+      }
       return;
     }
 
@@ -147,14 +182,18 @@ if (failure) {
 
   document.addEventListener("htmx:error", (event) => {
     const { ctx } = event.detail;
+    if (ctx?.sourceElement === refreshInterval && logDetailsOpen()) {
+      return;
+    }
     const reason = ctx?.request.signal?.reason;
     showFailure(reason === "timeout" ? "timeout" : "request", ctx);
   });
 
   document.addEventListener("htmx:after:swap", () => {
     closeLogDetails = setupLogDetails();
-    const { startTime, endTime, window, recentWindow } = document.querySelector("#results").dataset;
-    if (startTime && endTime) {
+    const { queryUrl, startTime, endTime, window, recentWindow } = document.querySelector("#results").dataset;
+    if (queryUrl) {
+      queryURL = queryUrl;
       document.querySelector("#start-time").value = startTime;
       document.querySelector("#end-time").value = endTime;
       searchWindow.value = recentWindow;

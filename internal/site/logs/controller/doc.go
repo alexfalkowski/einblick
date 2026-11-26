@@ -1,2 +1,2 @@
-// Package controller adapts browser log queries to the repository and prepares MVC models.
+// Package controller handles the HTTP lifecycle of browser log queries.
 package controller

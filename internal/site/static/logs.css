@@ -55,6 +55,9 @@ a.brand { display: block; width: fit-content; margin: 0 0 2rem; color: #fff; fon
 .sidebar input::placeholder { color: var(--color-base-content); }
 
 .workspace { padding: clamp(1rem, 3vw, 2.25rem); min-width: 0; }
+.workspace-header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 0 1rem; }
+.refresh-control:not([hidden]) { display: flex; align-items: center; gap: .5rem; margin-bottom: 1rem; }
+.refresh-control label { white-space: nowrap; }
 #log-filters, .log-summary, .log-sections {
   border: var(--border) solid var(--color-base-300);
   border-radius: var(--radius-box);

@@ -47,6 +47,11 @@ module Einblick
         get(link['href'], options(languages))
       end
 
+      def open_log_query(page, languages)
+        results = Nokogiri::HTML5(page.body).at_css('#results')
+        get(results['data-query-url'], options(languages))
+      end
+
       private
 
       def log_form_button(document, form, label)

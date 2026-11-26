@@ -1,13 +1,16 @@
 package model
 
-import "github.com/alexfalkowski/go-service/v3/time"
+import (
+	"github.com/alexfalkowski/einblick/internal/site/timerange"
+	"github.com/alexfalkowski/go-service/v3/time"
+)
 
 // Logs contains the filters and results for the full and partial views.
 type Logs struct {
 	// NextURL continues the current search. It is empty on the last page.
 	NextURL string
 
-	// QueryURL identifies the current search with fixed, exact bounds.
+	// QueryURL opens a fresh search using the current filters and a relative window.
 	QueryURL string
 
 	// Rows contains matching logs in newest-first order.
@@ -37,7 +40,7 @@ type Filters struct {
 	// TraceID is the hexadecimal identifier selected for correlation.
 	TraceID string
 
-	// SelectedWindow is the preset matching the applied duration, or empty for another duration.
+	// SelectedWindow is the selected relative preset shown in the time picker.
 	SelectedWindow string
 
 	// RecentWindow is the preset for the next search. An empty value keeps the absolute bounds.
@@ -47,7 +50,7 @@ type Filters struct {
 	SeverityOptions []FilterOption
 
 	// Windows holds the recent ranges that fit the configured search limit.
-	Windows []FilterOption
+	Windows []timerange.Preset
 
 	// PageSize is the requested number of results. Zero uses the configured size.
 	PageSize int

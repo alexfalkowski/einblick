@@ -1,13 +1,13 @@
 package duckdb
 
 import (
-	"net/url"
 	"strconv"
 
 	"github.com/alexfalkowski/go-service/v3/context"
 	"github.com/alexfalkowski/go-service/v3/database/sql"
 	"github.com/alexfalkowski/go-service/v3/database/sql/telemetry"
 	"github.com/alexfalkowski/go-service/v3/errors"
+	"github.com/alexfalkowski/go-service/v3/net/url"
 	"github.com/alexfalkowski/go-service/v3/strings"
 	"github.com/alexfalkowski/go-service/v3/telemetry/attributes"
 	"github.com/alexfalkowski/go-signal/v2"

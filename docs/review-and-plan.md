@@ -63,7 +63,10 @@ timestamp selection, supported shapes and duplicate policy for E-11.
   [Logs feature layout](../internal/site/logs) and reuse the
   [embedded catalogs](../internal/site/locales), [shared layouts](../internal/site/root/layout) and
   [Einblick daisyUI theme](../internal/site/static/logs.css). Use the
-  [initial visual reference](requirements.md#87-service-catalog-and-standard-ux).
+  [initial visual reference](requirements.md#87-service-catalog-and-standard-ux)
+  and the [shared time controls](requirements.md#time-controls). Verify each
+  view opens direct fixed-range links and reloads relative URLs against now.
+  Include a reload after paging where the view paginates.
   E-18 owns connected browser navigation, full accessibility acceptance
   and historical query outcomes. With an HTTP transport timeout of `1ns`,
   a direct German `GET /logs` returned HTTP 504 with an empty body.

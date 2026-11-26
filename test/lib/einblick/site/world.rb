@@ -95,8 +95,13 @@ module Einblick
         @response = site_client.open_related_logs(@site_pages.fetch(1), 'en')
       end
 
+      def find_recent_related_logs
+        @related_log_source = investigate_logs('full', 'en', 'window' => '15m', 'trace_id' => '')
+        @response = site_client.open_related_logs(@related_log_source, 'en')
+      end
+
       def search_and_page_without_htmx
-        choose_time_range('1 hour', layout: 'full')
+        choose_time_range('15 min', layout: 'full')
         @native_pages = [@response, site_client.open_next_page(@response, 'en')]
       end
 
