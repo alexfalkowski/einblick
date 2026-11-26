@@ -12,13 +12,15 @@ Feature: Investigate recent logs in the browser
   Scenario Outline: Replace a saved time range with a recent preset
     Given acknowledged searchable logs
     When I choose the "<preset>" time range
-    Then the query link should fix the "<preset>" window of <hours> hours ending now for the selected service
+    Then the query link should preserve the "<preset>" window of <minutes> minutes ending now for the selected service
 
     Examples:
-      | preset | hours |
-      | 1 hour | 1     |
-      | 3 days | 72    |
-      | 7 days | 168   |
+      | preset   | minutes |
+      | 15 min   | 15      |
+      | 1 hour   | 60      |
+      | 24 hours | 1440    |
+      | 3 days   | 4320    |
+      | 7 days   | 10080   |
 
   Scenario Outline: Search using the only preset within a short query limit
     When I choose "<preset>" with a <minutes>-minute query limit
@@ -33,7 +35,7 @@ Feature: Investigate recent logs in the browser
     Given acknowledged searchable logs
     When I submit the displayed search filters
     Then I should see the selected service's log messages and exact event times
-    And the query link should retain the original fractional seconds
+    And the results should retain the original fractional seconds
 
   Scenario Outline: Search again after new logs arrive
     Given acknowledged searchable logs
@@ -46,17 +48,27 @@ Feature: Investigate recent logs in the browser
       | 1 hour  | partial | 1 hour | 1     |
       | 1 hour  | full    | 1 hour | 1     |
 
+  Scenario: Reload a recent search link after new logs arrive
+    Given acknowledged searchable logs
+    When I reload the "15 min" search link after a new log arrives
+    Then the new log should appear in the last 15 minutes
+
   Scenario: Clear a filter and refresh recent logs without htmx
     Given acknowledged searchable logs
     When I clear the message filter before rerunning a one-hour search after a new log arrives
     Then clearing the filter should keep the exact time bounds
     And the next search should show the new log in a refreshed one-hour window
 
-  Scenario: Open a saved search with a custom time range
+  Scenario Outline: Open a saved search with an absolute time range
     Given acknowledged searchable logs
-    When I open a saved search from "2026-11-19T11:04:00Z" to "2026-11-19T11:04:04Z"
+    When I open a saved search from "<start>" to "<end>"
     Then the saved time range should be applied
     And I should see no matching logs
+
+    Examples:
+      | start                | end                  |
+      | 2026-11-19T11:04:00Z | 2026-11-19T11:04:04Z |
+      | 2026-11-19T10:30:00Z | 2026-11-19T10:45:00Z |
 
   Scenario Outline: Open a bookmark from the old UTC form
     Given acknowledged searchable logs
@@ -88,7 +100,7 @@ Feature: Investigate recent logs in the browser
     Given acknowledged searchable logs
     When I submit the browser filters <filters>
     Then I should only see the log message "<message>" with severity "<displayed severity>"
-    And the query link should preserve the submitted filters and absolute time range
+    And the results should keep the exact range and the link should preserve the submitted filters
 
     Examples:
       | filters                                         | message                | displayed severity |
@@ -134,15 +146,20 @@ Feature: Investigate recent logs in the browser
 
   Scenario: Search and page through filtered logs when htmx is unavailable
     Given acknowledged recent logs with matching requests and other messages, severities and traces
-    When I choose the last hour and follow Next page without htmx
-    And I rerun the paged search after a matching log arrives
+    When I choose the last 15 minutes and follow Next page without htmx
+    And I reload the paged search link after a matching log arrives
     Then the full pages should show "same-time first" followed by "first" in the same filtered search
-    And the next search should show the new matching log in a refreshed one-hour window
+    And reloading should show the new matching log in a refreshed 15-minute window
 
   Scenario: Find related logs from a later page
     Given acknowledged logs with related requests of different severities and messages
     When I find related logs from a later page of an active message and severity search
     Then I should see the matching trace with the same time range and filters
+
+  Scenario: Reload related logs after opening them from a recent search
+    Given acknowledged recent logs with matching requests and other messages, severities and traces
+    When I find related logs from a 15-minute search
+    Then the related search should keep the exact interval and reload with the default window
 
   Scenario: Inspect exact timestamps at the top of the OTLP time range
     Given acknowledged logs beyond the signed nanosecond range

@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
 module LogView
-  PRESET_VALUES = { 'Recent' => 'recent', '15 min' => '15m', '1 hour' => '1h', '3 days' => '3d', '7 days' => '7d' }.freeze
+  PRESET_VALUES = {
+    'Recent' => 'recent', '15 min' => '15m', '1 hour' => '1h', '24 hours' => '24h', '3 days' => '3d', '7 days' => '7d'
+  }.freeze
 
   LABELS = {
     'en' => {
@@ -12,6 +14,7 @@ module LogView
       timing: 'Timing and IDs', search: 'Search messages', time_range: 'Time range', retry: 'Try again',
       'broken link': 'This search link couldn’t be opened.', open_logs: 'Open Logs',
       related_logs: 'Find related logs', details: 'Log details', close_details: 'Close details',
+      auto_refresh: 'Auto-refresh', refresh_off: 'Off',
       'dates out of order': 'End time must be after start time.', 'wide date range': 'This time range exceeds the search limit.',
       'invalid dates': 'Enter a valid start and end time in UTC.', 'invalid filter': 'Check the search filters and try again.'
     },
@@ -23,7 +26,8 @@ module LogView
       no_message: 'Keine Meldung', timing: 'Zeitangaben und IDs',
       search: 'Meldungen durchsuchen', time_range: 'Zeitraum', retry: 'Erneut versuchen',
       'dates out of order': 'Das Ende muss nach dem Beginn liegen.', related_logs: 'Zugehörige Protokolle finden',
-      details: 'Protokolldetails', close_details: 'Details schließen'
+      details: 'Protokolldetails', close_details: 'Details schließen',
+      auto_refresh: 'Automatisch aktualisieren', refresh_off: 'Aus'
     },
     'es' => {
       title: 'Registros · Einblick', heading: 'Registros', service: 'Servicio', submit: 'Buscar', reset: 'Restablecer',
@@ -33,7 +37,8 @@ module LogView
       no_message: 'Sin mensaje', timing: 'Tiempos e identificadores',
       search: 'Buscar mensajes', time_range: 'Intervalo', retry: 'Volver a intentar',
       'broken link': 'No se pudo abrir este enlace de búsqueda.', open_logs: 'Abrir registros',
-      related_logs: 'Buscar registros relacionados', details: 'Detalles del registro', close_details: 'Cerrar detalles'
+      related_logs: 'Buscar registros relacionados', details: 'Detalles del registro', close_details: 'Cerrar detalles',
+      auto_refresh: 'Actualización automática', refresh_off: 'Desactivada'
     }
   }.freeze
 
@@ -115,6 +120,10 @@ RSpec::Matchers.define :show_full_log_layout do |language, labels, status|
       expect(document.at_css('#query-progress[role=status]').text.strip).to eq(labels.fetch(:loading))
       expect(document.at_css('label[for=text]').text).to eq(labels.fetch(:search))
       expect(document.at_css('.filters > #time-range-label').text).to eq(labels.fetch(:time_range))
+      expect(document.at_css('label[for=refresh-interval]').text).to eq(labels.fetch(:auto_refresh))
+      intervals = document.css('#refresh-interval option')
+      expect(intervals.map(&:text)).to eq([labels.fetch(:refresh_off), '5s', '10s', '15s'])
+      expect(intervals.map { |option| option['value'] }).to eq(%w[off 5s 10s 15s])
       expect(document.at_css('#query-failure[hidden] #retry-query[type=button]').text).to eq(labels.fetch(:retry))
     end
     true
@@ -235,8 +244,7 @@ RSpec::Matchers.define :show_related_log_search do |filters|
     expect(response.code).to eq(200)
     page = Nokogiri::HTML5(response.body)
     expect(page.at_css('#trace-id')['value']).to eq(filters.fetch('trace_id'))
-    query_url = URI.parse(page.at_css('#results')['data-query-url'])
-    expect(URI.decode_www_form(query_url.query).to_h).to eq(filters)
+    expect(response).to preserve_log_filters(filters, 'full')
   end
 end
 
@@ -258,13 +266,13 @@ RSpec::Matchers.define :show_log_severity do |severity|
 end
 
 RSpec::Matchers.define :preserve_log_filters do |filters, layout = 'partial'|
-  match do |response|
-    @path = LogView.query_url(response, layout)
-    @path.path == '/logs' && URI.decode_www_form(@path.query).to_h == filters
-  end
-
-  failure_message do
-    "expected query filters #{filters.inspect} in #{@path}"
+  match(notify_expectation_failures: true) do |response|
+    path = LogView.query_url(response, layout)
+    expect(path.path).to eq('/logs')
+    expect(URI.decode_www_form(path.query).to_h).to eq(filters.except('start_time', 'end_time').merge('window' => '1h'))
+    results = Nokogiri::HTML5.fragment(response.body).at_css('#results')
+    expect(results['data-start-time']).to eq(filters.fetch('start_time'))
+    expect(results['data-end-time']).to eq(filters.fetch('end_time'))
   end
 end
 
@@ -381,10 +389,8 @@ RSpec::Matchers.define :continue_full_page_log_search do |first_message, next_me
     first, next_page = responses
     expect(first).to show_log_view('full', 'en', 200).and show_log_messages(first_message)
     expect(next_page).to show_log_view('full', 'en', 200).and show_log_messages(next_message).and exhaust_log_search
-    first_query = URI.decode_www_form(LogView.query_url(first, 'full').query).to_h
-    next_query = URI.decode_www_form(LogView.query_url(next_page, 'full').query).to_h
-    expect(next_query.fetch('page_token')).not_to be_empty
-    expect(next_query.except('page_token')).to eq(first_query)
+    expect(LogView.query_url(next_page, 'full')).to eq(LogView.query_url(first, 'full'))
+    expect(next_page).to keep_log_time_bounds(first)
   end
 end
 
@@ -442,22 +448,31 @@ RSpec::Matchers.define :preserve_recent_window do |preset, seconds, expected_end
     url = LogView.query_url(response, layout)
     expect(url.path).to eq('/logs')
     query = URI.decode_www_form(url.query).to_h
-    ending = Time.iso8601(query.fetch('end_time'))
-    beginning = Time.iso8601(query.fetch('start_time'))
-    expect(query.except('start_time', 'end_time')).to eq(filters)
+    window = LogView::PRESET_VALUES.fetch(preset)
+    expect(query).to eq(filters.merge('window' => window))
+    results = Nokogiri::HTML5.fragment(response.body).at_css('#results')
+    ending = Time.iso8601(results['data-end-time'])
+    beginning = Time.iso8601(results['data-start-time'])
     expect(ending.to_r - beginning.to_r).to eq(seconds)
     expect(expected_end).to cover(ending)
-    results = Nokogiri::HTML5.fragment(response.body).at_css('#results')
-    expect(results['data-window']).to eq(LogView::PRESET_VALUES.fetch(preset))
+    expect(results['data-window']).to eq(window)
   end
 end
 
-RSpec::Matchers.define :keep_log_time_bounds do |before, layout|
+RSpec::Matchers.define :keep_log_time_bounds do |before|
   match(notify_expectation_failures: true) do |response|
     expect(response.code).to eq(200)
-    original_bounds = URI.decode_www_form(LogView.query_url(before, layout).query).to_h.slice('start_time', 'end_time')
-    actual_bounds = URI.decode_www_form(LogView.query_url(response, layout).query).to_h.slice('start_time', 'end_time')
-    expect(actual_bounds).to eq(original_bounds)
+    original = Nokogiri::HTML5(before.body).at_css('#results')
+    actual = Nokogiri::HTML5(response.body).at_css('#results')
+    expect(actual['data-start-time']).to eq(original['data-start-time'])
+    expect(actual['data-end-time']).to eq(original['data-end-time'])
+  end
+end
+
+RSpec::Matchers.define :offer_default_log_reload do
+  match(notify_expectation_failures: true) do |response|
+    query = LogView.query_url(response, 'full').query
+    expect(URI.decode_www_form(query).to_h).to include('window' => '1h')
   end
 end
 

@@ -2,11 +2,20 @@
 
 These entries are part of the [accepted-design index](../accepted-design.md).
 
-## Initial browser search window
+## Browser time selection and refresh
 
 The Logs page opens on the last hour, capped by the configured query limit.
-Choose a time preset or use an absolute link for longer searches.
+The address bar keeps the duration so reloads start a fresh search up to now,
+including after paging. Pagination and investigation actions can use the exact
+applied bounds. Apply the shared controls on every time-filtered view.
+[Time controls](../../requirements.md#time-controls) ·
 [Log queries](../../queries.md#-investigate-logs-in-the-browser)
+
+Reuse the [browser time selection package](../../../internal/site/timerange) for
+presets, exact bounds and reload durations. The
+[Logs query package](../../../internal/site/logs/query) binds log-specific filters
+and builds continuation links. The repository validates the cursor against the
+executed query.
 
 ## Search sources
 

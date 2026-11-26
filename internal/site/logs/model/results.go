@@ -1,11 +1,11 @@
-package controller
+package model
 
 import (
 	"encoding/hex"
 	"unicode/utf8"
 
 	"github.com/alexfalkowski/einblick/internal/logs/storage"
-	"github.com/alexfalkowski/einblick/internal/site/logs/model"
+	"github.com/alexfalkowski/einblick/internal/site/logs/query"
 	"github.com/alexfalkowski/go-service/v3/bytes"
 	"github.com/alexfalkowski/go-service/v3/context"
 	"github.com/alexfalkowski/go-service/v3/encoding/codec"
@@ -18,7 +18,7 @@ import (
 
 const matchContextRunes = 12
 
-var severityOptions = []model.FilterOption{
+var severityOptions = []FilterOption{
 	{Value: "DEBUG", Label: "logs.level.debug"},
 	{Value: "INFO", Label: "logs.level.info"},
 	{Value: "WARN", Label: "logs.level.warn"},
@@ -26,69 +26,60 @@ var severityOptions = []model.FilterOption{
 	{Value: "FATAL", Label: "logs.level.fatal"},
 }
 
-func newLogsModel(
-	ctx context.Context, query storage.Query, results *storage.Page, recent string, maxRange time.Duration,
-) (*model.Logs, error) {
-	windows, selectedWindow := windowOptions(maxRange, time.Duration(query.EndTime.Sub(query.StartTime)))
-	viewModel := &model.Logs{
-		QueryURL: logsURL(query, strings.Empty),
-		Filters: model.Filters{
-			StartTime:       query.StartTime.UTC(),
-			EndTime:         query.EndTime.UTC(),
-			ServiceName:     query.Service,
-			MessageText:     query.Text,
-			Severity:        query.Severity,
-			TraceID:         query.TraceID,
+// NewLogs builds the view model for a page of logs.
+func NewLogs(ctx context.Context, search query.Search, results *storage.Page, maxRange time.Duration) (*Logs, error) {
+	filters := search.Query()
+	windows, selectedWindow := search.Time.Presets(maxRange)
+	viewModel := &Logs{
+		QueryURL: search.ReloadURL(maxRange),
+		NextURL:  search.NextURL(results.NextPageToken),
+		Filters: Filters{
+			StartTime:       filters.StartTime,
+			EndTime:         filters.EndTime,
+			ServiceName:     filters.Service,
+			MessageText:     filters.Text,
+			Severity:        filters.Severity,
+			TraceID:         filters.TraceID,
 			SeverityOptions: severityOptions,
 			Windows:         windows,
 			SelectedWindow:  selectedWindow,
-			RecentWindow:    recent,
-			PageSize:        query.PageSize,
+			RecentWindow:    search.Time.SearchWindow,
+			PageSize:        filters.PageSize,
 		},
-		Rows: make([]model.LogRow, 0, len(results.Logs)),
+		Rows: make([]LogRow, 0, len(results.Logs)),
 	}
 	for _, stored := range results.Logs {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
 
-		row, err := newLogRow(stored, query.Text)
+		row, err := newLogRow(stored, filters.Text)
 		if err != nil {
 			return nil, err
 		}
 
-		if storage.ValidTraceID(row.TraceID) {
-			related := query
-			related.TraceID, related.PageToken = row.TraceID, strings.Empty
-			row.RelatedLogsURL = logsURL(related, strings.Empty)
-		}
-
+		row.RelatedLogsURL = search.RelatedLogsURL(row.TraceID)
 		viewModel.Rows = append(viewModel.Rows, row)
-	}
-
-	if !strings.IsEmpty(results.NextPageToken) {
-		query.PageToken = results.NextPageToken
-		viewModel.NextURL = logsURL(query, recent)
 	}
 	return viewModel, nil
 }
 
-func newLogRow(stored *storage.Log, search string) (model.LogRow, error) {
+func newLogRow(stored *storage.Log, search string) (LogRow, error) {
 	var entry logs.LogRecord
 	var source logs.ResourceLogs
 	var scope logs.ScopeLogs
 	decoder := proto.NewJSON()
 
 	if err := decoder.Decode(bytes.NewReader(stored.Record), &entry, codec.WithDiscardUnknown()); err != nil {
-		return model.LogRow{}, err
+		return LogRow{}, err
 	}
 
 	if err := decoder.Decode(bytes.NewReader(stored.Resource), &source, codec.WithDiscardUnknown()); err != nil {
-		return model.LogRow{}, err
+		return LogRow{}, err
 	}
 
 	if err := decoder.Decode(bytes.NewReader(stored.Scope), &scope, codec.WithDiscardUnknown()); err != nil {
-		return model.LogRow{}, err
+		return LogRow{}, err
 	}
 
 	var severity string
@@ -99,7 +90,7 @@ func newLogRow(stored *storage.Log, search string) (model.LogRow, error) {
 	}
 	message, messageLabel := logMessage(entry.GetBody())
 
-	return model.LogRow{
+	return LogRow{
 		EventTime:        stored.EventTime.UTC(),
 		ServiceName:      stringAttribute(source.GetResource().GetAttributes(), "service.name"),
 		Severity:         severity,
@@ -112,7 +103,7 @@ func newLogRow(stored *storage.Log, search string) (model.LogRow, error) {
 	}, nil
 }
 
-func messageMatch(message, search string) *model.MessageMatch {
+func messageMatch(message, search string) *MessageMatch {
 	if strings.IsEmpty(search) {
 		return nil
 	}
@@ -136,7 +127,7 @@ func messageMatch(message, search string) *model.MessageMatch {
 	if end < len(after) {
 		suffix += "…"
 	}
-	return &model.MessageMatch{Before: prefix, Text: search, After: suffix}
+	return &MessageMatch{Before: prefix, Text: search, After: suffix}
 }
 
 // logMessage returns the displayed text or a catalog key for its fallback.

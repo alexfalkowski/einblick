@@ -1,4 +1,4 @@
-package controller
+package model
 
 import (
 	"encoding/base64"
@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"github.com/alexfalkowski/einblick/internal/logs/storage"
-	"github.com/alexfalkowski/einblick/internal/site/logs/model"
 	"github.com/alexfalkowski/go-service/v3/strings"
 	"github.com/alexfalkowski/go-service/v3/time"
 	common "go.opentelemetry.io/proto/otlp/common/v1"
@@ -27,8 +26,8 @@ var resourceLabels = map[string]string{
 	"deployment.environment.name": "logs.environment",
 }
 
-func logDetails(stored *storage.Log, entry *logs.LogRecord, source *logs.ResourceLogs, scope *logs.ScopeLogs) model.LogDetails {
-	return model.LogDetails{
+func logDetails(stored *storage.Log, entry *logs.LogRecord, source *logs.ResourceLogs, scope *logs.ScopeLogs) LogDetails {
+	return LogDetails{
 		Body:              logValue(entry.GetBody()),
 		Attributes:        logFields(entry.GetAttributes()),
 		Resource:          resourceFields(source),
@@ -43,8 +42,8 @@ func logDetails(stored *storage.Log, entry *logs.LogRecord, source *logs.Resourc
 	}
 }
 
-func logTiming(event, received time.Time, entry *logs.LogRecord) model.LogTiming {
-	timing := model.LogTiming{ReceivedAt: received.UTC()}
+func logTiming(event, received time.Time, entry *logs.LogRecord) LogTiming {
+	timing := LogTiming{ReceivedAt: received.UTC()}
 	if observed := entry.GetObservedTimeUnixNano(); observed != 0 {
 		// Split the unsigned value before converting to preserve times after 2262.
 		//nolint:gosec // Each quotient and remainder fits in int64.
@@ -83,8 +82,8 @@ func receiptOffset(event, received time.Time) (string, string) {
 	return durationText(math.Abs(seconds), 0), label
 }
 
-func requestDetails(attributes []*common.KeyValue) model.RequestDetails {
-	var details model.RequestDetails
+func requestDetails(attributes []*common.KeyValue) RequestDetails {
+	var details RequestDetails
 	switch stringAttribute(attributes, "system") {
 	case "http":
 		details.StatusLabel = "logs.http_status"
@@ -134,8 +133,8 @@ func durationText(seconds float64, precision int) string {
 	return strings.Concat(strconv.FormatFloat(value, 'f', precision, 64), " ", unit)
 }
 
-func logFields(attributes []*common.KeyValue) []model.LogField {
-	fields := make([]model.LogField, 0, len(attributes))
+func logFields(attributes []*common.KeyValue) []LogField {
+	fields := make([]LogField, 0, len(attributes))
 	for _, attribute := range attributes {
 		key := attribute.GetKey()
 
@@ -146,50 +145,50 @@ func logFields(attributes []*common.KeyValue) []model.LogField {
 			name = key
 		}
 
-		fields = append(fields, model.LogField{Name: name, Value: logValue(attribute.GetValue())})
+		fields = append(fields, LogField{Name: name, Value: logValue(attribute.GetValue())})
 	}
 	return fields
 }
 
-func logValue(value *common.AnyValue) model.LogValue {
+func logValue(value *common.AnyValue) LogValue {
 	switch typed := value.GetValue().(type) {
 	case *common.AnyValue_StringValue:
 		return logString(typed.StringValue)
 	case *common.AnyValue_BoolValue:
-		return model.LogValue{Text: strconv.FormatBool(typed.BoolValue)}
+		return LogValue{Text: strconv.FormatBool(typed.BoolValue)}
 	case *common.AnyValue_IntValue:
-		return model.LogValue{Text: strconv.FormatInt(typed.IntValue, 10)}
+		return LogValue{Text: strconv.FormatInt(typed.IntValue, 10)}
 	case *common.AnyValue_DoubleValue:
-		return model.LogValue{Text: strconv.FormatFloat(typed.DoubleValue, 'g', -1, 64)}
+		return LogValue{Text: strconv.FormatFloat(typed.DoubleValue, 'g', -1, 64)}
 	case *common.AnyValue_BytesValue:
-		return model.LogValue{Text: base64.StdEncoding.EncodeToString(typed.BytesValue), Label: "logs.bytes"}
+		return LogValue{Text: base64.StdEncoding.EncodeToString(typed.BytesValue), Label: "logs.bytes"}
 	case *common.AnyValue_StringValueStrindex:
-		return model.LogValue{Text: strconv.FormatInt(int64(typed.StringValueStrindex), 10), Label: "logs.string_index"}
+		return LogValue{Text: strconv.FormatInt(int64(typed.StringValueStrindex), 10), Label: "logs.string_index"}
 	case *common.AnyValue_ArrayValue:
 		return logList(typed.ArrayValue.GetValues())
 	case *common.AnyValue_KvlistValue:
-		return model.LogValue{Fields: logFields(typed.KvlistValue.GetValues()), Label: "logs.map"}
+		return LogValue{Fields: logFields(typed.KvlistValue.GetValues()), Label: "logs.map"}
 	default:
-		return model.LogValue{Label: "logs.empty_value"}
+		return LogValue{Label: "logs.empty_value"}
 	}
 }
 
-func logString(text string) model.LogValue {
+func logString(text string) LogValue {
 	if strings.IsEmpty(strings.TrimSpace(text)) {
-		return model.LogValue{Text: text, Label: "logs.blank_value"}
+		return LogValue{Text: text, Label: "logs.blank_value"}
 	}
-	return model.LogValue{Text: text}
+	return LogValue{Text: text}
 }
 
-func logList(values []*common.AnyValue) model.LogValue {
-	items := make([]model.LogValue, 0, len(values))
+func logList(values []*common.AnyValue) LogValue {
+	items := make([]LogValue, 0, len(values))
 	for _, value := range values {
 		items = append(items, logValue(value))
 	}
-	return model.LogValue{Items: items, Label: "logs.list"}
+	return LogValue{Items: items, Label: "logs.list"}
 }
 
-func resourceFields(source *logs.ResourceLogs) []model.LogField {
+func resourceFields(source *logs.ResourceLogs) []LogField {
 	resource := source.GetResource()
 	fields := logFields(resource.GetAttributes())
 	for i := range fields {
@@ -198,51 +197,51 @@ func resourceFields(source *logs.ResourceLogs) []model.LogField {
 
 	fields = appendContextFields(fields, source.GetSchemaUrl(), resource.GetDroppedAttributesCount())
 	if refs := resource.GetEntityRefs(); len(refs) > 0 {
-		entities := make([]model.LogValue, 0, len(refs))
+		entities := make([]LogValue, 0, len(refs))
 		for _, ref := range refs {
 			entity := appendContextFields(nil, ref.GetSchemaUrl(), 0)
-			entity = append(entity, model.LogField{Label: "logs.entity_type", Value: model.LogValue{Text: ref.GetType()}})
+			entity = append(entity, LogField{Label: "logs.entity_type", Value: LogValue{Text: ref.GetType()}})
 			entity = appendEntityKeys(entity, "logs.entity_id_keys", ref.GetIdKeys())
 			entity = appendEntityKeys(entity, "logs.entity_description_keys", ref.GetDescriptionKeys())
-			entities = append(entities, model.LogValue{Fields: entity, Label: "logs.map"})
+			entities = append(entities, LogValue{Fields: entity, Label: "logs.map"})
 		}
-		fields = append(fields, model.LogField{Label: "logs.entity_refs", Value: model.LogValue{Items: entities, Label: "logs.list"}})
+		fields = append(fields, LogField{Label: "logs.entity_refs", Value: LogValue{Items: entities, Label: "logs.list"}})
 	}
 	return fields
 }
 
-func scopeFields(source *logs.ScopeLogs) []model.LogField {
+func scopeFields(source *logs.ScopeLogs) []LogField {
 	scope := source.GetScope()
-	var fields []model.LogField
+	var fields []LogField
 	if name := scope.GetName(); !strings.IsEmpty(name) {
-		fields = append(fields, model.LogField{Label: "logs.scope_name", Value: model.LogValue{Text: name}})
+		fields = append(fields, LogField{Label: "logs.scope_name", Value: LogValue{Text: name}})
 	}
 	if version := scope.GetVersion(); !strings.IsEmpty(version) {
-		fields = append(fields, model.LogField{Label: "logs.scope_version", Value: model.LogValue{Text: version}})
+		fields = append(fields, LogField{Label: "logs.scope_version", Value: LogValue{Text: version}})
 	}
 	fields = append(fields, logFields(scope.GetAttributes())...)
 	return appendContextFields(fields, source.GetSchemaUrl(), scope.GetDroppedAttributesCount())
 }
 
-func appendContextFields(fields []model.LogField, schemaURL string, dropped uint32) []model.LogField {
+func appendContextFields(fields []LogField, schemaURL string, dropped uint32) []LogField {
 	if !strings.IsEmpty(schemaURL) {
-		fields = append(fields, model.LogField{Label: "logs.schema_url", Value: model.LogValue{Text: schemaURL}})
+		fields = append(fields, LogField{Label: "logs.schema_url", Value: LogValue{Text: schemaURL}})
 	}
 	if dropped != 0 {
 		count := strconv.FormatUint(uint64(dropped), 10)
-		fields = append(fields, model.LogField{Label: "logs.dropped_attributes", Value: model.LogValue{Text: count}})
+		fields = append(fields, LogField{Label: "logs.dropped_attributes", Value: LogValue{Text: count}})
 	}
 	return fields
 }
 
-func appendEntityKeys(fields []model.LogField, label string, keys []string) []model.LogField {
+func appendEntityKeys(fields []LogField, label string, keys []string) []LogField {
 	if len(keys) == 0 {
 		return fields
 	}
 
-	items := make([]model.LogValue, 0, len(keys))
+	items := make([]LogValue, 0, len(keys))
 	for _, key := range keys {
-		items = append(items, model.LogValue{Text: key})
+		items = append(items, LogValue{Text: key})
 	}
-	return append(fields, model.LogField{Label: label, Value: model.LogValue{Items: items, Label: "logs.list"}})
+	return append(fields, LogField{Label: label, Value: LogValue{Items: items, Label: "logs.list"}})
 }

@@ -13,17 +13,20 @@ choice matches one exact level (Debug, Info, Warn, Error, or Fatal), while
 
 | Goal | Action |
 | --- | --- |
-| Search up to now | Choose a time preset. To apply filter edits, select **Search** or press Enter. The default window and presets advance to now on each search. |
+| Search up to now | Choose a time preset. To apply filter edits, select **Search** or press Enter. A recent window advances to now each time you search or reload its URL. |
+| Automatically refresh | Select **5s**, **10s**, or **15s** under **Auto-refresh**. Each refresh uses the applied filters and the rolling window from the address bar. Updates pause while log details are open or until a failed manual search is replaced by a successful one. Choose **Off** to stop automatic requests. The control starts at **Off** on a full page load. |
 | Keep the exact interval | Choose **Next page**, clear the message search with **×** or **Clear search**, or search from an absolute-range bookmark. Clearing or paging retains the preset for the next **Search**. |
-| Share or revisit a query | Copy the address bar URL to share the exact bounds, including fractional seconds, filters and page. Use Back for the previous query or **Reset** to clear the filters and return to the latest window. |
+| Share or revisit a query | Copy the address bar URL, such as `/logs?window=15m`. Reloading or sharing it opens the first page for that duration up to now, even when you're viewing a later page. Use Back for the previous query or **Reset** to clear the filters and return to the latest window. |
 | Inspect a log | Select a row or focus its message and press Enter. Use Escape or Close to return to it. On wide screens you can also click the backdrop. |
 | Follow a trace ID | Open **Timing and IDs** and choose **Find related logs**. The search keeps the current range and other filters. |
 
 The page offers **15 min**, **1 hour**, **24 hours**, **3 days**, and **7 days**
 as allowed by the query limit. Below 15 minutes, **Recent** uses the configured
-duration. A bookmarked range outside the presets is labeled **Current range**.
-For a custom interval within the limit, supply both `start_time` and `end_time`
-in the `/logs` URL as RFC 3339 timestamps.
+duration. To open a fixed interval, supply both `start_time` and `end_time` as
+RFC 3339 timestamps, for example
+`/logs?start_time=2026-11-19T11:00:00Z&end_time=2026-11-19T11:15:00Z`.
+The page shows **Current range** on entry. Reload and Auto-refresh then use
+the default duration.
 
 The Logs page chooses where to search based on the selected time range.
 Recent ranges covered by the current database volume can load during an R2

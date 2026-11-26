@@ -5,12 +5,14 @@ logs.service: Service
 logs.all_services: All services
 logs.time_range: Time range
 logs.current_range: Current range
-logs.range_15_minutes: 15 min
-logs.range_one_hour: 1 hour
-logs.range_24_hours: 24 hours
-logs.range_three_days: 3 days
-logs.range_seven_days: 7 days
-logs.range_recent: Recent
+logs.auto_refresh: Auto-refresh
+logs.refresh_off: 'Off'
+time_range.15_minutes: 15 min
+time_range.one_hour: 1 hour
+time_range.24_hours: 24 hours
+time_range.three_days: 3 days
+time_range.seven_days: 7 days
+time_range.recent: Recent
 logs.event_format: 02 Jan, 15:04:05
 logs.level.debug: Debug
 logs.level.info: Info

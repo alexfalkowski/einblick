@@ -253,7 +253,7 @@ The exact SQL schema and typed-attribute representation are implementation desig
 
 ### 8.3 Query behavior
 
-- **QRY-001 — Time and service selection.** Support an explicit time range and service selection through a versioned protobuf API exposed over gRPC and HTTP RPC. Recent-log ranges use start-inclusive and end-exclusive protobuf Timestamps, represented as RFC 3339 with nanosecond precision in protobuf JSON. Preserve exact absolute bounds in saved browser searches, pagination and later historical workflows. MVC controllers reuse the unversioned query operation directly. See the [query contract](queries.md).
+- **QRY-001 — Time and service selection.** Support an explicit time range and service selection through a versioned protobuf API exposed over gRPC and HTTP RPC. Recent-log ranges use start-inclusive and end-exclusive protobuf Timestamps, represented as RFC 3339 with nanosecond precision in protobuf JSON. Preserve exact absolute bounds for pagination and historical investigation. MVC controllers reuse the unversioned query operation directly. See the [query contract](queries.md).
 - **QRY-002 — Logs.** Support service, severity, text, and trace-ID filtering, a latest-first result order, and bounded stable pagination using event-time/ID keysets. New committed records behind the cursor may enter later pages; records ahead require a fresh query. Existing records must not repeat across pages. Pagination does not freeze membership or coordinate with ingestion.
 - **QRY-003 — Traces.** Expose bounded trace-ID lookup and basic service, duration, and error selection through the versioned query API over gRPC and HTTP RPC. Assemble spans across services and the day partitions covered by the lookup's search range.
 - **QRY-004 — Trace completeness.** Make bounded trace-search scope visible. Do not imply a trace is complete when its parent or other spans may fall outside the selected range, retention, or available data.
@@ -360,7 +360,7 @@ web
 
 | View or panel | Initial content and interpretation |
 | --- | --- |
-| Shared controls | Service and time window. The Logs page opens on the last hour, capped by the configured query limit. It offers 15-minute, 1-hour, 24-hour, 3-day and 7-day presets within that limit. For limits under 15 minutes, offer a Recent preset using the full configured duration. Search and Enter advance the default recent window or the chosen preset to now. Show the selected duration or Current range when the duration falls outside the available presets. Search from an absolute-range bookmark keeps the exact bounds. Pagination and clearing the message filter use the applied bounds and retain the preset for the next search, including during full-page navigation. The search URL records the applied absolute bounds. Later service views add instance, refresh/pause and protocol filters where meaningful. Do not issue overlapping automatic queries. |
+| Shared controls | Service and [time controls](#time-controls). Add instance and protocol filters where applicable. |
 | Latency | p50/p95/p99 over time from compatible request-duration histograms, displayed in milliseconds. Aggregate histograms across selected instances before quantile calculation. |
 | Traffic | Incoming requests per second, separate HTTP and gRPC groups. Do not sum client and server measurements for the same request. |
 | Errors | HTTP 4xx and 5xx identified explicitly; gRPC non-OK identified explicitly. Prefer separate HTTP 4xx/5xx series if useful. A combined summary is labelled non-success, since 4xx/non-OK do not all imply a service fault. |
@@ -388,6 +388,24 @@ behavior from the requirements rather than copying mock data or interaction
 limitations.
 
 The interaction draws inspiration from the existing golden-signal dashboard, Grafana's log-detail/correlation workflow, and Jaeger's trace timeline. There is no dashboard editor or requirement for users to configure Grafana.
+
+#### Time controls
+
+Use the same time controls on Logs, Traces, Overview and any future view with a
+time filter. Default to the last hour, capped by the view's query limit. Offer
+`15m`, `1h`, `24h`, `3d` and `7d` within that limit. For a limit under 15 minutes,
+offer Recent using the full configured duration.
+
+Keep the duration in the address bar as `window`, for example `window=15m`.
+Reload and Auto-refresh run a fresh query ending now, including after paging.
+Accept exact `start_time` and `end_time` on direct links to show a fixed
+interval on entry. A supplied `window` takes precedence. After displaying a
+fixed interval, use the default duration for subsequent reloads. Pagination and
+investigation actions can use the exact applied bounds.
+
+Where a view offers Auto-refresh, default to Off and offer `5s`, `10s` and
+`15s`. Refresh the applied query in place without adding browser history or
+overlapping requests.
 
 ### 8.8 R2 client selection
 

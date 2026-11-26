@@ -9,8 +9,17 @@
   </aside>
   <section class="workspace" aria-labelledby="logs-heading"
            hx-disable:inherited="#log-filters [type=submit], button[form=log-filters]">
-    <header>
+    <header class="workspace-header">
       <h1 id="logs-heading">{{.Localizer.Text "logs.heading"}}</h1>
+      <div class="refresh-control" hidden>
+        <label for="refresh-interval">{{.Localizer.Text "logs.auto_refresh"}}</label>
+        <select id="refresh-interval" class="select select-sm" hx-target="#results" hx-swap="outerHTML" hx-sync="#main:drop">
+          <option value="off">{{.Localizer.Text "logs.refresh_off"}}</option>
+          <option value="5s">5s</option>
+          <option value="10s">10s</option>
+          <option value="15s">15s</option>
+        </select>
+      </div>
     </header>
     <form id="log-filters" action="/logs" method="get" hx-put="/logs" hx-target="#results" hx-swap="outerHTML"
           hx-indicator="#query-progress" hx-sync="#main:drop">
