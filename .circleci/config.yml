@@ -35,7 +35,7 @@ commands:
 executors:
   go:
     docker:
-      - image: &go_image alexfalkowski/go:5.26
+      - image: &go_image alexfalkowski/go:5.27
   go-archive:
     docker:
       - image: *go_image
@@ -44,7 +44,7 @@ executors:
           FLOCI_AUTH_VALIDATE_SIGNATURES: "true"
   release:
     docker:
-      - image: alexfalkowski/release:8.54
+      - image: alexfalkowski/release:8.55
   alpine:
     docker:
       - image: alpine:latest
