@@ -28,6 +28,10 @@ Given('acknowledged recent logs with matching requests and other messages, sever
   prepare_recent_filtered_logs
 end
 
+Given('acknowledged matching logs immediately before and on a bucket boundary') do
+  prepare_activity_boundary_logs
+end
+
 When('I open the Logs page and load its assets') do
   open_logs_with_assets
 end
@@ -42,6 +46,26 @@ end
 
 When('I submit the displayed search filters') do
   submit_displayed_search
+end
+
+When('I reopen a custom time range, press Search, and continue to the next page') do
+  submit_and_reopen_custom_search
+end
+
+When('I request activity with invalid time bounds') do
+  load_activity_outside_a_valid_search
+end
+
+When('I load activity for a range ending mid-minute') do
+  load_activity_for_clipped_range
+end
+
+When('I view activity for a message search displayed one log at a time') do
+  load_activity_for_filtered_page
+end
+
+When('I edit the dates for a {string} search and clear its message filter') do |range|
+  clear_message_with_edited_dates(range)
 end
 
 When('I repeat a search for the {string} range after a new log arrives in the {string} view') do |range, layout|
@@ -60,12 +84,20 @@ When('I open a saved search from {string} to {string}') do |start_time, end_time
   open_saved_search(start_time, end_time)
 end
 
-When('I open an old bookmark with UTC picker bounds {string} and {string}') do |start_utc, end_utc|
-  open_utc_bookmark(start_utc, end_utc)
+When('I submit Custom picker dates {string} and {string}') do |start_utc, end_utc|
+  submit_picker_dates(start_utc, end_utc)
+end
+
+When('I open a Logs link with UTC picker fields alone') do
+  open_picker_only_bookmark
 end
 
 When('I investigate them in a {string} view with browser languages {string}') do |layout, languages|
   investigate_logs(layout, languages)
+end
+
+When('I load activity for that search with browser languages {string}') do |languages|
+  load_log_activity(languages)
 end
 
 When('I investigate it in the Logs page') do
@@ -146,6 +178,46 @@ Then('the results should retain the original fractional seconds') do
   expect(@response).to preserve_log_filters(@query)
 end
 
+Then('the exact custom time range and matching logs should survive resubmission and paging') do
+  expect(@custom_reload).to show_custom_log_range(@custom_bounds)
+  expect(@custom_resubmitted).to show_custom_log_range(@custom_bounds)
+  expect(@custom_next).to show_custom_log_range(@custom_bounds)
+  expect(@custom_resubmitted).to show_selected_logs(@query_service, @expected_query_records.take(2), @query_receipt_windows)
+  expect(@custom_next).to show_selected_logs(@query_service, @expected_query_records[2, 2], @query_receipt_windows)
+end
+
+Then('the chart should count both matching logs in adjacent labelled buckets') do
+  expect(@response).to show_log_messages('on the bucket boundary')
+  expect(@log_activity).to show_activity_counts([0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0], @response)
+  expect(@log_activity).to show_activity_times_for(@query.fetch('start_time'))
+end
+
+Then('the bucket labels should distinguish the exact endpoints') do
+  expect(@log_activity).to show_clipped_activity_labels
+end
+
+Then('the message filter should clear while the {string} interval stays applied') do |range|
+  expect(@response).to keep_log_time_bounds(@empty_message_search)
+  if range == 'fixed'
+    expect(@response).to show_selected_logs(@query_service, @expected_query_records, @query_receipt_windows)
+    expect(@response).to show_custom_log_range(@query.slice('start_time', 'end_time'))
+  else
+    expect(@response).to show_log_messages(Einblick::Site::ARRIVING_MESSAGE).and offer_log_search_window('15m')
+  end
+end
+
+Then('activity should report an invalid search') do
+  expect(@log_activity).to show_activity_error(400, 'broken link')
+end
+
+Then('the full Logs view should reject the dates with HTTP 400') do
+  expect(@response).to show_log_view('full', 'en', 400).and show_log_outcome('invalid dates', 'en')
+end
+
+Then('the activity chart should use {string}') do |language|
+  expect(@log_activity).to show_localized_log_activity(language)
+end
+
 Then('the new log should appear in a refreshed {string} window of {int} hours') do |preset, hours|
   expect(@search_before_arrival).to show_log_messages
   expect(@response).to show_log_messages(Einblick::Site::ARRIVING_MESSAGE)
@@ -175,9 +247,9 @@ Then('I should see no matching logs') do
   expect(@response).to show_log_outcome('empty', 'en')
 end
 
-Then('the search should use the exact bounds {string} and {string}') do |start_time, end_time|
+Then('the Custom search should use the exact bounds {string} and {string}') do |start_time, end_time|
   bounds = { 'start_time' => start_time, 'end_time' => end_time }
-  expect(@response).to show_saved_time_range(bounds).and preserve_log_filters(@query.merge(bounds), 'full')
+  expect(@response).to show_custom_log_range(bounds)
 end
 
 Then('I should see the {string} log view in {string}') do |layout, language|

@@ -60,6 +60,28 @@ module Einblick
         @response = site_client.submit_log_form(investigate_logs('full', 'en'), 'en', submitter: 'Search')
       end
 
+      def submit_and_reopen_custom_search
+        @custom_bounds = @query.slice('start_time', 'end_time')
+        dates = @custom_bounds.transform_keys { |key| key.sub('_time', '_utc') }
+        dates.transform_values! { |value| Time.iso8601(value).strftime('%Y-%m-%dT%H:%M:%S') }
+        @response = investigate_logs('partial', 'en', dates.merge('custom' => 'picker', 'page_size' => '2'))
+        @custom_reload = site_client.open_log_query(@response, 'en')
+        @custom_resubmitted = site_client.submit_log_form(@custom_reload, 'en', submitter: 'Search', layout: 'full')
+        @custom_next = site_client.open_next_page(@custom_resubmitted, 'en')
+      end
+
+      def load_activity_for_filtered_page
+        start_time = (Time.iso8601(@query.fetch('start_time')) - 5).iso8601(9)
+        end_time = (Time.iso8601(@query.fetch('end_time')) + 5).iso8601(9)
+        filters = { 'start_time' => start_time, 'end_time' => end_time, 'text' => 'bucket boundary', 'page_size' => '1' }
+        investigate_logs('full', 'en', filters)
+        load_log_activity('en')
+      end
+
+      def load_log_activity(languages)
+        @log_activity = site_client.open_log_activity(@response, languages)
+      end
+
       def clear_message_search(layout)
         @empty_message_search = investigate_logs('full', 'en', 'text' => MISSING_TERM, 'severity' => 'WARN')
         @response = site_client.submit_log_form(@empty_message_search, 'en', submitter: 'Clear search', layout: layout)
@@ -68,10 +90,6 @@ module Einblick
       def open_saved_search(start_time, end_time)
         @saved_time_range = { 'start_time' => start_time, 'end_time' => end_time }
         investigate_logs('full', 'en', @saved_time_range)
-      end
-
-      def open_utc_bookmark(start_utc, end_utc)
-        investigate_logs('full', 'en', 'start_utc' => start_utc, 'end_utc' => end_utc)
       end
 
       def investigate_log_outcome(outcome, layout, languages)

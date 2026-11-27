@@ -64,7 +64,8 @@ timestamp selection, supported shapes and duplicate policy for E-11.
   [embedded catalogs](../internal/site/locales), [shared layouts](../internal/site/root/layout) and
   [Einblick daisyUI theme](../internal/site/static/logs.css). Use the
   [initial visual reference](requirements.md#87-service-catalog-and-standard-ux)
-  and the [shared time controls](requirements.md#time-controls). Verify each
+  and the [shared time controls and chart selection](requirements.md#time-controls).
+  Each view owns its chart data. Verify each
   view opens direct fixed-range links and reloads relative URLs against now.
   Include a reload after paging where the view paginates.
   E-18 owns connected browser navigation, full accessibility acceptance

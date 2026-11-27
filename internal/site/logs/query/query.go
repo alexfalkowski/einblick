@@ -17,10 +17,13 @@ type Search struct {
 	Time timerange.Selection
 
 	filters storage.Query
+
+	// Custom records that the browser selected a fixed interval.
+	Custom bool
 }
 
 // Parse binds the Logs form and resolves its time selection against now.
-func Parse(form url.Values, now time.Time, maxRange time.Duration) (Search, error) {
+func Parse(form url.Values, now time.Time, limits timerange.Limits) (Search, error) {
 	filters := storage.Query{
 		Service: form.Get("service"), Severity: form.Get("severity"),
 		Text: form.Get("text"), TraceID: form.Get("trace_id"), PageToken: form.Get("page_token"),
@@ -35,15 +38,23 @@ func Parse(form url.Values, now time.Time, maxRange time.Duration) (Search, erro
 		}
 	}
 
+	maxRange := limits.PresetLimit()
 	selection, err := resolveTime(form, filters.PageToken, now, maxRange)
 	if err != nil {
 		return Search{}, errors.Join(storage.ErrInvalidQuery, err)
 	}
-	// Pagination and filter clearing carry the preset for a fresh search.
-	if preset := form.Get("search_window"); strings.IsEmpty(selection.SearchWindow) && timerange.Duration(preset, maxRange) != 0 {
-		selection.SearchWindow = preset
+	custom, err := customSelection(form, selection, now, limits)
+	if err != nil {
+		return Search{}, errors.Join(storage.ErrInvalidQuery, err)
 	}
-	return Search{Time: selection, filters: filters}, nil
+	// Pagination and filter clearing carry the preset for a fresh search.
+	if !custom && strings.IsEmpty(selection.SearchWindow) {
+		preset := form.Get("search_window")
+		if timerange.Duration(preset, maxRange) != 0 {
+			selection.SearchWindow = preset
+		}
+	}
+	return Search{Time: selection, Custom: custom, filters: filters}, nil
 }
 
 // Query returns the repository request with the applied filters and exact bounds.
@@ -53,11 +64,21 @@ func (s Search) Query() storage.Query {
 	return filters
 }
 
-// ReloadURL opens a fresh rolling search with the applied filters.
+// ReloadURL opens the first page for the applied filters and time selection.
 func (s Search) ReloadURL(maxRange time.Duration) string {
+	if s.Custom {
+		return "/logs?" + s.snapshotValues().Encode()
+	}
 	values := s.filterValues()
 	values.Set("window", s.Time.ReloadWindow(maxRange))
 	return "/logs?" + values.Encode()
+}
+
+// RangeURL opens a fixed range with the current filters.
+func (s Search) RangeURL(start, end time.Time) string {
+	s.Custom = true
+	s.Time.StartTime, s.Time.EndTime = start, end
+	return "/logs?" + s.snapshotValues().Encode()
 }
 
 // NextURL continues the current date range and filters with the repository's token.
@@ -72,6 +93,13 @@ func (s Search) NextURL(token string) string {
 		values.Set("search_window", s.Time.SearchWindow)
 	}
 	return "/logs?" + values.Encode()
+}
+
+// ActivityURL requests counts for the exact search independently of pagination.
+func (s Search) ActivityURL() string {
+	values := s.snapshotValues()
+	values.Del("custom")
+	return "/logs/activity?" + values.Encode()
 }
 
 // RelatedLogsURL searches the applied bounds with the row's trace ID. It returns
@@ -89,6 +117,9 @@ func (s Search) snapshotValues() url.Values {
 	values := s.filterValues()
 	values.Set("start_time", s.Time.StartTime.Format(time.RFC3339Nano))
 	values.Set("end_time", s.Time.EndTime.Format(time.RFC3339Nano))
+	if s.Custom {
+		values.Set("custom", "1")
+	}
 	return values
 }
 

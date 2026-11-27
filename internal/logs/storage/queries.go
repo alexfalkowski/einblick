@@ -14,6 +14,12 @@ var insertLogQuery string
 //go:embed queries/list_logs.sql
 var listLogsQuery string
 
+//go:embed queries/filter_logs.sql
+var filterLogsQuery string
+
+//go:embed queries/log_activity.sql
+var logActivityQuery string
+
 //go:embed queries/local_logs.sql
 var localLogsQuery string
 

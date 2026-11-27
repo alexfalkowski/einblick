@@ -1,10 +1,9 @@
-function setupLogDetails() {
-  const panel = document.querySelector(".log-details-panel");
+function setupLogDetails(results) {
+  const panel = results.querySelector(".log-details-panel");
   if (!panel?.showModal) {
     return;
   }
 
-  const results = panel.parentElement;
   const content = panel.querySelector(".log-details-content");
   const closeButton = panel.querySelector(".close-log-details");
   let selection;
@@ -56,74 +55,274 @@ function setupLogDetails() {
   });
   results.dataset.drawer = "";
 
-  return close;
+  return { close, isOpen: () => panel.open };
 }
 
-const failure = document.querySelector("#query-failure");
+function setupActivitySelection(chart, selectRange) {
+  const bars = [...chart.querySelectorAll(".activity-bar")];
+  const tooltip = chart.parentElement.querySelector(".activity-tooltip");
+  let first;
+  const barAt = (clientX) => {
+    const { left, width } = chart.getBoundingClientRect();
+    const index = Math.floor((clientX - left) * bars.length / width);
+    return Math.max(0, Math.min(index, bars.length - 1));
+  };
+  const selectThrough = (last) => {
+    const start = Math.min(first, last);
+    const end = Math.max(first, last);
+    bars.forEach((bar, index) => bar.toggleAttribute("data-selected", index >= start && index <= end));
+    const range = `${bars[start].dataset.startLabel} – ${bars[end].dataset.endLabel} UTC`;
+    showTooltip(last, `${tooltip.dataset.search} ${range}`);
+  };
 
-if (failure) {
-  let closeLogDetails = setupLogDetails();
+  function showTooltip(index, text) {
+    if (tooltip.textContent !== text) {
+      tooltip.textContent = text;
+    }
+    tooltip.hidden = false;
+    const width = chart.clientWidth;
+    const center = width * (index + 0.5) / bars.length;
+    const halfTooltip = tooltip.offsetWidth / 2;
+    tooltip.style.left = Math.max(halfTooltip, Math.min(center, width - halfTooltip)) + "px";
+  }
+
+  chart.addEventListener("pointerdown", (event) => {
+    if (!event.isPrimary || event.button !== 0) {
+      return;
+    }
+    chart.setPointerCapture(event.pointerId);
+    first = barAt(event.clientX);
+    selectThrough(first);
+  });
+  chart.addEventListener("pointermove", (event) => {
+    if (!event.isPrimary) {
+      return;
+    }
+    const last = barAt(event.clientX);
+    if (first === undefined) {
+      showTooltip(last, bars[last].dataset.summary);
+    } else {
+      selectThrough(last);
+    }
+  });
+  chart.addEventListener("pointerleave", () => {
+    if (first === undefined) {
+      tooltip.hidden = true;
+    }
+  });
+  chart.addEventListener("pointerup", (event) => {
+    if (!event.isPrimary || first === undefined) {
+      return;
+    }
+    const last = barAt(event.clientX);
+    const startTime = bars[Math.min(first, last)].dataset.start;
+    const endTime = bars[Math.max(first, last)].dataset.end;
+    first = undefined;
+    selectRange(startTime, endTime);
+  });
+  chart.addEventListener("lostpointercapture", () => {
+    first = undefined;
+    tooltip.hidden = true;
+    bars.forEach((bar) => bar.removeAttribute("data-selected"));
+  });
+}
+
+function setupLogActivity(panel, total, selectRange) {
+  const status = panel.querySelector("#activity-status");
+  const interval = panel.querySelector("#activity-interval");
+  const snapshot = panel.querySelector("#activity-snapshot");
+  const content = panel.querySelector("#activity-content");
+  let activityURL;
+  let matchesResults = true;
+  let pending;
+
+  function updateSnapshot() {
+    snapshot.hidden = matchesResults || !snapshot.textContent;
+    total.hidden = !matchesResults || !total.textContent;
+  }
+
+  function reset(url) {
+    pending?.abort();
+    pending = undefined;
+    activityURL = url;
+    matchesResults = true;
+    panel.hidden = !url;
+    status.hidden = true;
+    interval.textContent = "";
+    snapshot.textContent = "";
+    total.textContent = "";
+    updateSnapshot();
+    content.replaceChildren();
+  }
+
+  async function load(url) {
+    reset(url);
+    const request = new AbortController();
+    pending = request;
+    status.textContent = panel.dataset.loading;
+    status.hidden = false;
+    try {
+      const response = await fetch(url, { signal: request.signal });
+      if (!response.ok || response.headers.get("Einblick-View") !== "logs-activity") {
+        throw new Error("Log activity unavailable");
+      }
+      const fragment = await response.text();
+      if (request.signal.aborted) {
+        return;
+      }
+      content.innerHTML = fragment;
+      const summary = content.querySelector(".activity-summary");
+      setupActivitySelection(summary.querySelector(".activity-bars"), (startTime, endTime) => selectRange(url, startTime, endTime));
+      interval.textContent = summary.dataset.intervalLabel;
+      snapshot.textContent = summary.dataset.throughLabel;
+      total.textContent = summary.dataset.totalLabel;
+      updateSnapshot();
+      status.hidden = true;
+    } catch {
+      if (!request.signal.aborted) {
+        status.textContent = panel.dataset.unavailable;
+      }
+    } finally {
+      if (pending === request) {
+        pending = undefined;
+      }
+    }
+  }
+
+  function keepSnapshotFor(url) {
+    matchesResults = url === activityURL;
+    updateSnapshot();
+  }
+
+  function cancelLoading() {
+    if (pending) {
+      pending.abort();
+      pending = undefined;
+      status.textContent = panel.dataset.unavailable;
+    }
+  }
+
+  return { load, keepSnapshotFor, cancelLoading, clear: () => reset() };
+}
+
+function setupTimeFilters(form) {
+  const timePresets = form.querySelectorAll(".time-presets button[name=window]");
+  const currentRange = form.querySelector("#current-range");
+  const customButton = form.querySelector("#custom-range");
+  const customDates = form.querySelector("#custom-dates");
+  const customMode = form.querySelector("#custom-mode");
+  const startPicker = form.querySelector("#start-utc");
+  const endPicker = form.querySelector("#end-utc");
+  const earliestDate = form.querySelector("#earliest-date");
+  const earliestDateTime = earliestDate.querySelector("time");
+  const startTimeField = form.querySelector("#start-time");
+  const endTimeField = form.querySelector("#end-time");
+  const searchWindow = form.querySelector("#search-window");
+  const searchButtons = form.querySelectorAll("[data-search-submit]");
+  let pickerVersion = 0;
+
+  function showCustom(custom, { window: selectedWindow, recentWindow } = {}) {
+    customButton.setAttribute("aria-expanded", custom);
+    customButton.setAttribute("aria-pressed", custom);
+    customDates.hidden = !custom;
+    for (const input of [customMode, startPicker, endPicker]) {
+      input.disabled = !custom;
+    }
+    currentRange.hidden = custom || Boolean(selectedWindow);
+    searchButtons.forEach((button) => { button.value = custom ? "" : recentWindow; });
+    timePresets.forEach((preset) => { preset.setAttribute("aria-pressed", !custom && preset.value === selectedWindow); });
+  }
+
+  function apply(bounds, { preservePicker } = {}) {
+    const { startTime, endTime, earliest, recentWindow, custom } = bounds;
+    startTimeField.value = startTime;
+    endTimeField.value = endTime;
+
+    // The pickers show UTC to the second. The hidden fields retain the exact timestamps.
+    if (!preservePicker) {
+      startPicker.value = startTime.slice(0, 19);
+      endPicker.value = endTime.slice(0, 19);
+    }
+    earliestDate.hidden = !earliest;
+    earliestDateTime.dateTime = earliest;
+    earliestDateTime.textContent = earliest.slice(0, 19).replace("T", " ");
+    searchWindow.value = recentWindow;
+    customMode.value = custom === "true" ? "1" : "picker";
+    showCustom(preservePicker || custom === "true", bounds);
+  }
+
+  customDates.addEventListener("input", () => { pickerVersion += 1; });
+  customButton.addEventListener("click", () => {
+    pickerVersion += 1;
+    showCustom(true);
+    startPicker.focus();
+  });
+
+  return { apply, isCustomOpen: () => !customDates.hidden, version: () => pickerVersion };
+}
+
+function setupMessageFilter(form) {
+  const input = form.querySelector("#text");
+  const clear = form.querySelector("#clear-message");
+  const updateClearButton = () => { clear.hidden = !input.value; };
+
+  input.addEventListener("input", updateClearButton);
+  form.addEventListener("submit", (event) => {
+    if (event.submitter?.name === "clear_message") {
+      input.value = "";
+      input.focus();
+      updateClearButton();
+    }
+  });
+  form.addEventListener("htmx:config:request", (event) => {
+    // htmx disables the submit buttons before htmx:before:request.
+    if (event.detail.ctx.sourceEvent?.submitter === document.activeElement) {
+      input.focus();
+    }
+  });
+
+  return input;
+}
+
+function setupLogSearch(form) {
+  const failure = document.querySelector("#query-failure");
+  const failureMessage = failure.querySelector("#query-failure-message");
+  const retryButton = failure.querySelector("#retry-query");
+  const refreshInterval = document.querySelector("#refresh-interval");
+  const timeFilters = setupTimeFilters(form);
+  const messageInput = setupMessageFilter(form);
+  const activity = setupLogActivity(
+    document.querySelector("#log-activity"),
+    document.querySelector("#log-result-total"),
+    openActivityRange,
+  );
+
+  let results = document.querySelector("#results");
+  let details = setupLogDetails(results);
+  let queryURL = results.dataset.queryUrl;
   let failedQuery;
   let manualQueryFailed = false;
+  const requests = new WeakMap();
 
-  const timePresets = document.querySelectorAll(".time-presets button");
-  const currentRange = document.querySelector("#current-range");
-  const failureMessage = document.querySelector("#query-failure-message");
-  const retryButton = document.querySelector("#retry-query");
-  const filters = document.querySelector("#log-filters");
-  const searchButtons = filters.querySelectorAll("[data-search-submit]");
-  const searchWindow = filters.querySelector("#search-window");
-  const messageInput = document.querySelector("#text");
-  const clearMessage = document.querySelector("#clear-message");
-  const refreshInterval = document.querySelector("#refresh-interval");
-  const updateClearMessage = () => { clearMessage.hidden = !messageInput.value; };
-  messageInput.addEventListener("input", updateClearMessage);
-  filters.addEventListener("submit", (event) => {
-    if (event.submitter?.name === "clear_message") {
-      messageInput.value = "";
-      messageInput.focus();
-      updateClearMessage();
-    }
-  });
-  filters.addEventListener("htmx:config:request", (event) => {
-    // htmx disables the submit buttons before htmx:before:request.
-    if (event.detail.ctx.sourceEvent.submitter === document.activeElement) {
-      messageInput.focus();
-    }
-  });
-
-  let queryURL = document.querySelector("#results").dataset.queryUrl;
-  if (queryURL !== location.pathname + location.search) {
-    history.replaceState(history.state, "", queryURL + location.hash);
+  function refreshPaused() {
+    return details?.isOpen() || timeFilters.isCustomOpen();
   }
 
-  const logDetailsOpen = () => document.querySelector(".log-details-panel[open]");
-  if (window.htmx) {
-    let timer;
-    refreshInterval.closest(".refresh-control").hidden = false;
-    refreshInterval.addEventListener("change", () => {
-      clearInterval(timer);
-      const interval = htmx.parseInterval(refreshInterval.value);
-      if (interval) {
-        timer = setInterval(() => {
-          if (!logDetailsOpen() && !manualQueryFailed) {
-            htmx.ajax("PUT", queryURL, { source: refreshInterval });
-          }
-        }, interval);
-      }
-    });
+  function openActivityRange(activityURL, startTime, endTime) {
+    const url = new URL(activityURL, location.href);
+    url.pathname = new URL(form.action).pathname;
+    url.searchParams.set("start_time", startTime);
+    url.searchParams.set("end_time", endTime);
+    url.searchParams.set("custom", "1");
+    location.assign(url);
   }
 
-  retryButton.addEventListener("click", () => {
-    const { method, action, source, values } = failedQuery;
-    htmx.ajax(method, action, { source, values });
-  });
-
-  const showFailure = (reason, ctx) => {
-    if (ctx?.sourceElement && ctx.sourceElement !== refreshInterval) {
+  function showFailure(reason, ctx) {
+    const refreshing = ctx?.sourceElement === refreshInterval;
+    if (ctx?.sourceElement && !refreshing) {
       manualQueryFailed = true;
     }
-    closeLogDetails?.(false);
+    details?.close(false);
     failureMessage.textContent = failure.dataset[reason];
     failedQuery = undefined;
     if (ctx?.request.body) {
@@ -132,38 +331,40 @@ if (failure) {
     }
     retryButton.hidden = !failedQuery;
     failure.hidden = false;
-    document.querySelector("#results").hidden = true;
-  };
+    results.hidden = true;
+    if (refreshing) {
+      activity.keepSnapshotFor();
+    } else {
+      activity.clear();
+    }
+  }
 
-  document.addEventListener("htmx:before:request", () => {
+  function beforeRequest(event) {
+    const { ctx } = event.detail;
+    const paging = Boolean(ctx.sourceElement?.matches(".next"));
+    // htmx replaces the pagination link before firing htmx:after:swap.
+    requests.set(ctx, { paging, pickerVersion: timeFilters.version() });
+    if (ctx.sourceElement !== refreshInterval && !paging) {
+      activity.cancelLoading();
+    }
     failedQuery = undefined;
     failure.hidden = true;
-    const pagination = document.querySelector(".pagination");
+    const pagination = results.querySelector(".pagination");
     if (pagination) {
       if (pagination.contains(document.activeElement)) {
         messageInput.focus();
       }
       pagination.inert = true;
     }
-  });
+  }
 
-  document.addEventListener("htmx:finally:request", () => {
-    document.querySelector(".pagination")?.removeAttribute("inert");
-  });
-
-  document.addEventListener("htmx:before:history:update", (event) => {
-    const { history: update, sourceElement } = event.detail;
-    if (sourceElement === refreshInterval || update.path === location.pathname + location.search) {
-      event.preventDefault();
-    }
-  });
-
-  document.addEventListener("htmx:after:request", (event) => {
+  function afterRequest(event) {
     const { ctx } = event.detail;
-    if (ctx.sourceElement === refreshInterval && logDetailsOpen()) {
+    if (ctx.sourceElement === refreshInterval && refreshPaused()) {
       event.preventDefault();
       return;
     }
+
     const { response, text } = ctx;
     // Gateways can return HTML error pages. Only swap Einblick's fragment.
     const isLogFragment = response.headers.get("Einblick-View") === "logs-results" &&
@@ -178,28 +379,86 @@ if (failure) {
     event.preventDefault();
     const reason = { 499: "cancelled", 504: "timeout" }[response.status];
     showFailure(reason ?? "request", ctx);
-  });
+  }
 
-  document.addEventListener("htmx:error", (event) => {
+  function requestError(event) {
     const { ctx } = event.detail;
-    if (ctx?.sourceElement === refreshInterval && logDetailsOpen()) {
+    if (ctx?.sourceElement === refreshInterval && refreshPaused()) {
       return;
     }
-    const reason = ctx?.request.signal?.reason;
-    showFailure(reason === "timeout" ? "timeout" : "request", ctx);
-  });
+    showFailure(ctx?.request.signal?.reason === "timeout" ? "timeout" : "request", ctx);
+  }
 
-  document.addEventListener("htmx:after:swap", () => {
-    closeLogDetails = setupLogDetails();
-    const { queryUrl, startTime, endTime, window, recentWindow } = document.querySelector("#results").dataset;
-    if (queryUrl) {
-      queryURL = queryUrl;
-      document.querySelector("#start-time").value = startTime;
-      document.querySelector("#end-time").value = endTime;
-      searchWindow.value = recentWindow;
-      searchButtons.forEach((button) => { button.value = recentWindow; });
-      currentRange.hidden = Boolean(window);
-      timePresets.forEach((preset) => preset.setAttribute("aria-pressed", preset.value === window));
+  function afterResultsSwap(event) {
+    results = document.querySelector("#results");
+    details = setupLogDetails(results);
+
+    const { ctx } = event.detail;
+    const refreshing = ctx?.sourceElement === refreshInterval;
+    const request = requests.get(ctx);
+    const keepsActivity = refreshing || request?.paging;
+    const { queryUrl, activityUrl } = results.dataset;
+    if (!queryUrl) {
+      if (refreshing) {
+        activity.keepSnapshotFor();
+      } else {
+        activity.clear();
+      }
+      return;
+    }
+
+    queryURL = queryUrl;
+    const pickerChanged = request && request.pickerVersion !== timeFilters.version();
+    const preservePicker = timeFilters.isCustomOpen() && (keepsActivity || pickerChanged);
+    timeFilters.apply(results.dataset, { preservePicker });
+
+    if (keepsActivity) {
+      activity.keepSnapshotFor(activityUrl);
+    } else {
+      activity.load(activityUrl);
+    }
+  }
+
+  if (queryURL !== location.pathname + location.search) {
+    history.replaceState(history.state, "", queryURL + location.hash);
+  }
+  activity.load(results.dataset.activityUrl);
+
+  const htmx = window.htmx;
+  if (htmx) {
+    let timer;
+    refreshInterval.closest(".refresh-control").hidden = false;
+    refreshInterval.addEventListener("change", () => {
+      clearInterval(timer);
+      const interval = htmx.parseInterval(refreshInterval.value);
+      if (interval) {
+        timer = setInterval(() => {
+          if (!manualQueryFailed && !refreshPaused()) {
+            htmx.ajax("PUT", queryURL, { source: refreshInterval });
+          }
+        }, interval);
+      }
+    });
+    retryButton.addEventListener("click", () => {
+      const { method, action, source, values } = failedQuery;
+      htmx.ajax(method, action, { source, values });
+    });
+  }
+
+  document.addEventListener("htmx:before:request", beforeRequest);
+  document.addEventListener("htmx:finally:request", () => results.querySelector(".pagination")?.removeAttribute("inert"));
+  document.addEventListener("htmx:before:history:update", (event) => {
+    const { history: update, sourceElement } = event.detail;
+    if (sourceElement === refreshInterval || update.path === location.pathname + location.search) {
+      event.preventDefault();
     }
   });
+  document.addEventListener("htmx:after:request", afterRequest);
+  document.addEventListener("htmx:error", requestError);
+  document.addEventListener("htmx:after:swap", afterResultsSwap);
+}
+
+const form = document.querySelector("#log-filters");
+if (form) {
+  setupLogSearch(form);
 }

@@ -2,6 +2,8 @@
 
 module Einblick
   module Archive
+    HISTORY_RETENTION_SECONDS = 7 * 24 * 60 * 60
+
     # Searches archived logs while objects expire.
     module World
       def search_after_archive_expiration

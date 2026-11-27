@@ -10,8 +10,11 @@ type Logs struct {
 	// NextURL continues the current search. It is empty on the last page.
 	NextURL string
 
-	// QueryURL opens a fresh search using the current filters and a relative window.
+	// QueryURL opens the first page with the current filters and time selection.
 	QueryURL string
+
+	// ActivityURL counts matching logs over the applied filters and exact interval.
+	ActivityURL string
 
 	// Rows contains matching logs in newest-first order.
 	Rows []LogRow
@@ -22,6 +25,9 @@ type Logs struct {
 
 // Filters holds the display values for the log search form.
 type Filters struct {
+	// Earliest is the first date selectable under the archive lookback, when configured.
+	Earliest time.Time
+
 	// StartTime is the inclusive UTC bound submitted with filters and pagination.
 	StartTime time.Time
 
@@ -54,6 +60,9 @@ type Filters struct {
 
 	// PageSize is the requested number of results. Zero uses the configured size.
 	PageSize int
+
+	// Custom indicates that the date fields are open for the applied fixed search.
+	Custom bool
 }
 
 // FilterOption pairs a form value with its localized label.

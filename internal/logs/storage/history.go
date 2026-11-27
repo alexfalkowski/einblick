@@ -21,22 +21,12 @@ type archiveList struct {
 	expired map[string]struct{}
 }
 
-func logPageSQL(archived string) string {
-	return strings.Concat("WITH selected_logs AS (", localLogsQuery, archived, ") ", listLogsQuery)
-}
+type sqlQuery func(ctx context.Context, statement string, args ...any) (*sql.Rows, error)
 
-func archivePageEnd(query Query, position cursor) time.Time {
-	if position.BeforeID > 0 {
-		beforeNS, _ := strconv.ParseUint(position.BeforeNS, 10, 64)
-		end := timestamp(beforeNS).Add(time.Nanosecond.Duration())
-		if end.After(query.StartTime) && end.Before(query.EndTime) {
-			return end
-		}
-	}
-	return query.EndTime
-}
+// queryLogSources executes and scans a query before its archive snapshot closes.
+type queryLogSources func(queryRows sqlQuery, evictedLocations, archiveLocations []string) error
 
-func (r *repository) readHistory(ctx context.Context, query Query, position cursor) (*Page, error) {
+func (r *repository) readHistory(ctx context.Context, query Query, runQuery queryLogSources) error {
 	retention := r.store.Retention()
 	var expirationCutoff time.Time
 	if retention > 0 {
@@ -45,22 +35,22 @@ func (r *repository) readHistory(ctx context.Context, query Query, position curs
 
 	keys, err := archive.Discover(ctx, r.store, query.StartTime, query.EndTime)
 	if err != nil {
-		return nil, errors.Prefix("discover log archive", err)
+		return errors.Prefix("discover log archive", err)
 	}
 
-	page, err := r.readArchivePage(ctx, query, position, archiveList{objects: keys}, expirationCutoff)
+	err = r.readArchiveLogs(ctx, query, archiveList{objects: keys}, expirationCutoff, runQuery)
 	if err == nil || ctx.Err() != nil || retention == 0 {
-		return page, err
+		return err
 	}
 
 	expirationCutoff = time.Now().Add(-retention.Duration())
 
 	current, err := r.relistArchive(ctx, query, keys, expirationCutoff, err)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return r.readArchivePage(ctx, query, position, current, expirationCutoff)
+	return r.readArchiveLogs(ctx, query, current, expirationCutoff, runQuery)
 }
 
 func (r *repository) relistArchive(ctx context.Context, query Query, keys objectTimes, cutoff time.Time, cause error) (archiveList, error) {
@@ -110,41 +100,30 @@ func expiredObject(storedAt, cutoff time.Time) bool {
 	return !cutoff.IsZero() && !storedAt.IsZero() && !storedAt.After(cutoff)
 }
 
-func (r *repository) readArchivePage(ctx context.Context, query Query, position cursor, list archiveList, cutoff time.Time) (*Page, error) {
+func (r *repository) readArchiveLogs(ctx context.Context, query Query, list archiveList, cutoff time.Time, runQuery queryLogSources) error {
 	// The snapshot supplies local rows and reconciles batches evicted since listing.
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer tx.Rollback()
 
 	evicted, err := archiveSources(ctx, tx, query, list, cutoff)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	args := pageArgs(query, position)
-	var archived string
-	if len(list.objects) > 0 {
-		locations := make([]string, 0, len(list.objects))
-		for key := range list.objects {
-			locations = append(locations, r.store.URI(key))
-		}
-
-		for i, key := range evicted {
-			evicted[i] = r.store.URI(key)
-		}
-
-		archived = archivedLogsQuery
-		args = append([]any{evicted, locations}, args...)
+	if len(list.objects) == 0 {
+		return runQuery(tx.QueryContext, nil, nil)
 	}
-
-	rows, err := tx.QueryContext(ctx, logPageSQL(archived), args...)
-	if err != nil {
-		return nil, err
+	locations := make([]string, 0, len(list.objects))
+	for key := range list.objects {
+		locations = append(locations, r.store.URI(key))
 	}
-
-	return scanPage(ctx, rows, query.PageSize, &position)
+	for i, key := range evicted {
+		evicted[i] = r.store.URI(key)
+	}
+	return runQuery(tx.QueryContext, evicted, locations)
 }
 
 func archiveDays(query Query) (string, string) {
@@ -190,4 +169,15 @@ func archiveSources(ctx context.Context, tx *sql.Tx, query Query, listing archiv
 		evicted = append(evicted, key)
 	}
 	return evicted, rows.Err()
+}
+
+func archivePageEnd(query Query, position cursor) time.Time {
+	if position.BeforeID > 0 {
+		beforeNS, _ := strconv.ParseUint(position.BeforeNS, 10, 64)
+		end := timestamp(beforeNS).Add(time.Nanosecond.Duration())
+		if end.After(query.StartTime) && end.Before(query.EndTime) {
+			return end
+		}
+	}
+	return query.EndTime
 }

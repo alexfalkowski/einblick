@@ -54,7 +54,27 @@ Feature: Read acknowledged logs across local storage and the archive
     When the archive is published and the client searches from a fresh database volume
     Then the archive should supply the complete matching logs
     And the Logs page should continue to the next archived log
+    And the activity chart should count all matching archived logs
     And the fresh instance should leave the original archive objects unchanged
+
+  Scenario: Page through archived logs with one archive query slot
+    Given acknowledged logs are ready to archive
+    When the operator loads activity and continues to the next archived log with one query slot
+    Then activity should be unavailable for the archive search
+    And the Logs page should continue to the next archived log
+
+  Scenario Outline: Page through archived logs while another day's search is stalled
+    Given acknowledged logs on two days are ready to archive
+    When the operator pages during a stalled <search> and retries activity after it finishes
+    Then activity should be unavailable for the archive search
+    And the Logs page should continue to the next archived log
+    And the stalled <search> should finish after pagination and include the archived log
+    And the retried activity should count all logs matching the paged search
+
+    Examples:
+      | search         |
+      | activity chart |
+      | log page       |
 
   Scenario: Page through matching IDs from different volumes across eviction
     Given acknowledged logs are ready to archive
@@ -99,6 +119,19 @@ Feature: Read acknowledged logs across local storage and the archive
     Then a metrics scrape during the first slow read should report the previous backlog count
     And the metrics endpoint should withdraw the previous backlog sample after the timeout
     And the sampler should rest after a slow read
+
+  @archive_history_availability
+  Scenario: Apply new custom dates against the cutoff at submission
+    Given acknowledged logs are ready to archive
+    When the operator submits a valid new range and then a date that has aged past the cutoff
+    Then the valid range should be applied with its edited bounds
+    And the picker should show the original cutoff and the expired search should be rejected
+
+  @archive_history_availability
+  Scenario: Search the oldest bucket from the seven-day activity chart
+    Given acknowledged logs are ready to archive
+    When the operator opens the oldest bucket after the cutoff moves and changes its message filter
+    Then both views should keep the exact bucket interval after the cutoff moves
 
   @archive_history_availability
   Scenario: Keep available history readable when an older archive expires

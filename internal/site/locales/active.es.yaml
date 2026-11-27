@@ -13,6 +13,10 @@ time_range.24_hours: 24 horas
 time_range.three_days: 3 días
 time_range.seven_days: 7 días
 time_range.recent: Reciente
+time_range.custom: Personalizado
+time_range.from: Desde (UTC)
+time_range.to: Hasta (UTC)
+time_range.earliest: Primera fecha disponible
 logs.event_format: 02/01, 15:04:05
 logs.level.debug: Depuración
 logs.level.info: Información
@@ -83,6 +87,22 @@ logs.invalid_filters: Revisa los filtros de búsqueda y vuelve a intentarlo.
 logs.date_order: La hora de fin debe ser posterior a la de inicio.
 logs.date_range_too_wide: Este intervalo supera el límite de búsqueda.
 logs.invalid_dates: Introduce una hora de inicio y una de fin válidas en UTC.
+logs.date_outside_history: Elige fechas dentro del período de búsqueda disponible.
+logs.activity: Actividad de registros
+logs.activity_through: 'Gráfico hasta {{.End}} UTC'
+logs.activity_loading: Cargando actividad…
+logs.activity_unavailable: La actividad de registros no está disponible.
+logs.matching_count: '{{.Count}} registros coincidentes al cargar la actividad'
+logs.one_match: 1 registro coincidente al cargar la actividad
+logs.activity_search: Buscar
+logs.activity_intervals: Explorar intervalos de actividad
+logs.activity_tick_format: 02/01 15:04
+logs.activity_interval: 'Intervalos de {{.Size}} {{.Unit}}'
+logs.activity_bucket: '{{.Start}} – {{.End}} UTC · {{.Count}} registros'
+logs.activity_seconds: s
+logs.activity_minutes: min
+logs.activity_hours: h
+logs.activity_days: d
 logs.cancelled: Se canceló la consulta de registros.
 logs.timed_out: La consulta de registros agotó el tiempo de espera. Prueba con un intervalo más corto.
 logs.unavailable: El almacenamiento de registros no está disponible. Vuelve a intentarlo.

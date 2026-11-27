@@ -37,6 +37,34 @@ Feature: Investigate recent logs in the browser
     Then I should see the selected service's log messages and exact event times
     And the results should retain the original fractional seconds
 
+  Scenario: Reopen and resubmit a custom search before paging
+    Given acknowledged searchable logs
+    When I reopen a custom time range, press Search, and continue to the next page
+    Then the exact custom time range and matching logs should survive resubmission and paging
+
+  Scenario: Count matching logs across a bucket boundary in a paged search
+    Given acknowledged matching logs immediately before and on a bucket boundary
+    When I view activity for a message search displayed one log at a time
+    Then the chart should count both matching logs in adjacent labelled buckets
+
+  Scenario: Inspect an activity bucket clipped within a minute
+    When I load activity for a range ending mid-minute
+    Then the bucket labels should distinguish the exact endpoints
+
+  Scenario: Report invalid bounds when loading log activity
+    When I request activity with invalid time bounds
+    Then activity should report an invalid search
+
+  Scenario Outline: Clear the message filter while editing custom dates
+    Given acknowledged searchable logs
+    When I edit the dates for a "<range>" search and clear its message filter
+    Then the message filter should clear while the "<range>" interval stays applied
+
+    Examples:
+      | range   |
+      | fixed   |
+      | rolling |
+
   Scenario Outline: Search again after new logs arrive
     Given acknowledged searchable logs
     When I repeat a search for the "<range>" range after a new log arrives in the "<layout>" view
@@ -70,20 +98,26 @@ Feature: Investigate recent logs in the browser
       | 2026-11-19T11:04:00Z | 2026-11-19T11:04:04Z |
       | 2026-11-19T10:30:00Z | 2026-11-19T10:45:00Z |
 
-  Scenario Outline: Open a bookmark from the old UTC form
+  Scenario Outline: Submit the Custom picker with native UTC input values
     Given acknowledged searchable logs
-    When I open an old bookmark with UTC picker bounds "<start>" and "<end>"
-    Then the search should use the exact bounds "<applied start>" and "<applied end>"
+    When I submit Custom picker dates "<start>" and "<end>"
+    Then the Custom search should use the exact bounds "<applied start>" and "<applied end>"
 
     Examples:
       | start               | end                 | applied start                  | applied end                    |
       | 2026-11-19T11:04:05 | 2026-11-19T11:04:05 | 2026-11-19T11:04:05.123456789Z | 2026-11-19T11:04:05.123456799Z |
       | 2026-11-19T11:04    | 2026-11-19T11:04:06 | 2026-11-19T11:04:00Z           | 2026-11-19T11:04:06Z           |
 
+  Scenario: Reject a bookmark containing only picker inputs
+    When I open a Logs link with UTC picker fields alone
+    Then the full Logs view should reject the dates with HTTP 400
+
   Scenario Outline: Read logs in the preferred browser language
     Given acknowledged searchable logs
     When I investigate them in a "<layout>" view with browser languages "<preferences>"
+    And I load activity for that search with browser languages "<preferences>"
     Then I should see the "<layout>" log view in "<language>"
+    And the activity chart should use "<language>"
     And I should see the selected service's log messages and exact event times
 
     Examples:
