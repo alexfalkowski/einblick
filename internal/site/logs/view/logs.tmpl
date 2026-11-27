@@ -52,7 +52,7 @@
                  aria-label="{{.Localizer.Text "time_range.to"}}"
                  value="{{.Model.Filters.EndTime.Format $pickerTime}}"{{if not .Model.Filters.Custom}} disabled{{end}}>
           <p class="lookback">
-            {{if eq .Model.Filters.LookbackDays 1}}{{.Localizer.Text "time_range.lookback_one_day"}} · {{else if .Model.Filters.LookbackDays}}{{.Localizer.Message "time_range.lookback_days" (dict "Days" .Model.Filters.LookbackDays)}} · {{else if .Model.Filters.Lookback}}{{.Localizer.Message "time_range.lookback_duration" (dict "Duration" .Model.Filters.Lookback)}} · {{end}}UTC
+            {{if eq .Model.Filters.LookbackDays 1}}{{.Localizer.Text "time_range.lookback_one_day"}} · {{else if .Model.Filters.LookbackDays}}{{.Localizer.Message "time_range.lookback_days" (dict "Days" .Model.Filters.LookbackDays)}} · {{else if .Model.Filters.Lookback}}{{.Localizer.Message "time_range.lookback_duration" (dict "Duration" .Model.Filters.Lookback)}} · {{end}}<span id="picker-time-zone" data-invalid-time="{{.Localizer.Text "time_range.invalid_local_time"}}">UTC</span>
           </p>
         </div>
         <label for="text">{{.Localizer.Text "logs.text"}}</label>
@@ -137,7 +137,7 @@
       <tbody>
         {{range $index, $row := .Model.Rows}}
         <tr class="log-row">
-          <td><time datetime="{{.EventTime.Format $exactTime}}">{{.EventTime.Format $eventFormat}}</time></td>
+          <td><time datetime="{{.EventTime.Format $exactTime}}" data-display-time>{{.EventTime.Format $eventFormat}} UTC</time></td>
           <td class="service">{{if .ServiceName}}{{.ServiceName}}{{else}}{{$.Localizer.Text "logs.no_service"}}{{end}}</td>
           <td class="severity" data-severity="{{.Severity}}">{{template "log-severity" .}}</td>
           <td>
@@ -216,9 +216,11 @@
     </dl>
     {{end}}
     <dl class="log-summary-fields log-event-fields">
-      <div><dt>{{$locale.Text $timing.EventTimeLabel}}</dt><dd><time datetime="{{$row.EventTime.Format .ExactTime}}">{{($row.EventTime.Round 1000000).Format ($locale.Text "logs.detail_time_format")}}</time></dd></div>
+      {{$displayTime := $row.EventTime.Round 1000000}}
+      <div><dt>{{$locale.Text $timing.EventTimeLabel}}</dt><dd><time datetime="{{$row.EventTime.Format .ExactTime}}"
+        data-display-time="{{$displayTime.Format .ExactTime}}">{{$displayTime.Format ($locale.Text "logs.detail_time_format")}} UTC</time></dd></div>
       {{if $timing.ReceiptLabel}}
-      <div><dt>{{$locale.Text "logs.received_short"}}</dt><dd>{{$locale.Message $timing.ReceiptLabel $timing}}</dd></div>
+      <div><dt>{{$locale.Text "logs.received"}}</dt><dd>{{$locale.Message $timing.ReceiptLabel $timing}}</dd></div>
       {{end}}
     </dl>
   </div>

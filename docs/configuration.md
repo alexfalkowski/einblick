@@ -16,9 +16,9 @@ duckdb:
   threads: 1
 ```
 
-`path` is a database filename relative to the process working directory. Its
-parent directory must already exist and be writable. In-memory databases and
-DSN parameters are unsupported. Use a persistent mount for retained logs;
+`path` is an absolute database filename or one relative to the process working
+directory. Its parent directory must already exist and be writable. In-memory
+databases and DSN parameters are unsupported. Use a persistent mount for retained logs;
 `test/reports/` is disposable. See [storage and recovery](operations.md#-log-storage-and-recovery)
 for handling the database files across restarts.
 

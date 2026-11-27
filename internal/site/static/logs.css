@@ -138,15 +138,39 @@ a.brand { display: block; width: fit-content; margin: 0 0 2rem; color: #fff; fon
   overflow-wrap: anywhere;
   pointer-events: none;
 }
-.activity-axis { position: relative; min-height: 1.5em; margin-top: .3rem; }
-.activity-axis time { position: absolute; inset-inline-start: var(--tick-position); transform: translateX(-50%); white-space: nowrap; }
-.activity-axis time:first-child { transform: none; }
-.activity-axis time:last-child { transform: translateX(-100%); }
+.activity-axis { display: grid; grid-template-columns: minmax(0, 1fr); margin-top: .3rem; }
+.activity-axis time {
+  grid-area: 1 / 1;
+  justify-self: start;
+  align-self: start;
+  margin-inline-start: var(--tick-position);
+  max-inline-size: 12%;
+  transform: translateX(-50%);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+/* Quarter ticks snap to bar boundaries, so the endpoints need different widths. */
+.activity-axis time:first-child { max-inline-size: 11%; transform: none; text-align: start; }
+.activity-axis time:last-child {
+  justify-self: end;
+  margin-inline-start: 0;
+  max-inline-size: 18%;
+  transform: none;
+  text-align: end;
+}
 @container (max-width: 36rem) {
   .activity-tick-wide { display: none; }
+  .activity-axis time { max-inline-size: 24%; }
+  .activity-axis time:is(:first-child, :last-child) { max-inline-size: 25%; }
 }
 @container (max-width: 22rem) {
+  .activity-axis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
   .activity-axis time:not(:first-child):not(:last-child) { display: none; }
+  .activity-axis time:is(:first-child, :last-child) {
+    grid-area: auto;
+    justify-self: stretch;
+    max-inline-size: none;
+  }
 }
 .log-result-total { margin: .8rem 0 .5rem; font-size: 1rem; font-weight: 750; text-align: right; }
 .message-field { position: relative; min-width: 0; }

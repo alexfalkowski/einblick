@@ -19,7 +19,8 @@ time_range.to: Hasta (UTC)
 time_range.lookback_days: 'Últimos {{.Days}} días'
 time_range.lookback_one_day: 'Últimas 24 horas'
 time_range.lookback_duration: 'Últimas {{.Duration}}'
-time_range.start_too_early: 'Elige una fecha a partir del {{.Date}} UTC.'
+time_range.start_too_early: 'Elige una fecha a partir del {{.Date}}.'
+time_range.invalid_local_time: 'Esta hora no existe en tu zona horaria.'
 logs.event_format: 02/01, 15:04:05
 logs.level.debug: Depuración
 logs.level.info: Información
@@ -38,19 +39,18 @@ logs.loading: Cargando registros…
 logs.request_failed: No se pudieron cargar los registros
 logs.retry: Volver a intentar
 logs.results: Resultados de la consulta de registros
-logs.timestamp: Hora del evento (UTC)
+logs.timestamp: Hora del evento
 logs.message: Mensaje
 logs.details: Detalles del registro
 logs.close_details: Cerrar detalles
 logs.no_service: Sin nombre de servicio
 logs.no_body: Sin mensaje
 logs.structured_body: Mensaje estructurado
-logs.received: Recepción (UTC)
-logs.received_short: Recepción
+logs.received: Recepción
 logs.received_later: '{{.ReceiptOffset}} después'
 logs.received_earlier: '{{.ReceiptOffset}} antes'
 logs.received_same: En el mismo instante
-logs.observed: Hora de observación (UTC)
+logs.observed: Hora de observación
 logs.detail_time_format: 02/01/2006, 15:04:05,000
 logs.attributes: Atributos
 logs.source: Origen
@@ -89,10 +89,10 @@ logs.open: Abrir registros
 logs.invalid_filters: Revisa los filtros de búsqueda y vuelve a intentarlo.
 logs.date_order: La hora de fin debe ser posterior a la de inicio.
 logs.date_range_too_wide: Este intervalo supera el límite de búsqueda.
-logs.invalid_dates: Introduce una hora de inicio y una de fin válidas en UTC.
+logs.invalid_dates: Introduce una hora de inicio y una de fin válidas.
 logs.date_outside_history: 'Elige una fecha de inicio más reciente.'
 logs.activity: Actividad de registros
-logs.activity_through: 'Hasta {{.End}} UTC'
+logs.activity_through: 'Hasta {{.End}}'
 logs.activity_loading: 'Cargando…'
 logs.activity_unavailable: 'Gráfico no disponible'
 logs.activity_busy: 'Archivo ocupado'
@@ -103,7 +103,7 @@ logs.one_match: '1 coincidencia'
 logs.activity_search: Buscar
 logs.activity_tick_format: 02/01 15:04
 logs.activity_interval: 'Intervalos de {{.Size}} {{.Unit}}'
-logs.activity_bucket: '{{.Start}} – {{.End}} UTC · {{.Count}} registros'
+logs.activity_bucket: '{{.Start}} – {{.End}} · {{.Count}} registros'
 logs.activity_seconds: s
 logs.activity_minutes: min
 logs.activity_hours: h

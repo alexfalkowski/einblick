@@ -19,7 +19,8 @@ time_range.to: Bis (UTC)
 time_range.lookback_days: 'Letzte {{.Days}} Tage'
 time_range.lookback_one_day: 'Letzte 24 Stunden'
 time_range.lookback_duration: 'Letzte {{.Duration}}'
-time_range.start_too_early: 'Wähle ein Datum ab {{.Date}} UTC.'
+time_range.start_too_early: 'Wähle ein Datum ab {{.Date}}.'
+time_range.invalid_local_time: 'Diese Uhrzeit gibt es in deiner Zeitzone nicht.'
 logs.event_format: 02.01., 15:04:05
 logs.level.debug: Debug
 logs.level.info: Info
@@ -38,19 +39,18 @@ logs.loading: Protokolle werden geladen …
 logs.request_failed: Protokolle konnten nicht geladen werden
 logs.retry: Erneut versuchen
 logs.results: Ergebnisse der Protokollabfrage
-logs.timestamp: Ereigniszeit (UTC)
+logs.timestamp: Ereigniszeit
 logs.message: Meldung
 logs.details: Protokolldetails
 logs.close_details: Details schließen
 logs.no_service: Kein Dienstname
 logs.no_body: Keine Meldung
 logs.structured_body: Strukturierte Meldung
-logs.received: Empfangen (UTC)
-logs.received_short: Empfangen
+logs.received: Empfangen
 logs.received_later: '{{.ReceiptOffset}} später'
 logs.received_earlier: '{{.ReceiptOffset}} früher'
 logs.received_same: Zur selben Zeit
-logs.observed: Beobachtungszeit (UTC)
+logs.observed: Beobachtungszeit
 logs.detail_time_format: 02.01.2006, 15:04:05,000
 logs.attributes: Attribute
 logs.source: Quelle
@@ -89,10 +89,10 @@ logs.open: Protokolle öffnen
 logs.invalid_filters: Prüfe die Suchfilter und versuche es erneut.
 logs.date_order: Das Ende muss nach dem Beginn liegen.
 logs.date_range_too_wide: Dieser Zeitraum überschreitet das Suchlimit.
-logs.invalid_dates: Gib einen gültigen Beginn und ein gültiges Ende in UTC ein.
+logs.invalid_dates: Gib einen gültigen Beginn und ein gültiges Ende ein.
 logs.date_outside_history: 'Wähle ein neueres Startdatum.'
 logs.activity: Protokollaktivität
-logs.activity_through: 'Bis {{.End}} UTC'
+logs.activity_through: 'Bis {{.End}}'
 logs.activity_loading: 'Wird geladen …'
 logs.activity_unavailable: 'Diagramm nicht verfügbar'
 logs.activity_busy: 'Archiv ausgelastet'
@@ -103,7 +103,7 @@ logs.one_match: '1 Treffer'
 logs.activity_search: Suchen
 logs.activity_tick_format: 02.01. 15:04
 logs.activity_interval: '{{.Size}} {{.Unit}} pro Balken'
-logs.activity_bucket: '{{.Start}} – {{.End}} UTC · {{.Count}} Protokolle'
+logs.activity_bucket: '{{.Start}} – {{.End}} · {{.Count}} Protokolle'
 logs.activity_seconds: s
 logs.activity_minutes: min
 logs.activity_hours: h

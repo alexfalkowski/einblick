@@ -24,8 +24,13 @@ them accessible names instead of visible labels. Keep **Search** beside
 **Reset** so one submit action applies the time range and other filters.
 
 Custom searches and range selections from the activity chart retain their
-absolute URL bounds on reload. The Custom form sends UTC picker values with
-its exact applied bounds. Shareable fixed ranges use RFC 3339 bounds. Positive
+absolute URL bounds on reload. Use the browser's time zone for displayed
+times and Custom inputs. Show full timestamp precision in the browser's time
+zone in **Timing and IDs** and keep the underlying timestamps in UTC.
+Convert Custom values to UTC on submit and keep the exact applied instant when
+the field is unchanged. Reject skipped local times and use the earlier
+occurrence for newly entered repeated times. Shareable fixed ranges use RFC
+3339 bounds. Positive
 R2 retention bounds selectable log event dates in the browser. The repository
 determines archive coverage by object age and availability.
 Show the lookback beside the custom fields. On an in-page search with an expired
@@ -34,7 +39,7 @@ start date, show the current cutoff under that field.
 
 Load the activity chart and total automatically once search results are
 visible. Put the total above the results table. Show the bucket size beside
-the chart title and mark UTC on the last time label. Use a tooltip for
+the chart title and show the local UTC offset on the last time label. Use a tooltip for
 bucket details on hover and the selected interval while dragging. Round tooltip
 times to the nearest minute for minute-sized or larger buckets and to the nearest
 second for finer buckets. Searches from the chart use exact bounds. When

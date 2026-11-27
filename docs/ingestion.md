@@ -21,7 +21,7 @@ port `12000`.
 ```mermaid
 sequenceDiagram
     accTitle: Successful OTLP exports
-    accDescr: Log exports acknowledge local commit. Metric and trace exports acknowledge receipt after printing the request.
+    accDescr: Nonempty log exports acknowledge the local commit. Empty log exports skip the write. Metrics and traces acknowledge receipt after logging the request. Archive work runs independently.
     participant C as OTLP client
     participant E as Einblick
     participant D as DuckDB
@@ -49,7 +49,7 @@ context. The `signal` field is `metrics` or `traces`. Empty requests print `{}`.
 
 ## 📝 Log support and delivery
 
-The supported log contract is the decoded OTLP log schema in protobuf `v1.11.1`.
+The supported log contract is the decoded OTLP log schema pinned in [go.mod](../go.mod).
 Storage preserves all its known log, resource and scope fields: typed bodies
 and attributes, 64-bit integers, bytes, nested arrays/key-value lists, severity,
 correlation IDs/flags, event names, dropped counts and schema URLs. Optional

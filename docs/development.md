@@ -21,10 +21,11 @@ The gem detects Homebrew without extra build flags. The configured
 
 ## 🧱 Local dependencies
 
-From the Einblick repository root, run `make start` before running the service
-or its feature tests. This starts the shared stack, including Floci and the
-OpenTelemetry collector. Run `make stop` from the same directory when you are
-done using the stack. See [shared local dependencies](https://github.com/alexfalkowski/docker#-local-dependencies).
+From the Einblick repository root, run `make start` when you need the shared
+Floci emulator for R2 scenarios or the OpenTelemetry collector for outgoing
+traces. The local-only Logs quickstart serves requests without the shared
+stack. Run `make stop` when you are done using the stack.
+[Shared local dependencies](https://github.com/alexfalkowski/docker#-local-dependencies)
 
 ## 🥒 Tests and checks
 
@@ -107,21 +108,26 @@ supplies the backlog snapshot used by the metrics callback.
 
 ```mermaid
 flowchart TD
-    accTitle: Recent-log query paths
-    accDescr: The browser controller and the typed API adapter share the same repository and read the same local database.
+    accTitle: Log query paths
+    accDescr: The Logs page and versioned API use the same List operation. The browser activity chart uses Activity. Both operations read local DuckDB rows and can read older Parquet in R2.
     Browser[Browser] -->|GET or PUT /logs| MVC[Logs MVC controller]
+    Browser -->|GET /logs/activity| Chart[Activity MVC controller]
     Client[API client] -->|gRPC or HTTP RPC| API[Versioned ListLogs adapter]
     MVC --> List[Repository.List]
     API --> List
-    List --> DB[(DuckDB)]
+    Chart --> Activity[Repository.Activity]
+    List --> DB[(DuckDB local rows)]
+    Activity --> DB
+    DB -->|Read required history through httpfs| R2[(R2 Parquet)]
 ```
 
 The [typed API adapter](../internal/api/v1/logs/list.go) converts request and
 response messages. The [MVC controller](../internal/site/logs/controller/controller.go)
-handles form inputs and renders the page or fragment. `Repository.List` owns a
-shared deadline for validation, queueing and SQL work. A go-sync semaphore
-bounds active queries and lets waiting requests cancel. Log ingestion writes
-through `Repository.Add` independently of that semaphore.
+handles form inputs and renders the page or fragment. List and Activity share
+the query deadline and admission policy. One local query and two
+archive-inclusive queries can run independently. Activity uses an archive slot
+only when a slot remains available for a log page. Waiting searches can cancel.
+Log ingestion writes through `Repository.Add` independently of query admission.
 See [pagination](queries.md#-results-and-pagination) for cursor behavior.
 
 Keep timestamps as unsigned nanoseconds. Writes bind decimal strings to
@@ -174,15 +180,21 @@ files are checked in; edit the proto source and regenerate them.
 The shared MVC server renders the embedded templates in
 [`internal/site`](../internal/site). `GET /logs` returns a full document, and
 the form and pagination use `PUT /logs` to replace the results fragment.
-The [Logs route package](../internal/site/logs/route) wires both requests to
-the controller. Change the [Logs views](../internal/site/logs/view) for
-page-specific markup and `root/layout` for the shared page and fragment layouts.
+`GET /logs/activity` returns a separate chart fragment for the applied filters
+and bounds. The [Logs route package](../internal/site/logs/route) wires these
+requests to the controllers. Change the [Logs views](../internal/site/logs/view)
+for page-specific markup and `root/layout` for the shared layouts.
 Keep user-facing strings in each [locale catalog](../internal/site/locales).
 The [full-page layout](../internal/site/root/layout/full.tmpl) pins htmx and the
 daisyUI component stylesheets from jsDelivr with Subresource Integrity,
 following Web. Use the shared daisyUI controls with the Einblick theme in the
 [Logs stylesheet](../internal/site/static/logs.css). The theme, page layout and
 request-status script ship in the binary.
+
+Templates send exact RFC 3339 timestamps and UTC fallback text. The Logs script
+formats user-facing times after initial render and fragment updates. It converts
+Custom picker values to UTC when collecting form data. The repository and
+shareable URLs continue to use absolute bounds.
 
 ## 🪿 Schema migrations
 

@@ -14,7 +14,9 @@
 {{if eq .Model.Total 1}}{{$totalLabel = .Localizer.Text "logs.one_match"}}{{end}}
 <div class="activity-summary" lang="{{.Localizer.Tag}}" data-total-label="{{$totalLabel}}"
      data-interval-label="{{.Localizer.Message "logs.activity_interval" (dict "Size" .Model.IntervalSize "Unit" (.Localizer.Text .Model.IntervalUnit))}}"
-     data-through-label="{{.Localizer.Message "logs.activity_through" (dict "End" ($last.Time.Format $axisTime))}}">
+     data-through-format="{{.Localizer.Message "logs.activity_through" (dict "End" "{end}")}}"
+     data-bucket-format="{{.Localizer.Message "logs.activity_bucket" (dict "Start" "{start}" "End" "{end}" "Count" "{count}")}}"
+     data-tooltip-precision="{{$precision.Milliseconds}}">
   <div class="activity-plot" aria-hidden="true">
     <div class="activity-bars">
       {{range .Model.Bars}}
@@ -22,7 +24,7 @@
       {{$end := (.EndTime.Round $precision).Format $tooltipTime}}
       <div class="activity-bar" data-start="{{.StartTime.Format $exactTime}}" data-end="{{.EndTime.Format $exactTime}}"
            data-start-label="{{$start}}" data-end-label="{{$end}}" data-count="{{.Count}}" style="--bar-height: {{.Height}}%"
-           data-summary="{{$.Localizer.Message "logs.activity_bucket" (dict "Start" $start "End" $end "Count" .Count)}}">
+           data-summary="{{$.Localizer.Message "logs.activity_bucket" (dict "Start" $start "End" (printf "%s UTC" $end) "Count" .Count)}}">
         <span></span>
       </div>
       {{end}}

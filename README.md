@@ -40,13 +40,13 @@ disposable; use a persistent mount to retain accepted logs.
 ```mermaid
 flowchart LR
     accTitle: Telemetry in Einblick today
-    accDescr: OTLP logs are stored in DuckDB and optionally archived to R2. Queries combine local and archived logs. Metrics and traces are printed and discarded.
-    OTLP["OTLP/gRPC"] -->|Logs| DB[(DuckDB)]
-    OTLP -->|Metrics and traces| Logger[Service logger]
-    DB --> Queries[Browser and query API]
-    DB -->|Optional| Parquet[Local Parquet files]
-    Parquet -->|Optional| R2[Cloudflare R2]
-    R2 -->|Historical logs| Queries
+    accDescr: Einblick acknowledges log exports after a DuckDB commit. Optional archival stages Parquet and publishes to R2. The browser and API query DuckDB, which reads Parquet for ranges that need archive history. Metrics and traces print to the service logger.
+    OTLP["OTLP/gRPC exports"] -->|Logs commit before acknowledgement| DB[(DuckDB)]
+    OTLP -->|Metrics and traces are printed| Logger[Service logger]
+    DB -->|Optional background staging| Parquet[Local Parquet files]
+    Parquet -->|With R2 configured| R2[(Cloudflare R2)]
+    Queries[Logs page and ListLogs API] -->|Query logs| DB
+    DB -->|Read historical Parquet| R2
 ```
 
 See [telemetry ingestion](docs/ingestion.md) for OTLP/gRPC methods, gzip,
@@ -58,7 +58,8 @@ and [R2 publication](docs/configuration.md#-r2-log-archives) to configure archiv
 Open `http://localhost:11000/logs` to investigate acknowledged logs with
 service, severity, string-body text and trace-ID filters. The Logs page
 uses your browser language preferences and displays expandable typed log
-details. With R2 configured, the same search includes archived logs. See
+details. Displayed times and the Custom range picker use your browser's time
+zone. With R2 configured, the same search can include archived logs. See
 [log queries](docs/queries.md) for the browser and API usage.
 
 ## ⚙️ Configuration

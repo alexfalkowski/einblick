@@ -5,17 +5,18 @@
 ## 🖥️ Investigate logs in the browser
 
 Open `http://localhost:11000/logs` with the development configuration.
-The page opens on the last hour, or the configured query limit if it is shorter. Use the exact
-service name, **Search messages**, a hexadecimal **Trace ID**, or severity to
-narrow the results. An empty service filter includes unnamed services. A severity
+The page opens on the last hour, capped by the configured query range and
+archive lookback. Use the exact service name, **Search messages**, a hexadecimal
+**Trace ID**, or severity to narrow the results. An empty service filter includes
+unnamed services. A severity
 choice matches one exact level (Debug, Info, Warn, Error, or Fatal), while
 **All severities** includes every level. Matching message text is highlighted.
 
 | Goal | Action |
 | --- | --- |
 | Search up to now | Choose a time preset. To apply filter edits, select **Search** or press Enter. A recent window advances to now each time you search or reload its URL. |
-| Search between dates | Select **Custom**, enter the start and end dates and times in UTC, then use **Search** beside **Reset**. Share the address bar link to reopen the same interval on page one. |
-| Explore a narrower range | **Log activity** labels the bucket size and groups matching logs on UTC time boundaries. Hover over a bar for its rounded time range and count. Drag across the bars to search the selected interval. |
+| Search between dates | Select **Custom**, enter the dates and times in the browser time zone shown below the fields, then select **Search**. Share the address bar link to reopen the same interval on page one in any time zone. |
+| Explore a narrower range | **Log activity** groups matches in UTC-aligned buckets and labels them in your browser time zone. Hover over a bar for its rounded range and count. Drag across the bars to search their exact interval. |
 | Automatically refresh | Select **5s**, **10s**, or **15s** under **Auto-refresh**. Each refresh uses the applied filters and the rolling window from the address bar. Updates pause while the custom dates or log details are open, or until a failed manual search is replaced by a successful one. Choose **Off** to stop automatic requests. The control starts at **Off** on a full page load. |
 | Keep the exact interval | Choose **Next page**, clear the message search with **×** or **Clear search**, or search from an absolute-range bookmark. Clearing or paging retains the preset for the next **Search**. |
 | Share or revisit a query | Copy the address bar URL, such as `/logs?window=15m`. Reloading or sharing it opens the first page for that duration up to now, even when you're viewing a later page. Use Back for the previous query or **Reset** to clear the filters and return to the latest window. |
@@ -33,6 +34,11 @@ the cutoff moves, subject to available history. Change filters and select
 R2 itself expires archive objects by upload age, so the cutoff can exclude
 older events from late arrivals. The configured query range also bounds the
 length of each interval. [Query limits](configuration.md#-recent-log-queries)
+
+The picker rejects times skipped by a clock change. For a newly entered time
+that occurs twice, it uses the earlier occurrence. Reopening and submitting a
+saved range with its fields unchanged preserves the exact saved bounds.
+Without JavaScript, displayed timestamps and any visible date fields use UTC.
 
 A bookmark with `start_time` and `end_time` in RFC 3339, for example
 `/logs?start_time=2026-11-19T11:00:00Z&end_time=2026-11-19T11:15:00Z`,
@@ -56,13 +62,15 @@ outage. If a search needs unavailable archive history, the page shows a
 storage error. Choose a recent time preset or retry the same range after
 the archive recovers.
 
-The table shows UTC time to the second. When the producer omits event time,
-the **Log details** summary labels the observation or receipt time used in its
-place. The inspector fills the screen on narrow displays. It shows the full
+The table shows browser-local time to the second. Hover over a timestamp to
+see its full precision in your time zone. When the producer omits event time, the **Log details**
+summary labels the observation or receipt time used in its place. The
+inspector fills the screen on narrow displays. It shows the full
 message, available service, environment and time to receipt, and reported status
 and duration for HTTP and gRPC request logs.
 Expand **Attributes**, **Source**, or **Timing and IDs** for typed values,
-resource and instrumentation details, exact timestamps, and copyable IDs.
+resource and instrumentation details, exact local timestamps with their UTC
+offsets, and copyable IDs.
 Use the API for the original typed OTLP fields.
 
 While **Loading logs…** is visible, you can edit filters and submit after the
@@ -161,7 +169,7 @@ sequenceDiagram
     C->>E: ListLogs with bounds, filters and page size
     E-->>C: First page and token if more rows exist
     C->>E: Same query plus token
-    E-->>C: Rows strictly after the token's position
+    E-->>C: Next page after the token, with a new token if more rows exist
 ```
 
 Each page reads the committed records visible to that request. New records
@@ -177,9 +185,10 @@ An empty token means exhaustion. Token size is independent of filter length.
 An empty first page means no matches. Protobuf JSON omits default-valued fields, so
 `logs` and `nextPageToken` can be absent; generated
 clients expose an empty collection and empty string respectively.
-There is no total-count query. Tokens survive service restarts and eviction
-on the same volume while the archived objects remain available. Open a fresh
-query after replacing the database volume. Clients must treat tokens as opaque.
+For a match count, use the Logs page's activity chart. Tokens survive service
+restarts and eviction on the same volume while the archived objects remain
+available. Open a fresh query after replacing the database volume. Treat tokens
+as opaque.
 
 ## ⏱️ Bounds and failures
 
