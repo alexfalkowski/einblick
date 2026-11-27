@@ -16,7 +16,10 @@ time_range.recent: Recent
 time_range.custom: Custom
 time_range.from: From (UTC)
 time_range.to: To (UTC)
-time_range.earliest: Earliest selectable date
+time_range.lookback_days: 'Last {{.Days}} days'
+time_range.lookback_one_day: 'Last 24 hours'
+time_range.lookback_duration: 'Last {{.Duration}}'
+time_range.start_too_early: 'Choose a date on or after {{.Date}} UTC.'
 logs.event_format: 02 Jan, 15:04:05
 logs.level.debug: Debug
 logs.level.info: Info
@@ -78,24 +81,26 @@ logs.string_index: String index
 logs.blank_value: Blank string
 logs.empty_value: No value
 logs.next: Next page
-logs.empty: No logs found
-logs.no_message_matches: 'No messages match “{{.Term}}”'
-logs.empty_hint: Try a wider time range or clear a filter.
+logs.empty: 'No matches'
+logs.clear_filters: 'Clear filters'
+logs.empty_hint: 'Try a wider range.'
 logs.invalid_link: This search link couldn’t be opened.
 logs.open: Open Logs
 logs.invalid_filters: Check the search filters and try again.
 logs.date_order: End time must be after start time.
 logs.date_range_too_wide: This time range exceeds the search limit.
 logs.invalid_dates: Enter a valid start and end time in UTC.
-logs.date_outside_history: Choose dates within the available search period.
+logs.date_outside_history: 'Choose a more recent start date.'
 logs.activity: Log activity
-logs.activity_through: 'Chart through {{.End}} UTC'
-logs.activity_loading: Loading activity…
-logs.activity_unavailable: Log activity is unavailable.
-logs.matching_count: '{{.Count}} matching logs when activity loaded'
-logs.one_match: 1 matching log when activity loaded
+logs.activity_through: 'Through {{.End}} UTC'
+logs.activity_loading: 'Loading…'
+logs.activity_unavailable: 'Chart unavailable'
+logs.activity_busy: 'Archive busy'
+logs.activity_timeout: 'Chart timed out'
+logs.activity_retry: 'Retry'
+logs.matching_count: '{{.Count}} matches'
+logs.one_match: '1 match'
 logs.activity_search: Search
-logs.activity_intervals: Browse activity intervals
 logs.activity_tick_format: 02 Jan 15:04
 logs.activity_interval: '{{.Size}}{{.Unit}} buckets'
 logs.activity_bucket: '{{.Start}} – {{.End}} UTC · {{.Count}} logs'

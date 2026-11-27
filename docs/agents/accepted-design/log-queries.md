@@ -28,14 +28,20 @@ absolute URL bounds on reload. The Custom form sends UTC picker values with
 its exact applied bounds. Shareable fixed ranges use RFC 3339 bounds. Positive
 R2 retention bounds selectable log event dates in the browser. The repository
 determines archive coverage by object age and availability.
+Show the lookback beside the custom fields. On an in-page search with an expired
+start date, show the current cutoff under that field.
 [Browser log queries](../../queries.md#-investigate-logs-in-the-browser)
 
 Load the activity chart and total automatically once search results are
 visible. Put the total above the results table. Show the bucket size beside
 the chart title and mark UTC on the last time label. Use a tooltip for
-bucket details on hover and the selected interval while dragging. When
+bucket details on hover and the selected interval while dragging. Round tooltip
+times to the nearest minute for minute-sized or larger buckets and to the nearest
+second for finer buckets. Searches from the chart use exact bounds. When
 timed refresh moves the results ahead, show the chart's end time in its
 header.
+Use a short match count and hide it when it no longer describes the table.
+Offer **Clear filters** in the filtered empty state and keep the applied range.
 
 ## Search sources
 
@@ -46,11 +52,12 @@ that need unavailable archive history return an error in both interfaces.
 
 ## Search admission by source
 
-Apply `queries.concurrency` independently to current-volume and archive-inclusive
-searches. A stalled native archive read keeps its archive slot until cleanup
-finishes. Local-only searches use the current-volume slots.
+Allow one active current-volume search and two active archive-inclusive searches
+with independent admission. A stalled native archive read keeps its archive
+slot until cleanup finishes.
 Automatic activity takes an archive slot only when a slot remains available
 for a log page. If there is no spare capacity, activity reports unavailable.
+Show a retry action for temporary archive contention and chart timeouts.
 [Query configuration](../../configuration.md#-recent-log-queries)
 
 ## Response work after repository admission

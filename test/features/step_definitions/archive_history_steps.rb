@@ -74,10 +74,6 @@ When('the operator opens the oldest bucket after the cutoff moves and changes it
   search_oldest_activity_bucket
 end
 
-When('the operator loads activity and continues to the next archived log with one query slot') do
-  page_without_spare_archive_capacity
-end
-
 When(/\Athe operator pages during a stalled (activity chart|log page) and retries activity after it finishes\z/) do |search|
   page_while_archive_search_is_loading(search)
 end
@@ -102,7 +98,7 @@ When('the worker publishes ready logs after a listing failure opens the search c
   publish_while_archive_listings_are_unavailable
 end
 
-When('the client cancels an active archive query, searches while it drains, and retries') do
+When('the client cancels a query while both archive slots are occupied, searches while it drains, and retries') do
   query_after_archive_cancellation
 end
 
@@ -148,13 +144,13 @@ Then('the valid range should be applied with its edited bounds') do
   expect(@valid_custom_search).to show_custom_log_range(bounds)
 end
 
-Then('the picker should show the original cutoff and the expired search should be rejected') do
-  expect(@retention_search).to show_log_lookback(Einblick::Archive::HISTORY_RETENTION_SECONDS, @retention_query_window)
-  expect(@expired_custom_search).to show_log_view('full', 'en', 400).and show_log_outcome('outside retention', 'en')
+Then('the picker should show a short lookback hint and return the cutoff for the expired start date') do
+  expect(@retention_search).to show_log_lookback
+  expect(@expired_custom_search).to reject_expired_log_start(@expired_custom_start, @expired_cutoff_window)
 end
 
 Then('both views should keep the exact bucket interval after the cutoff moves') do
-  expect(@oldest_activity).to link_to_first_activity_bucket(@seven_day_page, @activity_bucket_bounds)
+  expect(@oldest_activity).to start_activity_at_search_boundary(@seven_day_page)
   expect(@activity_bucket_search).to show_custom_log_range(@activity_bucket_bounds)
   expect(@activity_bucket_filter).to show_custom_log_range(@activity_bucket_bounds.merge('text' => 'archived error'))
 end
@@ -238,8 +234,9 @@ Then('the activity chart should count all matching archived logs') do
   expect(@archive_activity).to show_activity_counts([@expected_query_records.length], @archive_next_page)
 end
 
-Then('activity should be unavailable for the archive search') do
+Then('activity should report a busy archive') do
   expect(@archive_activity).to show_activity_error(503, 'unavailable')
+  expect(@archive_activity.headers).to include(einblick_activity: 'busy')
 end
 
 Then(/\Athe stalled (activity chart|log page) should finish after pagination and include the archived log\z/) do |search|

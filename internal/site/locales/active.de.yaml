@@ -16,7 +16,10 @@ time_range.recent: Letzte Einträge
 time_range.custom: Benutzerdefiniert
 time_range.from: Von (UTC)
 time_range.to: Bis (UTC)
-time_range.earliest: Frühestes auswählbares Datum
+time_range.lookback_days: 'Letzte {{.Days}} Tage'
+time_range.lookback_one_day: 'Letzte 24 Stunden'
+time_range.lookback_duration: 'Letzte {{.Duration}}'
+time_range.start_too_early: 'Wähle ein Datum ab {{.Date}} UTC.'
 logs.event_format: 02.01., 15:04:05
 logs.level.debug: Debug
 logs.level.info: Info
@@ -78,24 +81,26 @@ logs.string_index: Zeichenfolgenindex
 logs.blank_value: Leere Zeichenfolge
 logs.empty_value: Kein Wert
 logs.next: Nächste Seite
-logs.empty: Keine Protokolle gefunden
-logs.no_message_matches: 'Keine Meldung enthält „{{.Term}}“'
-logs.empty_hint: Wähle einen größeren Zeitraum oder entferne einen Filter.
+logs.empty: 'Keine Treffer'
+logs.clear_filters: 'Filter löschen'
+logs.empty_hint: 'Wähle einen größeren Zeitraum.'
 logs.invalid_link: Dieser Suchlink konnte nicht geöffnet werden.
 logs.open: Protokolle öffnen
 logs.invalid_filters: Prüfe die Suchfilter und versuche es erneut.
 logs.date_order: Das Ende muss nach dem Beginn liegen.
 logs.date_range_too_wide: Dieser Zeitraum überschreitet das Suchlimit.
 logs.invalid_dates: Gib einen gültigen Beginn und ein gültiges Ende in UTC ein.
-logs.date_outside_history: Wähle Daten innerhalb des verfügbaren Suchzeitraums.
+logs.date_outside_history: 'Wähle ein neueres Startdatum.'
 logs.activity: Protokollaktivität
-logs.activity_through: 'Diagramm bis {{.End}} UTC'
-logs.activity_loading: Aktivität wird geladen…
-logs.activity_unavailable: Die Protokollaktivität ist nicht verfügbar.
-logs.matching_count: '{{.Count}} passende Protokolle beim Laden der Aktivität'
-logs.one_match: 1 passendes Protokoll beim Laden der Aktivität
+logs.activity_through: 'Bis {{.End}} UTC'
+logs.activity_loading: 'Wird geladen …'
+logs.activity_unavailable: 'Diagramm nicht verfügbar'
+logs.activity_busy: 'Archiv ausgelastet'
+logs.activity_timeout: 'Zeitlimit für Diagramm erreicht'
+logs.activity_retry: 'Erneut versuchen'
+logs.matching_count: '{{.Count}} Treffer'
+logs.one_match: '1 Treffer'
 logs.activity_search: Suchen
-logs.activity_intervals: Aktivitätsintervalle durchsuchen
 logs.activity_tick_format: 02.01. 15:04
 logs.activity_interval: '{{.Size}} {{.Unit}} pro Balken'
 logs.activity_bucket: '{{.Start}} – {{.End}} UTC · {{.Count}} Protokolle'

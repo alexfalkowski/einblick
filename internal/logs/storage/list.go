@@ -31,6 +31,9 @@ var ErrTimeOrder = errors.New("logs: end time must be after start time")
 // ErrTimeRangeTooWide identifies a search interval longer than the configured maximum.
 var ErrTimeRangeTooWide = errors.New("logs: search interval exceeds the configured maximum")
 
+// ErrActivityBusy indicates that an archive slot is temporarily unavailable for activity.
+var ErrActivityBusy = errors.New("logs: no spare archive slot for activity")
+
 const timestampBits = 64
 
 type cursor struct {
@@ -119,11 +122,10 @@ func (r *repository) acquireSearch(ctx context.Context, start time.Time, kind se
 	}
 
 	// Check spare capacity atomically, then return the page slot before activity starts.
-	const activitySlot, pageSlot = 1, 1
-	if !r.archiveQueries.TryAcquire(activitySlot + pageSlot) {
-		return nil, errors.New("logs: no spare archive slot for activity")
+	if !r.archiveQueries.TryAcquire(archivePageSlots + archiveActivitySlots) {
+		return nil, ErrActivityBusy
 	}
-	defer r.archiveQueries.Release(pageSlot)
+	defer r.archiveQueries.Release(archivePageSlots)
 
 	return r.archiveQueries, nil
 }

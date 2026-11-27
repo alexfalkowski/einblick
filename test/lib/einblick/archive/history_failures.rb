@@ -50,6 +50,7 @@ module Einblick
           prepare_local_logs_during_archive_stall
           archived_key = @original_archive_objects.keys.fetch(0)
           cancel_while_reading_archive(archived_key)
+          wait_for_log_query_limit(0)
           query_logs
         end
       end
@@ -57,13 +58,13 @@ module Einblick
       def cancel_while_reading_archive(key)
         @floci.hold_archive_read(key)
         with_active_archive_query do |operation|
-          wait_for { @floci.archive_read_waiting?(key) }.to be(true)
-          search_local_logs_during_archive_stall(key)
-          operation.cancel
-          search_while_cancelled_archive_query_drains
-          wait_for_log_query_limit(1)
-          @floci.release_archive_read(key)
-          wait_for_log_query_limit(0)
+          with_active_archive_query do
+            wait_for { @floci.archive_read_waiting?(key, minimum: 2) }.to be(true)
+            search_local_logs_during_archive_stall(key)
+            operation.cancel
+            search_while_cancelled_archive_query_drains
+            @floci.release_archive_read(key)
+          end
         end
       end
 

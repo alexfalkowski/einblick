@@ -261,7 +261,7 @@ The exact SQL schema and typed-attribute representation are implementation desig
 - **QRY-006 — Metric correctness.** Respect cumulative versus delta temporality, counter resets/start times, gaps, and compatible histogram boundaries. Do not average precomputed percentiles or treat bucket counts as ordinary observations. Fetch any lookback points needed for rate calculations.
 - **QRY-007 — Database execution.** Use database operators for query execution. Small telemetry-domain calculations are expected; a second general-purpose query execution pipeline is not.
 - **QRY-008 — Local/archive overlap.** Return each archive batch once when records exist both locally and in R2. A query must not gain gaps or duplicate batches while upload or local eviction occurs.
-- **QRY-009 — Bounded work.** Configure result limits, query timeout, historical-query concurrency, and a supported search-range bound. Propagate cancellation and enforce bounds without relying only on browser behavior.
+- **QRY-009 — Bounded work.** Configure result limits, query timeout, and a supported search-range bound. For logs, allow one active local query and two active archive queries, with automatic activity admitted only when an archive slot remains available for a log page. Propagate cancellation and enforce bounds without relying only on browser behavior.
 - **QRY-010 — Explicit failures.** Distinguish no matches, unavailable history, cancelled queries, and intentionally partial results. Log searches fail when required archive history is unavailable. If other queries return partial results, identify the missing coverage.
 - **QRY-011 — Controlled query surface.** Serve the fixed browser workflows through server-owned parameterized queries. A public arbitrary-SQL endpoint is outside scope.
 - **QRY-012 — Historical reads.** Select relevant day partitions and read archived Parquet through DuckDB. Startup must not require downloading or importing the full archive.
@@ -416,8 +416,7 @@ table while it describes the displayed interval. In-place paging and timed
 refreshes retain the previous chart. A chart selection starts a new search for
 the selected range. The table stays available during the activity request and
 after a failure. Automatic activity reports unavailable when an archive scan
-would take the last archive query slot. A keyboard-operable list exposes
-each activity bucket's count and exact interval link.
+would take the last archive query slot.
 
 Where a view offers Auto-refresh, default to Off and offer `5s`, `10s` and
 `15s`. Refresh the applied query in place without adding browser history or
@@ -502,7 +501,7 @@ This is a logical configuration inventory, not a finalized YAML schema or comman
 | Retention clock | Object age versus event age must be explicit. | Open |
 | R2 lifecycle configuration | If object-age expiration is selected, reuse infraops `expiration`, for example `168h` normally or `24h` for testing; `7d` is not valid Go duration syntax. | Installation policy/activation open |
 | DuckDB memory / threads | Required explicit settings; development uses `64MiB` and one worker. Production values require measured Go/native headroom. | Interface implemented; production tuning open |
-| Historical-query concurrency | One initially. | Proposed |
+| Historical-query concurrency | Two active archive queries for logs. | Log policy implemented; other signals open |
 | Query timeout | Required and configurable; development uses 30 seconds, subject to the HTTP deadline. | Recent-log interface implemented; production tuning open |
 | Result and search-range limits | Required. See the [development query configuration](../test/.config/server.yaml). | Recent-log interface implemented; production tuning open |
 | Pending-ingestion disk budget | Sized for a chosen R2 outage window plus recovery/export workspace. | Open tuning |

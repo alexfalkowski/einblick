@@ -57,20 +57,36 @@ module Einblick
         get(results['data-activity-url'], options(languages))
       end
 
+      def open_clear_log_filters(page, languages)
+        link = Nokogiri::HTML5(page.body).at_css('#results .empty-state a[href]')
+        get(link['href'], options(languages))
+      end
+
       def oldest_activity_bucket(page, languages)
-        activity = open_log_activity(page, languages)
-        document = Nokogiri::HTML5.fragment(activity.body)
-        bar = document.at_css('.activity-bar')
+        document = Nokogiri::HTML5(page.body)
+        activity_url = document.at_css('#results')['data-activity-url']
+        activity = get(activity_url, options(languages))
+        bar = Nokogiri::HTML5.fragment(activity.body).at_css('.activity-bar')
         bounds = { 'start_time' => bar['data-start'], 'end_time' => bar['data-end'] }
-        [activity, document.at_css('.activity-intervals a')['href'], bounds]
+        action = document.at_css('#log-filters')['action']
+        [activity, activity_bucket_search_url(activity_url, action, bounds), bounds]
       end
 
       private
 
+      def activity_bucket_search_url(activity_url, action, bounds)
+        query = URI.parse(activity_url)
+        query.path = action
+        filters = URI.decode_www_form(query.query).to_h
+        query.query = URI.encode_www_form(filters.merge(bounds, 'custom' => '1'))
+        query.to_s
+      end
+
       def log_form_button(document, form, label)
         buttons = form.css('button[type=submit]:not([disabled]):not([form])') +
                   document.css("button[type=submit][name][form='#{form['id']}']:not([disabled])")
-        buttons.find { |button| button.text == label } || raise("no enabled Logs submit button labelled #{label.inspect}")
+        buttons.find { |button| (button['aria-label'] || button.text) == label } ||
+          raise("no enabled Logs submit button labelled #{label.inspect}")
       end
 
       def submit_get_form(form, button, filters, languages)

@@ -45,8 +45,11 @@ func customSelection(form url.Values, selection timerange.Selection, now time.Ti
 	}
 
 	earliest := limits.Earliest(now).Truncate(time.Second.Duration())
-	if selection.StartTime.Before(earliest) || selection.EndTime.After(now) {
+	if selection.StartTime.Before(earliest) {
 		return false, timerange.ErrOutsideLookback
+	}
+	if selection.EndTime.After(now) {
+		return false, timerange.ErrInvalidDates
 	}
 	return true, nil
 }

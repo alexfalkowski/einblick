@@ -192,7 +192,7 @@ Then('the chart should count both matching logs in adjacent labelled buckets') d
   expect(@log_activity).to show_activity_times_for(@query.fetch('start_time'))
 end
 
-Then('the bucket labels should distinguish the exact endpoints') do
+Then('the minute bucket tooltip should show rounded times and its search should keep the exact endpoints') do
   expect(@log_activity).to show_clipped_activity_labels
 end
 
@@ -276,13 +276,18 @@ Then('I should see the original message, service and typed log details as text')
   expect(@response).to show_literal_log(@query_service, Einblick::Site::MARKUP_MESSAGE, Einblick::Site::MARKUP_TERM)
 end
 
-Then('I should see which text had no matches and how to clear it') do
-  expect(@empty_message_search).to show_empty_message_search(Einblick::Site::MISSING_TERM)
+Then('I should see a short empty state with an option to clear all filters') do
+  expect(@empty_message_search).to show_empty_message_search
 end
 
 Then('the {string} view should show warnings in the same time range for the selected service') do |layout|
   expect(@response).to show_log_view(layout, 'en', 200).and preserve_log_filters(@query.merge('severity' => 'WARN'), layout)
   expect(@response).to show_log_messages("literal %_ ' OR 1=1 --").and show_log_severity('WARN (INFO)')
+end
+
+Then('clearing all filters should keep the same time range') do
+  bounds = @query.slice('start_time', 'end_time')
+  expect(@cleared_filters).to show_log_view('full', 'en', 200).and preserve_log_filters(bounds, 'full')
 end
 
 Then('I should see German labels for their details and the original blank values') do

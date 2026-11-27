@@ -30,6 +30,10 @@ func NewLogs(repo storage.Repository, limits timerange.Limits, view, errorView *
 		now := time.Now().UTC()
 		search, err := query.Parse(req.Form, now, limits)
 		if err != nil {
+			if partial && errors.Is(err, timerange.ErrOutsideLookback) {
+				cutoff := limits.Earliest(now).Truncate(time.Second.Duration())
+				res.Header().Set("Einblick-Earliest-Start", cutoff.Format(time.RFC3339))
+			}
 			return errorView, nil, queryError(req, err)
 		}
 
@@ -38,7 +42,7 @@ func NewLogs(repo storage.Repository, limits timerange.Limits, view, errorView *
 			return errorView, nil, queryError(req, err)
 		}
 
-		viewModel, err := model.NewLogs(ctx, search, result, now, limits)
+		viewModel, err := model.NewLogs(ctx, search, result, limits)
 		if err != nil {
 			return errorView, nil, queryError(req, err)
 		}

@@ -57,16 +57,10 @@ Feature: Read acknowledged logs across local storage and the archive
     And the activity chart should count all matching archived logs
     And the fresh instance should leave the original archive objects unchanged
 
-  Scenario: Page through archived logs with one archive query slot
-    Given acknowledged logs are ready to archive
-    When the operator loads activity and continues to the next archived log with one query slot
-    Then activity should be unavailable for the archive search
-    And the Logs page should continue to the next archived log
-
   Scenario Outline: Page through archived logs while another day's search is stalled
     Given acknowledged logs on two days are ready to archive
     When the operator pages during a stalled <search> and retries activity after it finishes
-    Then activity should be unavailable for the archive search
+    Then activity should report a busy archive
     And the Logs page should continue to the next archived log
     And the stalled <search> should finish after pagination and include the archived log
     And the retried activity should count all logs matching the paged search
@@ -125,7 +119,7 @@ Feature: Read acknowledged logs across local storage and the archive
     Given acknowledged logs are ready to archive
     When the operator submits a valid new range and then a date that has aged past the cutoff
     Then the valid range should be applied with its edited bounds
-    And the picker should show the original cutoff and the expired search should be rejected
+    And the picker should show a short lookback hint and return the cutoff for the expired start date
 
   @archive_history_availability
   Scenario: Search the oldest bucket from the seven-day activity chart
@@ -184,7 +178,7 @@ Feature: Read acknowledged logs across local storage and the archive
   @archive_history_availability
   Scenario: Retry after cancelling an archive query
     Given acknowledged logs are ready to archive
-    When the client cancels an active archive query, searches while it drains, and retries
+    When the client cancels a query while both archive slots are occupied, searches while it drains, and retries
     Then the cancelled archive query should return gRPC cancelled
     And the recent search should return its records while the archive read is still held
     And the queued search should end without listing the archive

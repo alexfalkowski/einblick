@@ -85,6 +85,7 @@ module Einblick
       def clear_message_search(layout)
         @empty_message_search = investigate_logs('full', 'en', 'text' => MISSING_TERM, 'severity' => 'WARN')
         @response = site_client.submit_log_form(@empty_message_search, 'en', submitter: 'Clear search', layout: layout)
+        @cleared_filters = site_client.open_clear_log_filters(@empty_message_search, 'en')
       end
 
       def open_saved_search(start_time, end_time)

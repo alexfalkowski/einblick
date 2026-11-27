@@ -12,7 +12,6 @@ import (
 	"github.com/alexfalkowski/go-service/v3/encoding/codec"
 	"github.com/alexfalkowski/go-service/v3/encoding/proto"
 	"github.com/alexfalkowski/go-service/v3/strings"
-	"github.com/alexfalkowski/go-service/v3/time"
 	common "go.opentelemetry.io/proto/otlp/common/v1"
 	logs "go.opentelemetry.io/proto/otlp/logs/v1"
 )
@@ -28,17 +27,19 @@ var severityOptions = []FilterOption{
 }
 
 // NewLogs builds the view model for a page of logs.
-func NewLogs(ctx context.Context, search query.Search, results *storage.Page, now time.Time, limits timerange.Limits) (*Logs, error) {
+func NewLogs(ctx context.Context, search query.Search, results *storage.Page, limits timerange.Limits) (*Logs, error) {
 	filters := search.Query()
 	maxRange := limits.PresetLimit()
 	windows, selectedWindow := search.Time.Presets(maxRange)
 	viewModel := &Logs{
-		QueryURL:    search.ReloadURL(maxRange),
-		ActivityURL: search.ActivityURL(),
-		NextURL:     search.NextURL(results.NextPageToken),
+		QueryURL:        search.ReloadURL(maxRange),
+		ActivityURL:     search.ActivityURL(),
+		NextURL:         search.NextURL(results.NextPageToken),
+		ClearFiltersURL: search.ClearFiltersURL(),
 		Filters: Filters{
 			Custom:          search.Custom,
-			Earliest:        limits.Earliest(now),
+			Lookback:        limits.Lookback,
+			LookbackDays:    limits.LookbackDays(),
 			StartTime:       filters.StartTime,
 			EndTime:         filters.EndTime,
 			ServiceName:     filters.Service,

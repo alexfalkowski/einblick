@@ -49,7 +49,7 @@ Feature: Investigate recent logs in the browser
 
   Scenario: Inspect an activity bucket clipped within a minute
     When I load activity for a range ending mid-minute
-    Then the bucket labels should distinguish the exact endpoints
+    Then the minute bucket tooltip should show rounded times and its search should keep the exact endpoints
 
   Scenario: Report invalid bounds when loading log activity
     When I request activity with invalid time bounds
@@ -150,8 +150,9 @@ Feature: Investigate recent logs in the browser
   Scenario Outline: Clear a message search with no matches
     Given acknowledged searchable logs
     When I clear a message search with no matches in the "<layout>" view
-    Then I should see which text had no matches and how to clear it
+    Then I should see a short empty state with an option to clear all filters
     And the "<layout>" view should show warnings in the same time range for the selected service
+    And clearing all filters should keep the same time range
 
     Examples:
       | layout  |

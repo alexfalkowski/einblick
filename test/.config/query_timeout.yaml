@@ -3,7 +3,6 @@ queries:
   max_results: 100
   max_range: 24h
   timeout: 1ns
-  concurrency: 1
 duckdb:
   path: reports/recent.duckdb
   memory_limit: 64MiB

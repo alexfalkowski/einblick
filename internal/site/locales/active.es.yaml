@@ -16,7 +16,10 @@ time_range.recent: Reciente
 time_range.custom: Personalizado
 time_range.from: Desde (UTC)
 time_range.to: Hasta (UTC)
-time_range.earliest: Primera fecha disponible
+time_range.lookback_days: 'Últimos {{.Days}} días'
+time_range.lookback_one_day: 'Últimas 24 horas'
+time_range.lookback_duration: 'Últimas {{.Duration}}'
+time_range.start_too_early: 'Elige una fecha a partir del {{.Date}} UTC.'
 logs.event_format: 02/01, 15:04:05
 logs.level.debug: Depuración
 logs.level.info: Información
@@ -78,24 +81,26 @@ logs.string_index: Índice de cadena
 logs.blank_value: Cadena en blanco
 logs.empty_value: Sin valor
 logs.next: Página siguiente
-logs.empty: No se encontraron registros
-logs.no_message_matches: 'Ningún mensaje coincide con «{{.Term}}»'
-logs.empty_hint: Amplía el intervalo o quita un filtro.
+logs.empty: 'Sin coincidencias'
+logs.clear_filters: 'Quitar filtros'
+logs.empty_hint: 'Amplía el intervalo.'
 logs.invalid_link: No se pudo abrir este enlace de búsqueda.
 logs.open: Abrir registros
 logs.invalid_filters: Revisa los filtros de búsqueda y vuelve a intentarlo.
 logs.date_order: La hora de fin debe ser posterior a la de inicio.
 logs.date_range_too_wide: Este intervalo supera el límite de búsqueda.
 logs.invalid_dates: Introduce una hora de inicio y una de fin válidas en UTC.
-logs.date_outside_history: Elige fechas dentro del período de búsqueda disponible.
+logs.date_outside_history: 'Elige una fecha de inicio más reciente.'
 logs.activity: Actividad de registros
-logs.activity_through: 'Gráfico hasta {{.End}} UTC'
-logs.activity_loading: Cargando actividad…
-logs.activity_unavailable: La actividad de registros no está disponible.
-logs.matching_count: '{{.Count}} registros coincidentes al cargar la actividad'
-logs.one_match: 1 registro coincidente al cargar la actividad
+logs.activity_through: 'Hasta {{.End}} UTC'
+logs.activity_loading: 'Cargando…'
+logs.activity_unavailable: 'Gráfico no disponible'
+logs.activity_busy: 'Archivo ocupado'
+logs.activity_timeout: 'Tiempo de espera del gráfico agotado'
+logs.activity_retry: 'Reintentar'
+logs.matching_count: '{{.Count}} coincidencias'
+logs.one_match: '1 coincidencia'
 logs.activity_search: Buscar
-logs.activity_intervals: Explorar intervalos de actividad
 logs.activity_tick_format: 02/01 15:04
 logs.activity_interval: 'Intervalos de {{.Size}} {{.Unit}}'
 logs.activity_bucket: '{{.Start}} – {{.End}} UTC · {{.Count}} registros'

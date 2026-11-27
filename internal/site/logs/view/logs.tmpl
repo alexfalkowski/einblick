@@ -41,14 +41,18 @@
           <span id="current-range"{{if or .Model.Filters.SelectedWindow .Model.Filters.Custom}} hidden{{end}}>{{.Localizer.Text "logs.current_range"}}</span>
         </div>
         <div id="custom-dates" class="custom-dates"{{if not .Model.Filters.Custom}} hidden{{end}}>
-          <input id="start-utc" class="input input-sm" type="datetime-local" name="start_utc" step="1" required
-                 aria-label="{{.Localizer.Text "time_range.from"}}"
-                 value="{{.Model.Filters.StartTime.Format $pickerTime}}"{{if not .Model.Filters.Custom}} disabled{{end}}>
+          <div>
+            <input id="start-utc" class="input input-sm" type="datetime-local" name="start_utc" step="1" required
+                   aria-label="{{.Localizer.Text "time_range.from"}}" aria-describedby="start-date-error"
+                   value="{{.Model.Filters.StartTime.Format $pickerTime}}"{{if not .Model.Filters.Custom}} disabled{{end}}>
+            <p id="start-date-error" role="alert" hidden
+               data-message="{{.Localizer.Message "time_range.start_too_early" (dict "Date" "{date}")}}"></p>
+          </div>
           <input id="end-utc" class="input input-sm" type="datetime-local" name="end_utc" step="1" required
                  aria-label="{{.Localizer.Text "time_range.to"}}"
                  value="{{.Model.Filters.EndTime.Format $pickerTime}}"{{if not .Model.Filters.Custom}} disabled{{end}}>
-          <p id="earliest-date"{{if .Model.Filters.Earliest.IsZero}} hidden{{end}}>
-            {{.Localizer.Text "time_range.earliest"}} <time{{if not .Model.Filters.Earliest.IsZero}} datetime="{{.Model.Filters.Earliest.Format $exactTime}}"{{end}}>{{if not .Model.Filters.Earliest.IsZero}}{{.Model.Filters.Earliest.Format "2006-01-02 15:04:05"}}{{end}}</time>
+          <p class="lookback">
+            {{if eq .Model.Filters.LookbackDays 1}}{{.Localizer.Text "time_range.lookback_one_day"}} · {{else if .Model.Filters.LookbackDays}}{{.Localizer.Message "time_range.lookback_days" (dict "Days" .Model.Filters.LookbackDays)}} · {{else if .Model.Filters.Lookback}}{{.Localizer.Message "time_range.lookback_duration" (dict "Duration" .Model.Filters.Lookback)}} · {{end}}UTC
           </p>
         </div>
         <label for="text">{{.Localizer.Text "logs.text"}}</label>
@@ -87,12 +91,17 @@
     </div>
     <section id="log-activity" class="log-activity" aria-labelledby="activity-heading" hidden
              data-loading="{{.Localizer.Text "logs.activity_loading"}}"
-             data-unavailable="{{.Localizer.Text "logs.activity_unavailable"}}">
+             data-unavailable="{{.Localizer.Text "logs.activity_unavailable"}}"
+             data-busy="{{.Localizer.Text "logs.activity_busy"}}"
+             data-timeout="{{.Localizer.Text "logs.activity_timeout"}}">
       <div class="activity-heading">
         <h2 id="activity-heading">{{.Localizer.Text "logs.activity"}} <span id="activity-interval" class="activity-interval"></span></h2>
         <p id="activity-snapshot" hidden></p>
       </div>
-      <p id="activity-status" role="status" hidden></p>
+      <div class="activity-feedback">
+        <p id="activity-status" role="status" hidden></p>
+        <button id="retry-activity" class="btn btn-ghost btn-sm" type="button" hidden>{{.Localizer.Text "logs.activity_retry"}}</button>
+      </div>
       <div id="activity-content" aria-live="polite"></div>
     </section>
     <div aria-live="polite">
@@ -112,7 +121,6 @@
          data-start-time="{{.Model.Filters.StartTime.Format $exactTime}}"
          data-end-time="{{.Model.Filters.EndTime.Format $exactTime}}"
          data-custom="{{.Model.Filters.Custom}}"
-         data-earliest="{{if not .Model.Filters.Earliest.IsZero}}{{.Model.Filters.Earliest.Format $exactTime}}{{end}}"
          data-window="{{.Model.Filters.SelectedWindow}}"
          data-recent-window="{{.Model.Filters.RecentWindow}}">
   {{if .Model.Rows}}
@@ -167,11 +175,10 @@
   {{end}}
   {{else}}
   <div class="empty-state">
-    {{if .Model.Filters.MessageText}}
-    <h2>{{.Localizer.Message "logs.no_message_matches" (dict "Term" .Model.Filters.MessageText)}}</h2>
-    <button class="btn btn-outline btn-sm" type="submit" form="log-filters" name="clear_message" value="1" formnovalidate>{{.Localizer.Text "logs.clear_search"}}</button>
-    {{else}}
     <h2>{{.Localizer.Text "logs.empty"}}</h2>
+    {{if .Model.ClearFiltersURL}}
+    <a class="btn btn-outline btn-sm" href="{{.Model.ClearFiltersURL}}">{{.Localizer.Text "logs.clear_filters"}}</a>
+    {{else}}
     <p>{{.Localizer.Text "logs.empty_hint"}}</p>
     {{end}}
   </div>

@@ -13,6 +13,11 @@ import (
 // pinned log schema. Transport callers must report a permanent input failure.
 var ErrInvalidLog = errors.New("logs: invalid protobuf content")
 
+const (
+	archivePageSlots     = 1
+	archiveActivitySlots = 1
+)
+
 // Repository provides log persistence and queries over the service-owned database.
 type Repository interface {
 	// Add atomically persists a complete export and returns the committed record
@@ -34,7 +39,7 @@ type Repository interface {
 func NewRepository(cfg *Config, db *sql.DB, pool *sync.BufferPool, objects archive.ObjectStore) Repository {
 	return &repository{
 		config: cfg, db: db, pool: pool, store: objects,
-		localQueries:   sync.NewSemaphore(int64(cfg.Concurrency)),
-		archiveQueries: sync.NewSemaphore(int64(cfg.Concurrency)),
+		localQueries:   sync.NewSemaphore(1),
+		archiveQueries: sync.NewSemaphore(archivePageSlots + archiveActivitySlots),
 	}
 }
