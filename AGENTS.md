@@ -46,6 +46,14 @@ an exported error contract; otherwise create it at the failure site.
 Extract small helpers for genuinely shared behavior. Do not add abstractions
 for hypothetical future requirements.
 
+When a function declaration or call needs to wrap, review its responsibilities
+and inputs. Derive values where they are used and group inputs when they form
+an existing domain value. Prefer named operations or domain values when a
+positional boolean would obscure which behavior the caller selected.
+
+Keep conditions easy to scan. Separate value binding from long conditions and
+use guard clauses or named predicates to make distinct decisions clear.
+
 In Go code, use go-service's `strings.IsEmpty` for empty-string checks and
 `strings.Empty` for empty-string values.
 

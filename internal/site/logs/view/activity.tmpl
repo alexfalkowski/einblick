@@ -1,0 +1,47 @@
+{{define "results"}}
+{{if .Model}}
+{{$exactTime := "2006-01-02T15:04:05.999999999Z07:00"}}
+{{$axisTime := .Localizer.Text .Model.TickFormat}}
+{{$first := index .Model.Ticks 0}}
+{{$lastIndex := sub (len .Model.Ticks) 1}}
+{{$last := index .Model.Ticks $lastIndex}}
+{{$tooltipTime := printf "%s.999999999" (.Localizer.Text "logs.event_format")}}
+{{if eq ($first.Time.Format "2006-01-02") ($last.Time.Format "2006-01-02")}}
+  {{$tooltipTime = "15:04:05.999999999"}}
+{{end}}
+{{$totalLabel := .Localizer.Message "logs.matching_count" (dict "Count" .Model.Total)}}
+{{if eq .Model.Total 1}}{{$totalLabel = .Localizer.Text "logs.one_match"}}{{end}}
+<div class="activity-summary" lang="{{.Localizer.Tag}}" data-total-label="{{$totalLabel}}"
+     data-interval-label="{{.Localizer.Message "logs.activity_interval" (dict "Size" .Model.IntervalSize "Unit" (.Localizer.Text .Model.IntervalUnit))}}"
+     data-through-label="{{.Localizer.Message "logs.activity_through" (dict "End" ($last.Time.Format $axisTime))}}">
+  <div class="activity-plot" aria-hidden="true">
+    <div class="activity-bars">
+      {{range .Model.Bars}}
+      {{$start := .StartTime.Format $tooltipTime}}
+      {{$end := .EndTime.Format $tooltipTime}}
+      <div class="activity-bar" data-start="{{.StartTime.Format $exactTime}}" data-end="{{.EndTime.Format $exactTime}}"
+           data-start-label="{{$start}}" data-end-label="{{$end}}" data-count="{{.Count}}" style="--bar-height: {{.Height}}%"
+           data-summary="{{$.Localizer.Message "logs.activity_bucket" (dict "Start" $start "End" $end "Count" .Count)}}">
+        <span></span>
+      </div>
+      {{end}}
+    </div>
+    <div class="activity-tooltip" hidden data-search="{{.Localizer.Text "logs.activity_search"}}"></div>
+  </div>
+  <div class="activity-axis">
+    {{range $index, $tick := .Model.Ticks}}
+    <time{{if $tick.WideOnly}} class="activity-tick-wide"{{end}} style="--tick-position: {{$tick.Position}}%"
+         datetime="{{$tick.Time.Format $exactTime}}">{{$tick.Time.Format $axisTime}}{{if eq $index $lastIndex}} UTC{{end}}</time>
+    {{end}}
+  </div>
+  <details class="activity-intervals">
+    <summary>{{.Localizer.Text "logs.activity_intervals"}}</summary>
+    <ul>
+      {{range .Model.Bars}}
+      <li><a href="{{.SearchURL}}">{{$.Localizer.Message "logs.activity_bucket" (dict "Start" (.StartTime.Format $exactTime) "End" (.EndTime.Format $exactTime) "Count" .Count)}}</a></li>
+      {{end}}
+    </ul>
+  </details>
+</div>
+{{end}}
+{{end}}

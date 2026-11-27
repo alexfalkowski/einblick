@@ -10,6 +10,34 @@ import (
 // ErrInvalidDates identifies missing or malformed exact bounds.
 var ErrInvalidDates = errors.New("could not read the submitted dates")
 
+// ErrOutsideLookback identifies custom dates outside the browser's selectable history.
+var ErrOutsideLookback = errors.New("dates outside the selectable history")
+
+// Limits describes the interval length and history selectable in the browser.
+type Limits struct {
+	// MaxRange is the longest searchable interval.
+	MaxRange time.Duration
+
+	// Lookback limits event dates relative to now. Zero leaves historical dates available.
+	Lookback time.Duration
+}
+
+// PresetLimit returns the longest rolling window allowed by both limits.
+func (l Limits) PresetLimit() time.Duration {
+	if l.Lookback > 0 {
+		return min(l.Lookback, l.MaxRange)
+	}
+	return l.MaxRange
+}
+
+// Earliest returns the UTC lookback boundary, or the zero time with no lookback.
+func (l Limits) Earliest(now time.Time) time.Time {
+	if l.Lookback > 0 {
+		return now.UTC().Add(-l.Lookback.Duration())
+	}
+	return time.Time{}
+}
+
 const (
 	quarterHour  = 15 * time.Minute
 	day          = 24 * time.Hour

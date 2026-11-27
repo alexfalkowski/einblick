@@ -9,6 +9,10 @@ Given('acknowledged logs are ready to archive') do
   prepare_searchable_logs
 end
 
+Given('acknowledged logs on two days are ready to archive') do
+  prepare_activity_archive_days
+end
+
 Given('acknowledged recent logs on the server') do
   prepare_archive_storage
   prepare_recent_filtered_logs
@@ -60,6 +64,22 @@ end
 
 When('archive objects disappear and the operator changes the query retention setting') do
   search_after_archive_expiration
+end
+
+When('the operator submits a valid new range and then a date that has aged past the cutoff') do
+  submit_new_custom_ranges
+end
+
+When('the operator opens the oldest bucket after the cutoff moves and changes its message filter') do
+  search_oldest_activity_bucket
+end
+
+When('the operator loads activity and continues to the next archived log with one query slot') do
+  page_without_spare_archive_capacity
+end
+
+When(/\Athe operator pages during a stalled (activity chart|log page) and retries activity after it finishes\z/) do |search|
+  page_while_archive_search_is_loading(search)
 end
 
 When('an eligible archive object disappears and the follow-up listing fails') do
@@ -121,6 +141,22 @@ end
 Then('one remote Parquet file should contain every acknowledged log for the day') do
   expect(@large_daily_archive_keys.size).to eq(1)
   expect(@large_daily_archive_timestamps).to eq(log_query_records(@archive_request).map(&:time_unix_nano))
+end
+
+Then('the valid range should be applied with its edited bounds') do
+  bounds = { 'start_time' => @valid_custom_start.iso8601, 'end_time' => (@valid_custom_start + 3600).iso8601 }
+  expect(@valid_custom_search).to show_custom_log_range(bounds)
+end
+
+Then('the picker should show the original cutoff and the expired search should be rejected') do
+  expect(@retention_search).to show_log_lookback(Einblick::Archive::HISTORY_RETENTION_SECONDS, @retention_query_window)
+  expect(@expired_custom_search).to show_log_view('full', 'en', 400).and show_log_outcome('outside retention', 'en')
+end
+
+Then('both views should keep the exact bucket interval after the cutoff moves') do
+  expect(@oldest_activity).to link_to_first_activity_bucket(@seven_day_page, @activity_bucket_bounds)
+  expect(@activity_bucket_search).to show_custom_log_range(@activity_bucket_bounds)
+  expect(@activity_bucket_filter).to show_custom_log_range(@activity_bucket_bounds.merge('text' => 'archived error'))
 end
 
 Then('the archive file should use bounded Parquet row groups') do
@@ -196,6 +232,28 @@ end
 Then('the Logs page should continue to the next archived log') do
   expect(@archive_next_page.code).to eq(200)
   expect(@archive_next_page).to show_selected_logs(@query_service, @expected_query_records[1, 1], @query_receipt_windows)
+end
+
+Then('the activity chart should count all matching archived logs') do
+  expect(@archive_activity).to show_activity_counts([@expected_query_records.length], @archive_next_page)
+end
+
+Then('activity should be unavailable for the archive search') do
+  expect(@archive_activity).to show_activity_error(503, 'unavailable')
+end
+
+Then(/\Athe stalled (activity chart|log page) should finish after pagination and include the archived log\z/) do |search|
+  expect(@archive_search_still_loading).to be(true)
+  if search == 'activity chart'
+    expect(@held_archive_response).to show_activity_counts([1], @held_activity_page)
+  else
+    expect(@held_archive_response.code).to eq(200)
+    expect(@held_archive_response).to show_selected_logs(@query_service, [@held_archive_record], @query_receipt_windows)
+  end
+end
+
+Then('the retried activity should count all logs matching the paged search') do
+  expect(@retried_archive_activity).to show_activity_counts([@expected_query_records.length], @archive_next_page)
 end
 
 Then('the log query should report unavailable history') do

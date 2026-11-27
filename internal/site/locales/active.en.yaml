@@ -13,6 +13,10 @@ time_range.24_hours: 24 hours
 time_range.three_days: 3 days
 time_range.seven_days: 7 days
 time_range.recent: Recent
+time_range.custom: Custom
+time_range.from: From (UTC)
+time_range.to: To (UTC)
+time_range.earliest: Earliest selectable date
 logs.event_format: 02 Jan, 15:04:05
 logs.level.debug: Debug
 logs.level.info: Info
@@ -83,6 +87,22 @@ logs.invalid_filters: Check the search filters and try again.
 logs.date_order: End time must be after start time.
 logs.date_range_too_wide: This time range exceeds the search limit.
 logs.invalid_dates: Enter a valid start and end time in UTC.
+logs.date_outside_history: Choose dates within the available search period.
+logs.activity: Log activity
+logs.activity_through: 'Chart through {{.End}} UTC'
+logs.activity_loading: Loading activity…
+logs.activity_unavailable: Log activity is unavailable.
+logs.matching_count: '{{.Count}} matching logs when activity loaded'
+logs.one_match: 1 matching log when activity loaded
+logs.activity_search: Search
+logs.activity_intervals: Browse activity intervals
+logs.activity_tick_format: 02 Jan 15:04
+logs.activity_interval: '{{.Size}}{{.Unit}} buckets'
+logs.activity_bucket: '{{.Start}} – {{.End}} UTC · {{.Count}} logs'
+logs.activity_seconds: s
+logs.activity_minutes: min
+logs.activity_hours: h
+logs.activity_days: d
 logs.cancelled: The log query was cancelled.
 logs.timed_out: The log query timed out. Try a narrower time range.
 logs.unavailable: Log storage is unavailable. Try again.

@@ -399,9 +399,25 @@ offer Recent using the full configured duration.
 Keep the duration in the address bar as `window`, for example `window=15m`.
 Reload and Auto-refresh run a fresh query ending now, including after paging.
 Accept exact `start_time` and `end_time` on direct links to show a fixed
-interval on entry. A supplied `window` takes precedence. After displaying a
-fixed interval, use the default duration for subsequent reloads. Pagination and
-investigation actions can use the exact applied bounds.
+interval on entry. A supplied `window` takes precedence. Direct links that
+supply only the absolute bounds use the default duration on subsequent
+reloads. Pagination and investigation actions can use the exact applied bounds.
+
+On Logs, place **Custom** after the available presets and show the UTC start
+and end date-and-time fields below them. **Search** applies the fields and
+other filters.
+Use positive configured R2 retention as the maximum browser lookback for new
+custom searches and the query range limit as the maximum interval length.
+Links from the picker and chart keep their absolute bounds on reload.
+
+Load **Log activity** automatically on Logs to show the event-time distribution
+for the applied interval and filters. Show the exact total above the results
+table while it describes the displayed interval. In-place paging and timed
+refreshes retain the previous chart. A chart selection starts a new search for
+the selected range. The table stays available during the activity request and
+after a failure. Automatic activity reports unavailable when an archive scan
+would take the last archive query slot. A keyboard-operable list exposes
+each activity bucket's count and exact interval link.
 
 Where a view offers Auto-refresh, default to Off and offer `5s`, `10s` and
 `15s`. Refresh the applied query in place without adding browser history or

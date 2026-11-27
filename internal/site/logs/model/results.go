@@ -6,6 +6,7 @@ import (
 
 	"github.com/alexfalkowski/einblick/internal/logs/storage"
 	"github.com/alexfalkowski/einblick/internal/site/logs/query"
+	"github.com/alexfalkowski/einblick/internal/site/timerange"
 	"github.com/alexfalkowski/go-service/v3/bytes"
 	"github.com/alexfalkowski/go-service/v3/context"
 	"github.com/alexfalkowski/go-service/v3/encoding/codec"
@@ -27,13 +28,17 @@ var severityOptions = []FilterOption{
 }
 
 // NewLogs builds the view model for a page of logs.
-func NewLogs(ctx context.Context, search query.Search, results *storage.Page, maxRange time.Duration) (*Logs, error) {
+func NewLogs(ctx context.Context, search query.Search, results *storage.Page, now time.Time, limits timerange.Limits) (*Logs, error) {
 	filters := search.Query()
+	maxRange := limits.PresetLimit()
 	windows, selectedWindow := search.Time.Presets(maxRange)
 	viewModel := &Logs{
-		QueryURL: search.ReloadURL(maxRange),
-		NextURL:  search.NextURL(results.NextPageToken),
+		QueryURL:    search.ReloadURL(maxRange),
+		ActivityURL: search.ActivityURL(),
+		NextURL:     search.NextURL(results.NextPageToken),
 		Filters: Filters{
+			Custom:          search.Custom,
+			Earliest:        limits.Earliest(now),
 			StartTime:       filters.StartTime,
 			EndTime:         filters.EndTime,
 			ServiceName:     filters.Service,

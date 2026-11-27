@@ -43,18 +43,22 @@ module Einblick
       end
 
       def query_fresh_archive(failure: false)
-        query_from_fresh_archive do
+        profile = failure ? 'publication' : 'history_retention'
+        query_from_fresh_archive(profile) do
           @floci.pause_access if failure
           query_logs
           page_through_archived_logs unless failure
         end
       end
 
-      def page_through_archived_logs
-        site = Einblick::Site::HTTP.new('http://localhost:11000')
-        first = site.submit('/logs', @query.merge('page_size' => 1), 'en')
+      def page_through_archived_logs(first = first_archived_log_page)
+        @archive_activity = site_client.open_log_activity(first, 'en')
         next_page = Nokogiri::HTML5.fragment(first.body).at_css('a.next')['hx-put']
-        @archive_next_page = site.submit(next_page, {}, 'en')
+        @archive_next_page = site_client.submit(next_page, {}, 'en')
+      end
+
+      def first_archived_log_page
+        site_client.submit('/logs', @query.merge('page_size' => 1), 'en')
       end
 
       def query_duplicate_archive_ids
@@ -86,8 +90,8 @@ module Einblick
         pending&.join
       end
 
-      def query_from_fresh_archive(&)
-        with_fresh_archive { with_server_profile('publication', &) }
+      def query_from_fresh_archive(profile = 'publication', &)
+        with_fresh_archive { with_server_profile(profile, &) }
       end
 
       def with_fresh_archive

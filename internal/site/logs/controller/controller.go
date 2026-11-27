@@ -4,6 +4,7 @@ import (
 	"github.com/alexfalkowski/einblick/internal/logs/storage"
 	"github.com/alexfalkowski/einblick/internal/site/logs/model"
 	"github.com/alexfalkowski/einblick/internal/site/logs/query"
+	"github.com/alexfalkowski/einblick/internal/site/timerange"
 	"github.com/alexfalkowski/go-service/v3/context"
 	"github.com/alexfalkowski/go-service/v3/errors"
 	"github.com/alexfalkowski/go-service/v3/net/http"
@@ -14,7 +15,7 @@ import (
 
 // NewLogs queries the log repository and prepares a model for the supplied
 // full or partial view. The error view renders localized request failures.
-func NewLogs(repo storage.Repository, maxRange time.Duration, view, errorView *mvc.View) mvc.Controller[model.Logs] {
+func NewLogs(repo storage.Repository, limits timerange.Limits, view, errorView *mvc.View) mvc.Controller[model.Logs] {
 	return func(ctx context.Context) (*mvc.View, *model.Logs, error) {
 		req, res := meta.Request(ctx), meta.Response(ctx)
 		res.Header().Set("Cache-Control", "no-store")
@@ -26,7 +27,8 @@ func NewLogs(repo storage.Repository, maxRange time.Duration, view, errorView *m
 		if err := req.ParseForm(); err != nil {
 			return errorView, nil, queryError(req, errors.Join(storage.ErrInvalidQuery, err))
 		}
-		search, err := query.Parse(req.Form, time.Now(), maxRange)
+		now := time.Now().UTC()
+		search, err := query.Parse(req.Form, now, limits)
 		if err != nil {
 			return errorView, nil, queryError(req, err)
 		}
@@ -36,7 +38,7 @@ func NewLogs(repo storage.Repository, maxRange time.Duration, view, errorView *m
 			return errorView, nil, queryError(req, err)
 		}
 
-		viewModel, err := model.NewLogs(ctx, search, result, maxRange)
+		viewModel, err := model.NewLogs(ctx, search, result, now, limits)
 		if err != nil {
 			return errorView, nil, queryError(req, err)
 		}

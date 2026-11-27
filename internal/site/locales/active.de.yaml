@@ -13,6 +13,10 @@ time_range.24_hours: 24 Stunden
 time_range.three_days: 3 Tage
 time_range.seven_days: 7 Tage
 time_range.recent: Letzte Einträge
+time_range.custom: Benutzerdefiniert
+time_range.from: Von (UTC)
+time_range.to: Bis (UTC)
+time_range.earliest: Frühestes auswählbares Datum
 logs.event_format: 02.01., 15:04:05
 logs.level.debug: Debug
 logs.level.info: Info
@@ -83,6 +87,22 @@ logs.invalid_filters: Prüfe die Suchfilter und versuche es erneut.
 logs.date_order: Das Ende muss nach dem Beginn liegen.
 logs.date_range_too_wide: Dieser Zeitraum überschreitet das Suchlimit.
 logs.invalid_dates: Gib einen gültigen Beginn und ein gültiges Ende in UTC ein.
+logs.date_outside_history: Wähle Daten innerhalb des verfügbaren Suchzeitraums.
+logs.activity: Protokollaktivität
+logs.activity_through: 'Diagramm bis {{.End}} UTC'
+logs.activity_loading: Aktivität wird geladen…
+logs.activity_unavailable: Die Protokollaktivität ist nicht verfügbar.
+logs.matching_count: '{{.Count}} passende Protokolle beim Laden der Aktivität'
+logs.one_match: 1 passendes Protokoll beim Laden der Aktivität
+logs.activity_search: Suchen
+logs.activity_intervals: Aktivitätsintervalle durchsuchen
+logs.activity_tick_format: 02.01. 15:04
+logs.activity_interval: '{{.Size}} {{.Unit}} pro Balken'
+logs.activity_bucket: '{{.Start}} – {{.End}} UTC · {{.Count}} Protokolle'
+logs.activity_seconds: s
+logs.activity_minutes: min
+logs.activity_hours: h
+logs.activity_days: T
 logs.cancelled: Die Protokollabfrage wurde abgebrochen.
 logs.timed_out: Zeitlimit der Protokollabfrage überschritten. Einen kürzeren Zeitraum wählen.
 logs.unavailable: Der Protokollspeicher ist nicht verfügbar. Erneut versuchen.

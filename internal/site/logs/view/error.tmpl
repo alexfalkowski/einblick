@@ -17,7 +17,7 @@
 {{$message := .Model.Message}}
 {{if eq .Model.Code 400}}
   {{$label = "logs.invalid_filters"}}
-  {{if or (eq $message "logs.invalid_link") (eq $message "logs.date_order") (eq $message "logs.invalid_dates") (eq $message "logs.date_range_too_wide")}}
+  {{if or (eq $message "logs.invalid_link") (eq $message "logs.date_order") (eq $message "logs.invalid_dates") (eq $message "logs.date_range_too_wide") (eq $message "logs.date_outside_history")}}
     {{$label = $message}}
   {{end}}
 {{else if eq .Model.Code 499}}{{$label = "logs.cancelled"}}

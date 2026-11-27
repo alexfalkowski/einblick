@@ -15,8 +15,8 @@ func resolveTime(form url.Values, token string, now time.Time, maxRange time.Dur
 	switch {
 	case hasWindow && hasCursor:
 		return timerange.Selection{}, storage.ErrInvalidQuery
-	case !hasWindow && (form.Has("start_utc") || form.Has("end_utc")):
-		return legacySelection(form)
+	case !hasWindow && submittedDates(form):
+		return pickerSelection(form)
 	case hasCursor && !form.Has("start_time") && !form.Has("end_time"):
 		return timerange.Selection{}, timerange.ErrInvalidDates
 	default:
@@ -24,37 +24,68 @@ func resolveTime(form url.Values, token string, now time.Time, maxRange time.Dur
 	}
 }
 
-func legacySelection(form url.Values) (timerange.Selection, error) {
-	start, err := parseLegacyBound(form, "start_time", "start_utc")
+func customSelection(form url.Values, selection timerange.Selection, now time.Time, limits timerange.Limits) (bool, error) {
+	if !strings.IsEmpty(form.Get("window")) {
+		return false, nil
+	}
+
+	if !submittedDates(form) {
+		// Chart selections, saved links and filter clearing keep the applied bounds.
+		if form.Get("custom") != "1" {
+			return false, nil
+		}
+		if !form.Has("start_time") {
+			return false, timerange.ErrInvalidDates
+		}
+		return true, nil
+	}
+
+	if keepsAppliedDates(form, selection) {
+		return true, nil
+	}
+
+	earliest := limits.Earliest(now).Truncate(time.Second.Duration())
+	if selection.StartTime.Before(earliest) || selection.EndTime.After(now) {
+		return false, timerange.ErrOutsideLookback
+	}
+	return true, nil
+}
+
+func keepsAppliedDates(form url.Values, selection timerange.Selection) bool {
+	return form.Get("custom") == "1" &&
+		selection.StartTime.Format(time.RFC3339Nano) == form.Get("start_time") &&
+		selection.EndTime.Format(time.RFC3339Nano) == form.Get("end_time")
+}
+
+func submittedDates(form url.Values) bool {
+	return form.Get("clear_message") != "1" && (form.Has("start_utc") || form.Has("end_utc"))
+}
+
+func pickerSelection(form url.Values) (timerange.Selection, error) {
+	mode := form.Get("custom")
+	if mode != "picker" && mode != "1" {
+		return timerange.Selection{}, timerange.ErrInvalidDates
+	}
+
+	start, err := parsePickerBound(form.Get("start_time"), form.Get("start_utc"))
 	if err != nil {
 		return timerange.Selection{}, errors.Join(timerange.ErrInvalidDates, err)
 	}
-	end, err := parseLegacyBound(form, "end_time", "end_utc")
+
+	end, err := parsePickerBound(form.Get("end_time"), form.Get("end_utc"))
 	if err != nil {
 		return timerange.Selection{}, errors.Join(timerange.ErrInvalidDates, err)
 	}
+
 	return timerange.Selection{StartTime: start, EndTime: end}, nil
 }
 
-func parseLegacyBound(form url.Values, exactKey, pickerKey string) (time.Time, error) {
-	exactText := form.Get(exactKey)
-	hasExact := !strings.IsEmpty(exactText)
-	hasPicker := form.Has(pickerKey)
-	if !hasExact && !hasPicker {
-		return time.Time{}, storage.ErrInvalidQuery
-	}
-
+func parsePickerBound(exactText, pickerText string) (time.Time, error) {
 	var exactTime time.Time
-	if hasExact {
-		if err := exactTime.UnmarshalText([]byte(exactText)); err != nil {
-			return time.Time{}, err
-		}
-	}
-	if !hasPicker {
-		return exactTime.UTC(), nil
+	if err := exactTime.UnmarshalText([]byte(exactText)); err != nil {
+		return time.Time{}, err
 	}
 
-	pickerText := form.Get(pickerKey)
 	// A native datetime-local control omits seconds when they are zero.
 	if len(pickerText) == len("2006-01-02T15:04") {
 		pickerText += ":00"

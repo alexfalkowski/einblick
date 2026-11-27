@@ -29,6 +29,8 @@ func invalidQueryLabel(req *http.Request, err error) string {
 	hasDates := form.Has("start_utc") || form.Has("end_utc")
 	isLink := !strings.IsEmpty(form.Get("page_token")) || (req.Method == http.MethodGet && !hasDates)
 	switch {
+	case errors.Is(err, timerange.ErrOutsideLookback):
+		return "logs.date_outside_history"
 	case isLink:
 		return "logs.invalid_link"
 	case errors.Is(err, storage.ErrTimeOrder):

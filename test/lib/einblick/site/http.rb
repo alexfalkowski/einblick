@@ -31,10 +31,10 @@ module Einblick
         get(link['href'], options(languages))
       end
 
-      def submit_log_form(page, languages, submitter: nil, layout: 'partial')
+      def submit_log_form(page, languages, submitter: nil, layout: 'partial', edits: {})
         document = Nokogiri::HTML5(page.body)
         form = document.at_css('#log-filters')
-        filters = log_form_filters(document, form)
+        filters = log_form_filters(document, form).merge(edits)
         button = log_form_button(document, form, submitter) if submitter
         filters[button['name']] = button['value'] if button&.[]('name')
         return submit_get_form(form, button, filters, languages) if layout == 'full'
@@ -50,6 +50,19 @@ module Einblick
       def open_log_query(page, languages)
         results = Nokogiri::HTML5(page.body).at_css('#results')
         get(results['data-query-url'], options(languages))
+      end
+
+      def open_log_activity(page, languages)
+        results = Nokogiri::HTML5(page.body).at_css('#results')
+        get(results['data-activity-url'], options(languages))
+      end
+
+      def oldest_activity_bucket(page, languages)
+        activity = open_log_activity(page, languages)
+        document = Nokogiri::HTML5.fragment(activity.body)
+        bar = document.at_css('.activity-bar')
+        bounds = { 'start_time' => bar['data-start'], 'end_time' => bar['data-end'] }
+        [activity, document.at_css('.activity-intervals a')['href'], bounds]
       end
 
       private

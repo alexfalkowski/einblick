@@ -15,6 +15,7 @@ import (
 	"github.com/alexfalkowski/go-service/v3/errors"
 	"github.com/alexfalkowski/go-service/v3/strings"
 	"github.com/alexfalkowski/go-service/v3/time"
+	"github.com/alexfalkowski/go-sync"
 	logs "go.opentelemetry.io/proto/otlp/logs/v1"
 )
 
@@ -41,9 +42,46 @@ type cursor struct {
 
 var maxPageTokenLength = cursorTokenLimit()
 
+// logSearch runs a validated query while its source's admission slot is held.
+type logSearch func(ctx context.Context, query Query) error
+
+type searchKind uint8
+
+const (
+	pageSearch searchKind = iota
+	activitySearch
+)
+
 // List executes a fixed, bounded query. It propagates cancellation through queue
 // waits and SQL execution. No partial page is returned.
 func (r *repository) List(ctx context.Context, query Query) (*Page, error) {
+	var page *Page
+	err := r.search(ctx, query, pageSearch, func(ctx context.Context, query Query) error {
+		position, err := queryCursor(query)
+		if err != nil {
+			return err
+		}
+
+		if includesHistoricalRange(ctx, query.StartTime) {
+			query.EndTime = archivePageEnd(query, *position)
+		}
+
+		args := append(filterArgs(query),
+			position.BeforeNS, position.BeforeNS, position.BeforeID, position.BeforeID, position.BeforeSource, query.PageSize+1,
+		)
+
+		return r.queryLogs(ctx, query, listLogsQuery, args, func(rows *sql.Rows) error {
+			page, err = scanPage(ctx, rows, query.PageSize, position)
+			return err
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return page, nil
+}
+
+func (r *repository) search(ctx context.Context, query Query, kind searchKind, run logSearch) error {
 	ctx, cancel := context.WithTimeout(ctx, r.config.Timeout)
 	defer cancel()
 
@@ -53,57 +91,85 @@ func (r *repository) List(ctx context.Context, query Query) (*Page, error) {
 	}
 
 	if err := r.validateQuery(query); err != nil {
-		return nil, err
+		return err
 	}
 
-	// Use the deadline so ranges read locally stay local across midnight UTC.
-	deadline, _ := ctx.Deadline()
-	mayIncludeEvictions := query.StartTime.Before(archive.LocalWindowStart(deadline))
-	admission := r.localQueries
-	if mayIncludeEvictions && r.store != nil {
-		admission = r.archiveQueries
-	}
-	if err := admission.Acquire(ctx, 1); err != nil {
-		return nil, err
+	admission, err := r.acquireSearch(ctx, query.StartTime, kind)
+	if err != nil {
+		return err
 	}
 	defer admission.Release(1)
 
-	position, err := queryCursor(query)
-	if err != nil {
-		return nil, err
-	}
-
-	page, err := r.readPage(ctx, query, position, mayIncludeEvictions)
+	err = run(ctx, query)
 	if ctxErr := ctx.Err(); ctxErr != nil {
-		err = ctxErr
+		return ctxErr
 	}
-	if err != nil {
-		return nil, err
-	}
-
-	return page, nil
+	return err
 }
 
-func (r *repository) readPage(ctx context.Context, query Query, position *cursor, mayIncludeEvictions bool) (*Page, error) {
-	if mayIncludeEvictions {
-		query.EndTime = archivePageEnd(query, *position)
+func (r *repository) acquireSearch(ctx context.Context, start time.Time, kind searchKind) (*sync.Semaphore, error) {
+	if r.store == nil || !includesHistoricalRange(ctx, start) {
+		return r.localQueries, r.localQueries.Acquire(ctx, 1)
+	}
+	if kind == pageSearch {
+		return r.archiveQueries, r.archiveQueries.Acquire(ctx, 1)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	// Check spare capacity atomically, then return the page slot before activity starts.
+	const activitySlot, pageSlot = 1, 1
+	if !r.archiveQueries.TryAcquire(activitySlot + pageSlot) {
+		return nil, errors.New("logs: no spare archive slot for activity")
+	}
+	defer r.archiveQueries.Release(pageSlot)
+
+	return r.archiveQueries, nil
+}
+
+func includesHistoricalRange(ctx context.Context, startTime time.Time) bool {
+	// Use the deadline so ranges read locally stay local across midnight UTC.
+	deadline, _ := ctx.Deadline()
+	return startTime.Before(archive.LocalWindowStart(deadline))
+}
+
+func (r *repository) queryLogs(ctx context.Context, query Query, statement string, args []any, scan func(*sql.Rows) error) error {
+	runQuery := func(queryRows sqlQuery, evictedLocations, archiveLocations []string) error {
+		archived := strings.Empty
+		queryArgs := args
+		if len(archiveLocations) > 0 {
+			archived = archivedLogsQuery
+			queryArgs = append([]any{evictedLocations, archiveLocations}, args...)
+		}
+
+		querySQL := strings.Concat(
+			"WITH selected_logs AS (", localLogsQuery, archived, "), filtered_logs AS (", filterLogsQuery, ") ", statement,
+		)
+		rows, err := queryRows(ctx, querySQL, queryArgs...)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+
+		return scan(rows)
+	}
+
+	if includesHistoricalRange(ctx, query.StartTime) {
 		if r.store != nil {
-			return r.readHistory(ctx, query, *position)
+			return r.readHistory(ctx, query, runQuery)
 		}
 		if err := r.checkLocalHistory(ctx, query); err != nil {
-			return nil, err
+			return err
 		}
 	}
 
-	rows, err := r.db.QueryContext(ctx, logPageSQL(strings.Empty), pageArgs(query, *position)...)
-	if err != nil {
-		return nil, err
-	}
-	return scanPage(ctx, rows, query.PageSize, position)
+	return runQuery(r.db.QueryContext, nil, nil)
 }
 
 func (r *repository) checkLocalHistory(ctx context.Context, query Query) error {
 	startDay, endDay := archiveDays(query)
+
 	var evicted bool
 	if err := r.db.QueryRowContext(ctx, archiveEvictionsQuery, startDay, endDay).Scan(&evicted); err != nil {
 		return err
@@ -114,7 +180,7 @@ func (r *repository) checkLocalHistory(ctx context.Context, query Query) error {
 	return nil
 }
 
-func pageArgs(query Query, position cursor) []any {
+func filterArgs(query Query) []any {
 	trace, _ := hex.DecodeString(query.TraceID)
 
 	var severity string
@@ -126,15 +192,12 @@ func pageArgs(query Query, position cursor) []any {
 
 	return []any{
 		unixNanoseconds(query.StartTime).String(), unixNanoseconds(query.EndTime.Add(-time.Nanosecond.Duration())).String(),
-		position.BeforeNS, position.BeforeNS, position.BeforeID, position.BeforeID, position.BeforeSource,
 		query.Service, query.Service, severity, severity, query.Text, query.Text,
-		query.TraceID, base64.StdEncoding.EncodeToString(trace), query.PageSize + 1,
+		query.TraceID, base64.StdEncoding.EncodeToString(trace),
 	}
 }
 
 func scanPage(ctx context.Context, rows *sql.Rows, size int, position *cursor) (*Page, error) {
-	defer rows.Close()
-
 	page := &Page{Logs: make([]*Log, 0, size)}
 	for rows.Next() {
 		var log Log

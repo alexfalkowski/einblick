@@ -49,6 +49,24 @@ module Einblick
         with_server_profile(profile, &)
       end
 
+      def with_retention_profile(&)
+        with_floci { with_eviction_profile('history_retention', &) }
+      end
+
+      def page_without_spare_archive_capacity
+        query_from_fresh_archive { page_through_archived_logs }
+      end
+
+      def search_oldest_activity_bucket
+        with_retention_profile do
+          @activity_bucket_search = open_activity_bucket_after_cutoff
+          filters = { 'text' => 'archived error' }
+          @activity_bucket_filter = site_client.submit_log_form(
+            @activity_bucket_search, 'en', submitter: 'Search', layout: 'full', edits: filters
+          )
+        end
+      end
+
       def wait_for_archive_evictions(*keys)
         ids = keys.map { |key| File.basename(key, '.parquet') }
         wait(timeout: 10).for do
@@ -65,6 +83,13 @@ module Einblick
       end
 
       private
+
+      def open_activity_bucket_after_cutoff
+        @seven_day_page = site_client.open('/logs?window=7d', 'en')
+        @oldest_activity, link, @activity_bucket_bounds = site_client.oldest_activity_bucket(@seven_day_page, 'en')
+        wait_until_history_cutoff_passes(Time.iso8601(@activity_bucket_bounds.fetch('start_time')))
+        site_client.open(link, 'en')
+      end
 
       def staged_archive_key(batch_id)
         file = archive_files.find { |path| File.basename(path, '.parquet') == batch_id }

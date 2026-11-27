@@ -1,5 +1,6 @@
 {{define "content"}}
 {{$exactTime := "2006-01-02T15:04:05.999999999Z07:00"}}
+{{$pickerTime := "2006-01-02T15:04:05"}}
 <div class="console">
   <aside class="sidebar">
     <a class="brand" href="/logs">Einblick</a>
@@ -26,21 +27,35 @@
       <input id="start-time" type="hidden" name="start_time" value="{{.Model.Filters.StartTime.Format $exactTime}}">
       <input id="end-time" type="hidden" name="end_time" value="{{.Model.Filters.EndTime.Format $exactTime}}">
       <input id="search-window" type="hidden" name="search_window" value="{{.Model.Filters.RecentWindow}}">
+      <input id="custom-mode" type="hidden" name="custom" value="{{if .Model.Filters.Custom}}1{{else}}picker{{end}}"{{if not .Model.Filters.Custom}} disabled{{end}}>
       <!-- Enter uses the first submit control, so give it the same value as Search. -->
       <input type="submit" name="window" value="{{.Model.Filters.RecentWindow}}" data-search-submit hidden>
       <div class="filters">
         <span id="time-range-label">{{.Localizer.Text "logs.time_range"}}</span>
         <div class="time-presets" role="group" aria-labelledby="time-range-label">
           {{range .Model.Filters.Windows}}
-          <button name="window" value="{{.Value}}" type="submit" aria-pressed="{{eq .Value $.Model.Filters.SelectedWindow}}">{{$.Localizer.Text .Label}}</button>
+          <button name="window" value="{{.Value}}" type="submit" formnovalidate aria-pressed="{{eq .Value $.Model.Filters.SelectedWindow}}">{{$.Localizer.Text .Label}}</button>
           {{end}}
-          <span id="current-range"{{if .Model.Filters.SelectedWindow}} hidden{{end}}>{{.Localizer.Text "logs.current_range"}}</span>
+          <button id="custom-range" type="button" aria-controls="custom-dates" aria-expanded="{{.Model.Filters.Custom}}"
+                  aria-pressed="{{.Model.Filters.Custom}}">{{.Localizer.Text "time_range.custom"}}</button>
+          <span id="current-range"{{if or .Model.Filters.SelectedWindow .Model.Filters.Custom}} hidden{{end}}>{{.Localizer.Text "logs.current_range"}}</span>
+        </div>
+        <div id="custom-dates" class="custom-dates"{{if not .Model.Filters.Custom}} hidden{{end}}>
+          <input id="start-utc" class="input input-sm" type="datetime-local" name="start_utc" step="1" required
+                 aria-label="{{.Localizer.Text "time_range.from"}}"
+                 value="{{.Model.Filters.StartTime.Format $pickerTime}}"{{if not .Model.Filters.Custom}} disabled{{end}}>
+          <input id="end-utc" class="input input-sm" type="datetime-local" name="end_utc" step="1" required
+                 aria-label="{{.Localizer.Text "time_range.to"}}"
+                 value="{{.Model.Filters.EndTime.Format $pickerTime}}"{{if not .Model.Filters.Custom}} disabled{{end}}>
+          <p id="earliest-date"{{if .Model.Filters.Earliest.IsZero}} hidden{{end}}>
+            {{.Localizer.Text "time_range.earliest"}} <time{{if not .Model.Filters.Earliest.IsZero}} datetime="{{.Model.Filters.Earliest.Format $exactTime}}"{{end}}>{{if not .Model.Filters.Earliest.IsZero}}{{.Model.Filters.Earliest.Format "2006-01-02 15:04:05"}}{{end}}</time>
+          </p>
         </div>
         <label for="text">{{.Localizer.Text "logs.text"}}</label>
         <div class="message-field">
           <input id="text" class="input input-sm" name="text" type="text" inputmode="search" enterkeyhint="search"
                  value="{{.Model.Filters.MessageText}}" spellcheck="false">
-          <button id="clear-message" type="submit" name="clear_message" value="1"
+          <button id="clear-message" type="submit" name="clear_message" value="1" formnovalidate
                   aria-label="{{.Localizer.Text "logs.clear_search"}}"{{if not .Model.Filters.MessageText}} hidden{{end}}>×</button>
         </div>
         <label for="severity">{{.Localizer.Text "logs.severity"}}</label>
@@ -70,7 +85,18 @@
       <p id="query-failure-message" role="alert"></p>
       <button id="retry-query" type="button" class="btn btn-outline btn-sm">{{.Localizer.Text "logs.retry"}}</button>
     </div>
+    <section id="log-activity" class="log-activity" aria-labelledby="activity-heading" hidden
+             data-loading="{{.Localizer.Text "logs.activity_loading"}}"
+             data-unavailable="{{.Localizer.Text "logs.activity_unavailable"}}">
+      <div class="activity-heading">
+        <h2 id="activity-heading">{{.Localizer.Text "logs.activity"}} <span id="activity-interval" class="activity-interval"></span></h2>
+        <p id="activity-snapshot" hidden></p>
+      </div>
+      <p id="activity-status" role="status" hidden></p>
+      <div id="activity-content" aria-live="polite"></div>
+    </section>
     <div aria-live="polite">
+      <p id="log-result-total" class="log-result-total" hidden></p>
       {{template "results" .}}
     </div>
   </section>
@@ -82,8 +108,11 @@
 {{$eventFormat := .Localizer.Text "logs.event_format"}}
 <section id="results" lang="{{.Localizer.Tag}}" aria-label="{{.Localizer.Text "logs.results"}}"
          data-query-url="{{.Model.QueryURL}}"
+         data-activity-url="{{.Model.ActivityURL}}"
          data-start-time="{{.Model.Filters.StartTime.Format $exactTime}}"
          data-end-time="{{.Model.Filters.EndTime.Format $exactTime}}"
+         data-custom="{{.Model.Filters.Custom}}"
+         data-earliest="{{if not .Model.Filters.Earliest.IsZero}}{{.Model.Filters.Earliest.Format $exactTime}}{{end}}"
          data-window="{{.Model.Filters.SelectedWindow}}"
          data-recent-window="{{.Model.Filters.RecentWindow}}">
   {{if .Model.Rows}}
@@ -140,7 +169,7 @@
   <div class="empty-state">
     {{if .Model.Filters.MessageText}}
     <h2>{{.Localizer.Message "logs.no_message_matches" (dict "Term" .Model.Filters.MessageText)}}</h2>
-    <button class="btn btn-outline btn-sm" type="submit" form="log-filters" name="clear_message" value="1">{{.Localizer.Text "logs.clear_search"}}</button>
+    <button class="btn btn-outline btn-sm" type="submit" form="log-filters" name="clear_message" value="1" formnovalidate>{{.Localizer.Text "logs.clear_search"}}</button>
     {{else}}
     <h2>{{.Localizer.Text "logs.empty"}}</h2>
     <p>{{.Localizer.Text "logs.empty_hint"}}</p>

@@ -24,6 +24,9 @@ type Repository interface {
 	// New arrivals behind the cursor can enter later pages; refresh to see those ahead.
 	// Invalid input returns ErrInvalidQuery; cancellation/deadline errors remain inspectable.
 	List(ctx context.Context, query Query) (*Page, error)
+
+	// Activity counts all matching logs across the selected interval in one read.
+	Activity(ctx context.Context, query Query) (*Activity, error)
 }
 
 // NewRepository provides log persistence and queries over the service-owned database.
