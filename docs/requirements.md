@@ -307,7 +307,7 @@ Initial archive compaction and a remote manifest service are unnecessary for an 
 ### 8.6 Embedded frontend
 
 - **WEB-001 — Existing MVC pattern.** Use go-service MVC, embedded Go templates/assets, and the web service's full-page/partial-view conventions.
-- **WEB-002 — Small frontend.** Use a lightweight browser stack with built-in charts. Load pinned htmx and the daisyUI component styles from jsDelivr with Subresource Integrity, following Web. Use the Einblick theme for shared controls. Full-page queries work when the CDN is unavailable. uPlot is proposed for charts. Include the licenses for any third-party assets shipped with the service.
+- **WEB-002 — Small frontend.** Use a lightweight browser stack with built-in charts. Load pinned htmx and the daisyUI component styles from jsDelivr with Subresource Integrity, following Web. Use the Einblick theme for shared controls, with light as the default and dark mode following the browser’s color scheme preference. Full-page queries work when the CDN is unavailable. uPlot is proposed for charts. Include the licenses for any third-party assets shipped with the service.
 - **WEB-003 — Connected investigation.** Provide navigation from a log's trace ID to the trace and from a trace to related logs. Preserve useful investigation context in shareable URLs and return navigation.
 - **WEB-004 — File-based credentials.** Reserved; site authentication is outside v1 under WEB-012.
 - **WEB-005 — Password verification.** Reserved; site authentication is outside v1 under WEB-012.

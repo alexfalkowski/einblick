@@ -5,6 +5,9 @@
 ## 🖥️ Investigate logs in the browser
 
 Open `http://localhost:11000/logs` with the development configuration.
+The page follows your device or browser’s light or dark appearance setting.
+Change that setting to switch themes while the page is open.
+
 The page opens on the last hour, capped by the configured query range and
 archive lookback. Use the exact service name, **Search messages**, a hexadecimal
 **Trace ID**, or severity to narrow the results. An empty service filter includes
