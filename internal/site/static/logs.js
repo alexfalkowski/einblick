@@ -554,9 +554,8 @@ function setupLogSearch(form) {
     failedQuery = { method, action, values: Object.fromEntries(body), paging, refreshing, pickerVersion };
     progress.textContent = "";
     failure.hidden = false;
-    const description = `${message} · ${failure.dataset.previous}`;
-    if (failureMessage.textContent !== description) {
-      failureMessage.textContent = description;
+    if (failureMessage.textContent !== message) {
+      failureMessage.textContent = message;
     }
   }
 
@@ -665,9 +664,9 @@ function setupLogSearch(form) {
       return;
     }
 
-    const fragment = hasFragment ? new DOMParser().parseFromString(text, "text/html") : undefined;
-    const message = fragment?.querySelector(".query-alert[role=alert] > p")?.textContent;
     const reason = { 499: "cancelled", 504: "timeout" }[response.status];
+    const fragment = hasFragment && reason !== "timeout" ? new DOMParser().parseFromString(text, "text/html") : undefined;
+    const message = fragment?.querySelector(".query-alert[role=alert] > p")?.textContent;
     showFailure(message || failure.dataset[reason ?? "request"], ctx, request);
   }
 
