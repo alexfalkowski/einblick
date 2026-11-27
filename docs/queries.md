@@ -15,7 +15,7 @@ choice matches one exact level (Debug, Info, Warn, Error, or Fatal), while
 | --- | --- |
 | Search up to now | Choose a time preset. To apply filter edits, select **Search** or press Enter. A recent window advances to now each time you search or reload its URL. |
 | Search between dates | Select **Custom**, enter the start and end dates and times in UTC, then use **Search** beside **Reset**. Share the address bar link to reopen the same interval on page one. |
-| Explore a narrower range | **Log activity** labels the bucket size and groups matching logs on UTC time boundaries. Hover over a bar for its time range and count. Drag across the bars to search a narrower interval, or open **Browse activity intervals** and follow a link to search one bucket's exact range. |
+| Explore a narrower range | **Log activity** labels the bucket size and groups matching logs on UTC time boundaries. Hover over a bar for its rounded time range and count. Drag across the bars to search the selected interval. |
 | Automatically refresh | Select **5s**, **10s**, or **15s** under **Auto-refresh**. Each refresh uses the applied filters and the rolling window from the address bar. Updates pause while the custom dates or log details are open, or until a failed manual search is replaced by a successful one. Choose **Off** to stop automatic requests. The control starts at **Off** on a full page load. |
 | Keep the exact interval | Choose **Next page**, clear the message search with **×** or **Clear search**, or search from an absolute-range bookmark. Clearing or paging retains the preset for the next **Search**. |
 | Share or revisit a query | Copy the address bar URL, such as `/logs?window=15m`. Reloading or sharing it opens the first page for that duration up to now, even when you're viewing a later page. Use Back for the previous query or **Reset** to clear the filters and return to the latest window. |
@@ -26,7 +26,8 @@ The page offers **15 min**, **1 hour**, **24 hours**, **3 days**, and **7 days**
 as allowed by the query range and configured R2 retention. Below 15 minutes,
 **Recent** uses the allowed duration. A positive R2 retention duration sets the
 maximum event-time lookback for new dates submitted from the picker. The picker
-shows that cutoff. Chart selections and saved links keep their exact dates as
+shows the lookback and gives the current cutoff if a start date is rejected
+during an in-page search. Chart selections and saved links keep their exact dates as
 the cutoff moves, subject to available history. Change filters and select
 **Search** to reuse the applied dates.
 R2 itself expires archive objects by upload age, so the cutoff can exclude
@@ -45,9 +46,9 @@ and timed refreshes keep the chart from your last
 search. When a timed refresh moves the table to a new interval, the chart
 header shows where its range ends and the previous total is hidden. An
 automatic activity query uses spare archive capacity, leaving an archive slot
-for a log search or page. With `queries.concurrency: 1`, activity is unavailable
-for archive-inclusive searches. The table remains usable if activity is
-unavailable.
+for a log search or page. If the archive is busy or the chart times out,
+**Retry** reloads activity for the displayed search. The table remains usable
+while the chart loads.
 
 The Logs page chooses where to search based on the selected time range.
 Recent ranges covered by the current database volume can load during an R2
@@ -66,7 +67,8 @@ Use the API for the original typed OTLP fields.
 
 While **Loading logs…** is visible, you can edit filters and submit after the
 query finishes. If htmx is unavailable, searches and pagination open full pages.
-For no matches, try a longer preset or clear a filter. If a saved link fails,
+For no matches, try a longer preset or choose **Clear filters** to keep the
+same dates and remove the log filters. If a saved link fails,
 choose **Open Logs**. When offered after a network or gateway error, **Try again**
 resends the same inputs. A transport timeout appears in in-place updates and can
 return an empty HTTP 504 on direct navigation.

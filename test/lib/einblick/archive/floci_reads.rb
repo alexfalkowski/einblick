@@ -40,8 +40,8 @@ module Einblick
         @archive_read_gates[key] = Queue.new
       end
 
-      def archive_read_waiting?(key)
-        @archive_read_gates&.fetch(key, nil)&.num_waiting.to_i.positive?
+      def archive_read_waiting?(key, minimum: 1)
+        @archive_read_gates&.fetch(key, nil)&.num_waiting.to_i >= minimum
       end
 
       def release_archive_read(key = nil)

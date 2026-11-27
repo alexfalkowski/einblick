@@ -23,15 +23,20 @@ module Einblick
       end
 
       def submit_aged_custom_range
-        label = Nokogiri::HTML5(@retention_search.body).at_css('#earliest-date time')
-        start = Time.iso8601(label['datetime']).floor + 1
+        start = @retention_query_window.end.floor - HISTORY_RETENTION_SECONDS + 1
         wait_until_history_cutoff_passes(start)
-        submit_custom_picker_range(start)
+        @expired_custom_start = start
+        submitted_at = Time.now.utc
+        response = submit_custom_picker_range(start, layout: 'partial')
+        earliest_cutoff = (submitted_at - HISTORY_RETENTION_SECONDS).floor
+        latest_cutoff = (Time.now.utc - HISTORY_RETENTION_SECONDS).floor
+        @expired_cutoff_window = earliest_cutoff..latest_cutoff
+        response
       end
 
-      def submit_custom_picker_range(start)
+      def submit_custom_picker_range(start, layout: 'full')
         dates = { 'start_utc' => start.strftime('%FT%T'), 'end_utc' => (start + 3600).strftime('%FT%T') }
-        site_client.submit_log_form(@retention_search, 'en', submitter: 'Search', layout: 'full', edits: dates)
+        site_client.submit_log_form(@retention_search, 'en', submitter: 'Search', layout:, edits: dates)
       end
 
       def wait_until_history_cutoff_passes(start)

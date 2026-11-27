@@ -5,9 +5,10 @@
 {{$first := index .Model.Ticks 0}}
 {{$lastIndex := sub (len .Model.Ticks) 1}}
 {{$last := index .Model.Ticks $lastIndex}}
-{{$tooltipTime := printf "%s.999999999" (.Localizer.Text "logs.event_format")}}
-{{if eq ($first.Time.Format "2006-01-02") ($last.Time.Format "2006-01-02")}}
-  {{$tooltipTime = "15:04:05.999999999"}}
+{{$precision := .Model.TooltipPrecision.Duration}}
+{{$tooltipTime := $axisTime}}
+{{if eq (($first.Time.Round $precision).Format "2006-01-02") (($last.Time.Round $precision).Format "2006-01-02")}}
+  {{$tooltipTime = .Model.TooltipFormat}}
 {{end}}
 {{$totalLabel := .Localizer.Message "logs.matching_count" (dict "Count" .Model.Total)}}
 {{if eq .Model.Total 1}}{{$totalLabel = .Localizer.Text "logs.one_match"}}{{end}}
@@ -17,8 +18,8 @@
   <div class="activity-plot" aria-hidden="true">
     <div class="activity-bars">
       {{range .Model.Bars}}
-      {{$start := .StartTime.Format $tooltipTime}}
-      {{$end := .EndTime.Format $tooltipTime}}
+      {{$start := (.StartTime.Round $precision).Format $tooltipTime}}
+      {{$end := (.EndTime.Round $precision).Format $tooltipTime}}
       <div class="activity-bar" data-start="{{.StartTime.Format $exactTime}}" data-end="{{.EndTime.Format $exactTime}}"
            data-start-label="{{$start}}" data-end-label="{{$end}}" data-count="{{.Count}}" style="--bar-height: {{.Height}}%"
            data-summary="{{$.Localizer.Message "logs.activity_bucket" (dict "Start" $start "End" $end "Count" .Count)}}">
@@ -34,14 +35,6 @@
          datetime="{{$tick.Time.Format $exactTime}}">{{$tick.Time.Format $axisTime}}{{if eq $index $lastIndex}} UTC{{end}}</time>
     {{end}}
   </div>
-  <details class="activity-intervals">
-    <summary>{{.Localizer.Text "logs.activity_intervals"}}</summary>
-    <ul>
-      {{range .Model.Bars}}
-      <li><a href="{{.SearchURL}}">{{$.Localizer.Message "logs.activity_bucket" (dict "Start" (.StartTime.Format $exactTime) "End" (.EndTime.Format $exactTime) "Count" .Count)}}</a></li>
-      {{end}}
-    </ul>
-  </details>
 </div>
 {{end}}
 {{end}}

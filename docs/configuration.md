@@ -184,16 +184,16 @@ queries:
   max_results: 100
   max_range: 168h
   timeout: 30s
-  concurrency: 1
 ```
 
 `max_results` bounds each page and supplies its size when omitted or zero.
 It must be positive and leave room for the extra row used to detect another
 page. `max_range` is the largest selected event-time interval. `timeout`
-covers queue waits and database work. `concurrency` bounds active queries
-separately for local-only and archive-inclusive searches. When both scopes are
-active, up to twice that many queries can execute on the shared DuckDB engine.
-Durations and concurrency must be positive.
+covers queue waits and database work. Both durations must be positive. Einblick
+allows one active local log query and two active archive queries on the
+shared DuckDB engine. Remove `queries.concurrency` from existing configuration
+before starting this version. Restore the previous positive value if rolling
+back to v1.33.0.
 
 These are development tuning values, not measured production capacity. The
 development HTTP timeout is shorter than the query budget and can end a request

@@ -8,9 +8,9 @@ module LogView
   LABELS = {
     'en' => {
       title: 'Logs · Einblick', heading: 'Logs', service: 'Service', submit: 'Search', reset: 'Reset', loading: 'Loading logs…',
-      results: 'Log query results', message: 'Message', empty: 'No logs found',
+      results: 'Log query results', message: 'Message', empty: 'No matches',
       unavailable: 'Log storage is unavailable',
-      empty_hint: 'Try a wider time range or clear a filter.', structured: 'Structured message', no_message: 'No message',
+      clear_filters: 'Clear filters', structured: 'Structured message', no_message: 'No message',
       timing: 'Timing and IDs', search: 'Search messages', time_range: 'Time range', retry: 'Try again',
       'broken link': 'This search link couldn’t be opened.', open_logs: 'Open Logs',
       related_logs: 'Find related logs', details: 'Log details', close_details: 'Close details',
@@ -18,12 +18,12 @@ module LogView
       custom: 'Custom', activity: 'Log activity', activity_interval: '1s buckets',
       'dates out of order': 'End time must be after start time.', 'wide date range': 'This time range exceeds the search limit.',
       'invalid dates': 'Enter a valid start and end time in UTC.', 'invalid filter': 'Check the search filters and try again.',
-      'outside retention': 'Choose dates within the available search period.'
+      'outside retention': 'Choose a more recent start date.'
     },
     'de' => {
       title: 'Protokolle · Einblick', heading: 'Protokolle', service: 'Dienst', submit: 'Suchen', reset: 'Zurücksetzen',
       loading: 'Protokolle werden geladen …', results: 'Ergebnisse der Protokollabfrage', message: 'Meldung',
-      empty: 'Keine Protokolle gefunden', empty_hint: 'Wähle einen größeren Zeitraum oder entferne einen Filter.',
+      empty: 'Keine Treffer', clear_filters: 'Filter löschen',
       unavailable: 'Der Protokollspeicher ist nicht verfügbar', structured: 'Strukturierte Meldung',
       no_message: 'Keine Meldung', timing: 'Zeitangaben und IDs',
       search: 'Meldungen durchsuchen', time_range: 'Zeitraum', retry: 'Erneut versuchen',
@@ -35,7 +35,7 @@ module LogView
     'es' => {
       title: 'Registros · Einblick', heading: 'Registros', service: 'Servicio', submit: 'Buscar', reset: 'Restablecer',
       loading: 'Cargando registros…', results: 'Resultados de la consulta de registros', message: 'Mensaje',
-      empty: 'No se encontraron registros', empty_hint: 'Amplía el intervalo o quita un filtro.',
+      empty: 'Sin coincidencias', clear_filters: 'Quitar filtros',
       timeout: 'La consulta de registros agotó el tiempo de espera', structured: 'Mensaje estructurado',
       no_message: 'Sin mensaje', timing: 'Tiempos e identificadores',
       search: 'Buscar mensajes', time_range: 'Intervalo', retry: 'Volver a intentar',
@@ -316,14 +316,14 @@ RSpec::Matchers.define :show_message_match do |term|
   end
 end
 
-RSpec::Matchers.define :show_empty_message_search do |term|
+RSpec::Matchers.define :show_empty_message_search do
   match(notify_expectation_failures: true) do |response|
     expect(response.code).to eq(200)
     document = Nokogiri::HTML5(response.body)
     empty = document.at_css('#results .empty-state')
-    expect(empty.at_css('h2').text).to eq("No messages match “#{term}”")
+    expect(empty.at_css('h2').text).to eq('No matches')
     expect(empty.css('img')).to be_empty
-    expect(empty.at_css('button[form=log-filters][name=clear_message]').text).to eq('Clear search')
+    expect(empty.at_css('a[href]').text).to eq('Clear filters')
     expect(document.at_css('#clear-message:not([hidden])')['aria-label']).to eq('Clear search')
   end
 end
@@ -409,7 +409,7 @@ RSpec::Matchers.define :show_log_outcome do |outcome, language|
     expect(results.css('time')).to be_empty
     if outcome == 'empty'
       expect(results.at_css('.empty-state h2').text).to eq(labels.fetch(:empty))
-      expect(results.at_css('.empty-state p').text).to eq(labels.fetch(:empty_hint))
+      expect(results.at_css('.empty-state a[href]').text).to eq(labels.fetch(:clear_filters))
     else
       expect(results).to show_log_alert(outcome, labels, document.at_css('main'))
     end
@@ -439,7 +439,7 @@ RSpec::Matchers.define :show_time_and_severity_controls do
     expect(document.css('#custom-dates[hidden] input[type=datetime-local][disabled]').length).to eq(2)
     expect(document.css('#log-filters .actions button[type=submit]').map(&:text)).to eq(['Search'])
     expect(document.at_css('#results')['data-activity-url']).to start_with('/logs/activity?')
-    expect(document.css('#log-activity button')).to be_empty
+    expect(document.at_css('#log-activity #retry-activity[hidden]').text).to eq('Retry')
     expect(document.at_css('#activity-heading > #activity-interval').text).to be_empty
     expect(document.at_css('#log-result-total[hidden] + #results')).not_to be_nil
     expect(document.css('#severity option').map(&:text)).to eq(['All severities', 'Debug', 'Info', 'Warn', 'Error', 'Fatal'])
@@ -557,8 +557,7 @@ RSpec::Matchers.define :show_activity_counts do |counts, page|
   match(notify_expectation_failures: true) do |response|
     expect(response.code).to eq(200)
     doc = Nokogiri::HTML5.fragment(response.body)
-    matches = counts.sum == 1 ? '1 matching log' : "#{counts.sum} matching logs"
-    total_label = "#{matches} when activity loaded"
+    total_label = counts.sum == 1 ? '1 match' : "#{counts.sum} matches"
     summary = doc.at_css('.activity-summary')
     expect(summary['data-total-label']).to eq(total_label)
     expect(summary.text).not_to include(total_label)
@@ -572,15 +571,11 @@ RSpec::Matchers.define :show_activity_counts do |counts, page|
   end
 end
 
-RSpec::Matchers.define :link_to_first_activity_bucket do |page, bounds|
+RSpec::Matchers.define :start_activity_at_search_boundary do |page|
   match(notify_expectation_failures: true) do |response|
     document = Nokogiri::HTML5.fragment(response.body)
     results = Nokogiri::HTML5(page.body).at_css('#results')
-    expect(bounds.fetch('start_time')).to eq(results['data-start-time'])
-    link = URI.parse(document.at_css('.activity-intervals a')['href'])
-    expect(link.path).to eq('/logs')
-    expect(URI.decode_www_form(link.query).to_h).to include(bounds.merge('custom' => '1'))
-    true
+    expect(document.at_css('.activity-bar')['data-start']).to eq(results['data-start-time'])
   end
 end
 
@@ -589,23 +584,37 @@ RSpec::Matchers.define :show_clipped_activity_labels do
     expect(response.code).to eq(200)
     document = Nokogiri::HTML5.fragment(response.body)
     bucket = document.css('.activity-bar').last
-    expect(bucket['data-start-label']).to eq('11:00:00')
-    expect(bucket['data-end-label']).to eq('11:00:42.123456789')
-    expect(bucket['data-summary']).to include('11:00:00 – 11:00:42.123456789 UTC')
+    expect(document.at_css('.activity-summary')['data-interval-label']).to eq('1min buckets')
+    expect(bucket['data-start-label']).to eq('11:00')
+    expect(bucket['data-end-label']).to eq('11:01')
+    expect(bucket['data-summary']).to include('11:00 – 11:01 UTC')
+    bounds = { 'start_time' => '2026-11-19T11:00:00Z', 'end_time' => '2026-11-19T11:00:42.123456789Z' }
+    expect(bucket['data-start']).to eq(bounds.fetch('start_time'))
+    expect(bucket['data-end']).to eq(bounds.fetch('end_time'))
+    expect(document.css('.activity-summary details')).to be_empty
     expect(document.css('.activity-axis time').last.text).to end_with('11:00 UTC')
     true
   end
 end
 
-RSpec::Matchers.define :show_log_lookback do |seconds, searched_at|
+RSpec::Matchers.define :show_log_lookback do
   match(notify_expectation_failures: true) do |response|
     expect(response.code).to eq(200)
     doc = Nokogiri::HTML5(response.body)
-    label = doc.at_css('#custom-dates:not([hidden]) #earliest-date:not([hidden]) time')
-    earliest = Time.iso8601(label['datetime'])
-    expect(searched_at).to cover(earliest + seconds)
-    expect(label.text).to eq(earliest.strftime('%F %T'))
+    picker = doc.at_css('#custom-dates:not([hidden])')
+    expect(picker.at_css('.lookback').text.strip).to eq('Last 7 days · UTC')
+    expect(picker.css('time')).to be_empty
+    expect(picker.at_css('#start-date-error[hidden]')['data-message']).to eq('Choose a date on or after {date} UTC.')
     true
+  end
+end
+
+RSpec::Matchers.define :reject_expired_log_start do |start, cutoff_window|
+  match(notify_expectation_failures: true) do |response|
+    expect(response).to show_log_view('partial', 'en', 400).and show_log_outcome('outside retention', 'en')
+    cutoff = Time.iso8601(response.headers.fetch(:einblick_earliest_start))
+    expect(cutoff).to be > start
+    expect(cutoff_window).to cover(cutoff)
   end
 end
 
@@ -618,19 +627,11 @@ RSpec::Matchers.define :show_activity_times_for do |event_time|
     expect(bucket['data-start']).to eq(start.iso8601)
     expect(bucket['data-end']).to eq((start + 1).iso8601)
     expect(bucket['data-summary']).to include(start.strftime('%H:%M:%S'), (start + 1).strftime('%H:%M:%S'))
-    intervals = document.at_css('details.activity-intervals')
-    expect(intervals.at_css('summary').text).to eq('Browse activity intervals')
-    link = intervals.css('a[href]').find { |item| item.text.start_with?(start.iso8601) }
-    expect(link.text).to include(start.iso8601, (start + 1).iso8601)
-    url = URI.parse(link['href'])
-    expect(url.path).to eq('/logs')
-    bounds = { 'start_time' => start.iso8601, 'end_time' => (start + 1).iso8601 }
-    expect(URI.decode_www_form(url.query).to_h).to include(bounds.merge('custom' => '1', 'text' => 'bucket boundary'))
     ticks = document.css('.activity-axis time')
     expect(ticks.map { |tick| tick['datetime'] }).to include(start.iso8601)
     expect(document.at_css('.activity-tooltip[hidden][data-search="Search"]').text).to be_empty
     expect(ticks.map(&:text).grep(/UTC/)).to eq([ticks.last.text])
-    expect(document.at_css('.activity-summary')['data-through-label']).to eq("Chart through #{ticks.last.text}")
+    expect(document.at_css('.activity-summary')['data-through-label']).to eq("Through #{ticks.last.text}")
     true
   end
 end

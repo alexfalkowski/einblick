@@ -38,6 +38,14 @@ func (l Limits) Earliest(now time.Time) time.Time {
 	return time.Time{}
 }
 
+// LookbackDays returns the lookback in whole days, or zero for other durations.
+func (l Limits) LookbackDays() int64 {
+	if l.Lookback%day != 0 {
+		return 0
+	}
+	return int64(l.Lookback / day)
+}
+
 const (
 	quarterHour  = 15 * time.Minute
 	day          = 24 * time.Hour

@@ -74,13 +74,6 @@ func (s Search) ReloadURL(maxRange time.Duration) string {
 	return "/logs?" + values.Encode()
 }
 
-// RangeURL opens a fixed range with the current filters.
-func (s Search) RangeURL(start, end time.Time) string {
-	s.Custom = true
-	s.Time.StartTime, s.Time.EndTime = start, end
-	return "/logs?" + s.snapshotValues().Encode()
-}
-
 // NextURL continues the current date range and filters with the repository's token.
 // It returns an empty URL at exhaustion.
 func (s Search) NextURL(token string) string {
@@ -100,6 +93,23 @@ func (s Search) ActivityURL() string {
 	values := s.snapshotValues()
 	values.Del("custom")
 	return "/logs/activity?" + values.Encode()
+}
+
+// ClearFiltersURL keeps the applied time selection and page size while clearing all log filters.
+// It is empty when there are no log filters to clear.
+func (s Search) ClearFiltersURL() string {
+	filters := s.filters
+	if strings.IsEmpty(filters.Service) && strings.IsEmpty(filters.Text) &&
+		strings.IsEmpty(filters.Severity) && strings.IsEmpty(filters.TraceID) {
+		return strings.Empty
+	}
+
+	s.filters = storage.Query{PageSize: filters.PageSize}
+	values := s.snapshotValues()
+	if !strings.IsEmpty(s.Time.SearchWindow) {
+		values.Set("search_window", s.Time.SearchWindow)
+	}
+	return "/logs?" + values.Encode()
 }
 
 // RelatedLogsURL searches the applied bounds with the row's trace ID. It returns

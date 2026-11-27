@@ -129,10 +129,12 @@ function setupActivitySelection(chart, selectRange) {
 
 function setupLogActivity(panel, total, selectRange) {
   const status = panel.querySelector("#activity-status");
+  const retry = panel.querySelector("#retry-activity");
   const interval = panel.querySelector("#activity-interval");
   const snapshot = panel.querySelector("#activity-snapshot");
   const content = panel.querySelector("#activity-content");
   let activityURL;
+  let resultsURL;
   let matchesResults = true;
   let pending;
 
@@ -148,6 +150,7 @@ function setupLogActivity(panel, total, selectRange) {
     matchesResults = true;
     panel.hidden = !url;
     status.hidden = true;
+    retry.hidden = true;
     interval.textContent = "";
     snapshot.textContent = "";
     total.textContent = "";
@@ -156,15 +159,27 @@ function setupLogActivity(panel, total, selectRange) {
   }
 
   async function load(url) {
+    resultsURL = url;
     reset(url);
+    if (!url) {
+      return;
+    }
     const request = new AbortController();
     pending = request;
     status.textContent = panel.dataset.loading;
     status.hidden = false;
     try {
       const response = await fetch(url, { signal: request.signal });
+      if (request.signal.aborted) {
+        return;
+      }
       if (!response.ok || response.headers.get("Einblick-View") !== "logs-activity") {
-        throw new Error("Log activity unavailable");
+        const reason = response.status === 504 ? "timeout"
+          : response.headers.get("Einblick-Activity") === "busy" ? "busy"
+          : "unavailable";
+        status.textContent = panel.dataset[reason];
+        retry.hidden = !resultsURL || reason === "unavailable";
+        return;
       }
       const fragment = await response.text();
       if (request.signal.aborted) {
@@ -181,6 +196,7 @@ function setupLogActivity(panel, total, selectRange) {
     } catch {
       if (!request.signal.aborted) {
         status.textContent = panel.dataset.unavailable;
+        retry.hidden = !resultsURL;
       }
     } finally {
       if (pending === request) {
@@ -190,7 +206,9 @@ function setupLogActivity(panel, total, selectRange) {
   }
 
   function keepSnapshotFor(url) {
+    resultsURL = url;
     matchesResults = url === activityURL;
+    retry.hidden ||= !url;
     updateSnapshot();
   }
 
@@ -202,7 +220,9 @@ function setupLogActivity(panel, total, selectRange) {
     }
   }
 
-  return { load, keepSnapshotFor, cancelLoading, clear: () => reset() };
+  retry.addEventListener("click", () => load(resultsURL));
+
+  return { load, keepSnapshotFor, cancelLoading, clear: () => load() };
 }
 
 function setupTimeFilters(form) {
@@ -213,8 +233,7 @@ function setupTimeFilters(form) {
   const customMode = form.querySelector("#custom-mode");
   const startPicker = form.querySelector("#start-utc");
   const endPicker = form.querySelector("#end-utc");
-  const earliestDate = form.querySelector("#earliest-date");
-  const earliestDateTime = earliestDate.querySelector("time");
+  const startError = form.querySelector("#start-date-error");
   const startTimeField = form.querySelector("#start-time");
   const endTimeField = form.querySelector("#end-time");
   const searchWindow = form.querySelector("#search-window");
@@ -234,7 +253,7 @@ function setupTimeFilters(form) {
   }
 
   function apply(bounds, { preservePicker } = {}) {
-    const { startTime, endTime, earliest, recentWindow, custom } = bounds;
+    const { startTime, endTime, recentWindow, custom } = bounds;
     startTimeField.value = startTime;
     endTimeField.value = endTime;
 
@@ -242,15 +261,30 @@ function setupTimeFilters(form) {
     if (!preservePicker) {
       startPicker.value = startTime.slice(0, 19);
       endPicker.value = endTime.slice(0, 19);
+      clearStartError();
     }
-    earliestDate.hidden = !earliest;
-    earliestDateTime.dateTime = earliest;
-    earliestDateTime.textContent = earliest.slice(0, 19).replace("T", " ");
     searchWindow.value = recentWindow;
     customMode.value = custom === "true" ? "1" : "picker";
     showCustom(preservePicker || custom === "true", bounds);
   }
 
+  function clearStartError() {
+    startError.hidden = true;
+    startError.textContent = "";
+    startPicker.removeAttribute("aria-invalid");
+  }
+
+  function showStartError(cutoff) {
+    const date = new Intl.DateTimeFormat(form.closest("[lang]")?.lang, {
+      dateStyle: "medium", timeStyle: "medium", timeZone: "UTC", hourCycle: "h23",
+    }).format(new Date(cutoff));
+    startPicker.setAttribute("aria-invalid", "true");
+    startError.textContent = startError.dataset.message.replace("{date}", date);
+    startError.hidden = false;
+    startPicker.focus();
+  }
+
+  startPicker.addEventListener("input", clearStartError);
   customDates.addEventListener("input", () => { pickerVersion += 1; });
   customButton.addEventListener("click", () => {
     pickerVersion += 1;
@@ -258,7 +292,7 @@ function setupTimeFilters(form) {
     startPicker.focus();
   });
 
-  return { apply, isCustomOpen: () => !customDates.hidden, version: () => pickerVersion };
+  return { apply, showStartError, isCustomOpen: () => !customDates.hidden, version: () => pickerVersion };
 }
 
 function setupMessageFilter(form) {
@@ -372,6 +406,13 @@ function setupLogSearch(form) {
     if (isLogFragment) {
       if (ctx.sourceElement !== refreshInterval) {
         manualQueryFailed = response.status >= 400;
+      }
+      const earliestStart = response.headers.get("Einblick-Earliest-Start");
+      if (earliestStart && timeFilters.isCustomOpen()) {
+        event.preventDefault();
+        if (requests.get(ctx)?.pickerVersion === timeFilters.version()) {
+          timeFilters.showStartError(earliestStart);
+        }
       }
       return;
     }

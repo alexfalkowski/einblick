@@ -30,9 +30,12 @@ func NewActivity(repo storage.Repository, limits timerange.Limits, view, errorVi
 
 		activity, err := repo.Activity(ctx, search.Query())
 		if err != nil {
+			if errors.Is(err, storage.ErrActivityBusy) {
+				res.Header().Set("Einblick-Activity", "busy")
+			}
 			return errorView, nil, queryError(req, err)
 		}
 
-		return view, model.NewActivity(activity, search), nil
+		return view, model.NewActivity(activity), nil
 	}
 }

@@ -16,6 +16,9 @@ type Logs struct {
 	// ActivityURL counts matching logs over the applied filters and exact interval.
 	ActivityURL string
 
+	// ClearFiltersURL opens the same interval without log filters, when any are applied.
+	ClearFiltersURL string
+
 	// Rows contains matching logs in newest-first order.
 	Rows []LogRow
 
@@ -25,9 +28,6 @@ type Logs struct {
 
 // Filters holds the display values for the log search form.
 type Filters struct {
-	// Earliest is the first date selectable under the archive lookback, when configured.
-	Earliest time.Time
-
 	// StartTime is the inclusive UTC bound submitted with filters and pagination.
 	StartTime time.Time
 
@@ -57,6 +57,12 @@ type Filters struct {
 
 	// Windows holds the recent ranges that fit the configured search limit.
 	Windows []timerange.Preset
+
+	// Lookback is the duration covered by the custom date picker. Zero leaves history unbounded.
+	Lookback time.Duration
+
+	// LookbackDays is the configured lookback when it is a whole number of days.
+	LookbackDays int64
 
 	// PageSize is the requested number of results. Zero uses the configured size.
 	PageSize int

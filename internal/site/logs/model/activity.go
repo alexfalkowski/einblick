@@ -2,7 +2,6 @@ package model
 
 import (
 	"github.com/alexfalkowski/einblick/internal/logs/storage"
-	"github.com/alexfalkowski/einblick/internal/site/logs/query"
 	"github.com/alexfalkowski/go-service/v3/time"
 )
 
@@ -10,6 +9,9 @@ import (
 type Activity struct {
 	// TickFormat is the localized time format key for the current resolution.
 	TickFormat string
+
+	// TooltipFormat formats tooltip times when the chart spans one UTC date.
+	TooltipFormat string
 
 	// IntervalUnit is the localized unit key for the time saved in IntervalSize.
 	IntervalUnit string
@@ -25,14 +27,14 @@ type Activity struct {
 
 	// IntervalSize is the number of units in each full bucket.
 	IntervalSize int64
+
+	// TooltipPrecision rounds the displayed bounds for the bucket size.
+	TooltipPrecision time.Duration
 }
 
 // ActivityBar shows one event-time interval in the activity chart.
 type ActivityBar struct {
 	storage.ActivityBucket
-
-	// SearchURL opens the bucket's exact bounds with the applied filters.
-	SearchURL string
 
 	// Height is the percentage of the busiest bucket's count.
 	Height int
@@ -51,16 +53,19 @@ type ActivityTick struct {
 }
 
 // NewActivity scales the chart to the largest bucket and sums its counts.
-func NewActivity(data *storage.Activity, search query.Search) *Activity {
+func NewActivity(data *storage.Activity) *Activity {
 	const fullHeight = 100
 
 	intervalSize, intervalUnit := activityInterval(data.Interval)
 	activity := &Activity{
 		Bars: make([]ActivityBar, len(data.Buckets)), Ticks: activityTicks(data.Buckets),
 		TickFormat: "logs.activity_tick_format", IntervalUnit: intervalUnit, IntervalSize: intervalSize,
+		TooltipFormat: "15:04", TooltipPrecision: time.Minute,
 	}
 	if data.Interval < time.Minute {
 		activity.TickFormat = "logs.event_format"
+		activity.TooltipFormat = "15:04:05"
+		activity.TooltipPrecision = time.Second
 	}
 	var peak int64
 	for _, bucket := range data.Buckets {
@@ -68,7 +73,7 @@ func NewActivity(data *storage.Activity, search query.Search) *Activity {
 		peak = max(peak, bucket.Count)
 	}
 	for index, bucket := range data.Buckets {
-		bar := ActivityBar{ActivityBucket: bucket, SearchURL: search.RangeURL(bucket.StartTime, bucket.EndTime)}
+		bar := ActivityBar{ActivityBucket: bucket}
 		if bucket.Count > 0 {
 			bar.Height = max(1, int(float64(bucket.Count)/float64(peak)*fullHeight))
 		}

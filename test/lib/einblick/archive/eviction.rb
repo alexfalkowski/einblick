@@ -53,10 +53,6 @@ module Einblick
         with_floci { with_eviction_profile('history_retention', &) }
       end
 
-      def page_without_spare_archive_capacity
-        query_from_fresh_archive { page_through_archived_logs }
-      end
-
       def search_oldest_activity_bucket
         with_retention_profile do
           @activity_bucket_search = open_activity_bucket_after_cutoff

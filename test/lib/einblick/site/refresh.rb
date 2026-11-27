@@ -50,7 +50,7 @@ module Einblick
       end
 
       def load_activity_for_clipped_range
-        bounds = { start_time: '2026-11-19T10:00:00Z', end_time: '2026-11-19T11:00:42.123456789Z' }
+        bounds = { start_time: '2026-11-19T10:30:00Z', end_time: '2026-11-19T11:00:42.123456789Z' }
         @log_activity = site_client.open("/logs/activity?#{URI.encode_www_form(bounds)}", 'en')
       end
 
