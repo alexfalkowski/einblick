@@ -35,7 +35,8 @@ logs.related_logs: Buscar registros relacionados
 logs.query: Buscar
 logs.clear_search: Borrar búsqueda
 logs.reset: Restablecer
-logs.loading: Cargando registros…
+logs.loading: Buscando…
+logs.previous_results: Resultados anteriores
 logs.request_failed: No se pudieron cargar los registros
 logs.retry: Volver a intentar
 logs.results: Resultados de la consulta de registros
@@ -92,8 +93,10 @@ logs.date_range_too_wide: Este intervalo supera el límite de búsqueda.
 logs.invalid_dates: Introduce una hora de inicio y una de fin válidas.
 logs.date_outside_history: 'Elige una fecha de inicio más reciente.'
 logs.activity: Actividad de registros
+logs.count_updating: Actualizando recuento…
+logs.count_unavailable: Recuento no disponible
 logs.activity_through: 'Hasta {{.End}}'
-logs.activity_loading: 'Cargando…'
+logs.activity_previous: Búsqueda anterior
 logs.activity_unavailable: 'Gráfico no disponible'
 logs.activity_busy: 'Archivo ocupado'
 logs.activity_timeout: 'Tiempo de espera del gráfico agotado'

@@ -86,6 +86,9 @@ a.brand { display: block; width: fit-content; margin: 0 0 2rem; color: #fff; fon
   background: var(--primary-tint);
 }
 .time-presets button[aria-pressed="true"] { border-color: var(--color-primary); background: var(--color-primary); color: var(--color-primary-content); }
+.custom-range-control { display: flex; flex: 1 1 0; align-items: center; gap: .5rem; min-inline-size: max-content; }
+.custom-range-control:has(#picker-time-zone:not([hidden])) { flex: 0 1 auto; min-inline-size: 0; }
+.time-zone-pill { min-inline-size: 0; overflow: hidden; color: var(--muted); text-overflow: ellipsis; }
 #current-range { flex-basis: 100%; color: var(--muted); font-size: var(--text-small); }
 .time-presets, .custom-dates, .actions { grid-column: 2 / -1; }
 .custom-dates:not([hidden]) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; }
@@ -94,17 +97,22 @@ a.brand { display: block; width: fit-content; margin: 0 0 2rem; color: #fff; fon
 .custom-dates p { grid-column: 1 / -1; margin: 0; font-size: var(--text-small); color: var(--muted); }
 .custom-dates #start-date-error { margin-top: .3rem; color: var(--color-error); }
 .custom-dates #start-utc[aria-invalid="true"] { --input-color: var(--color-error); }
-.log-activity { margin-bottom: .65rem; border: 1px solid var(--color-base-300); border-radius: var(--radius-box); padding: .75rem 1rem; background: var(--color-base-100); }
-.activity-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .25rem 1rem; }
-.log-activity h2 { margin: 0; font-size: var(--text-body); font-weight: 700; }
+.log-activity { --activity-plot-height: 6rem; margin-bottom: .65rem; border: 1px solid var(--color-base-300); border-radius: var(--radius-box); padding: .75rem 1rem; background: var(--color-base-100); }
+.activity-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .25rem 1rem; min-block-size: 1.75rem; }
+.activity-title { display: flex; align-items: center; gap: .375rem; min-block-size: 1.625rem; min-inline-size: 0; }
+.log-activity h2 { margin: 0; font-size: var(--text-body); font-weight: 700; white-space: nowrap; }
 .activity-axis, .activity-interval, #activity-status, #activity-snapshot { color: var(--muted); font-size: var(--text-small); }
-#activity-status { margin: .25rem 0; }
-.activity-feedback { display: flex; align-items: center; gap: .5rem; }
-.activity-feedback button[hidden] { display: none; }
-#activity-snapshot { margin: 0; }
-.activity-interval:not(:empty) {
-  display: inline-block;
-  margin-inline-start: .5rem;
+#activity-status { margin: 0; }
+.activity-frame { display: grid; grid-template-columns: minmax(0, 1fr); margin-top: .5rem; }
+.activity-frame > * { grid-area: 1 / 1; }
+#activity-content { min-block-size: calc(var(--activity-plot-height) + .3rem + 3lh); font-size: var(--text-small); }
+#activity-content:empty::before { content: ""; display: block; block-size: var(--activity-plot-height); border-bottom: 1px solid var(--color-base-300); }
+.activity-feedback { display: flex; align-self: center; justify-content: center; align-items: center; gap: .5rem; }
+.activity-feedback[hidden], .activity-feedback button[hidden] { display: none; }
+#activity-snapshot { margin: 0; white-space: nowrap; }
+.activity-interval:empty { display: none; }
+.activity-interval { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; }
+.time-zone-pill, .activity-interval:not(:empty), #query-progress:not(:empty) {
   padding: .1rem .5rem;
   border: var(--border) solid var(--color-base-300);
   border-radius: 999px;
@@ -114,14 +122,14 @@ a.brand { display: block; width: fit-content; margin: 0 0 2rem; color: #fff; fon
   line-height: 1.4;
   white-space: nowrap;
 }
-.activity-summary { margin-top: .5rem; container-type: inline-size; }
+.activity-summary { container-type: inline-size; }
 .activity-plot { position: relative; }
-.activity-bars { display: flex; height: 6rem; border-bottom: 1px solid var(--color-base-300); cursor: crosshair; user-select: none; touch-action: pan-y; }
+.activity-bars { display: flex; block-size: var(--activity-plot-height); border-bottom: 1px solid var(--color-base-300); cursor: crosshair; user-select: none; touch-action: pan-y; }
 .activity-bar { display: flex; align-items: end; flex: 1; min-width: 0; }
 .activity-bar span { display: block; width: 100%; height: var(--bar-height); margin-inline: 1px; background: var(--color-primary); pointer-events: none; }
 .activity-bar:hover { background: var(--primary-tint); }
 .activity-bar[data-selected] { background: color-mix(in srgb, var(--color-primary) 24%, var(--color-base-100)); }
-.activity-tooltip {
+.log-tooltip, .activity-axis time[data-tooltip]::after {
   position: absolute;
   z-index: 1;
   inset-block-end: calc(100% + .35rem);
@@ -138,8 +146,15 @@ a.brand { display: block; width: fit-content; margin: 0 0 2rem; color: #fff; fon
   overflow-wrap: anywhere;
   pointer-events: none;
 }
+.activity-axis time[data-tooltip]::after {
+  display: none;
+  inset-inline-start: 50%;
+  max-inline-size: min(20rem, calc(100vw - 2rem));
+}
+.activity-axis time[data-tooltip]:hover::after { display: block; }
 .activity-axis { display: grid; grid-template-columns: minmax(0, 1fr); margin-top: .3rem; }
 .activity-axis time {
+  position: relative;
   grid-area: 1 / 1;
   justify-self: start;
   align-self: start;
@@ -149,6 +164,9 @@ a.brand { display: block; width: fit-content; margin: 0 0 2rem; color: #fff; fon
   text-align: center;
   overflow-wrap: anywhere;
 }
+.activity-axis time[data-tooltip]::after { content: attr(data-tooltip); }
+.activity-axis time:first-child::after { inset-inline-start: 0; transform: none; }
+.activity-axis time:last-child::after { inset-inline: auto 0; transform: none; }
 /* Quarter ticks snap to bar boundaries, so the endpoints need different widths. */
 .activity-axis time:first-child { max-inline-size: 11%; transform: none; text-align: start; }
 .activity-axis time:last-child {
@@ -172,7 +190,8 @@ a.brand { display: block; width: fit-content; margin: 0 0 2rem; color: #fff; fon
     max-inline-size: none;
   }
 }
-.log-result-total { margin: .8rem 0 .5rem; font-size: 1rem; font-weight: 750; text-align: right; }
+.log-result-total { min-block-size: 1lh; margin: .8rem 0 .5rem; font-size: 1rem; font-weight: 750; text-align: right; }
+.log-result-total[hidden] { display: block; visibility: hidden; }
 .message-field { position: relative; min-width: 0; }
 .message-field #text { padding-inline-end: 2rem; }
 #clear-message {
@@ -202,14 +221,12 @@ label, #time-range-label { font-size: var(--text-small); font-weight: 700; }
 .actions .btn { font-size: var(--text-body); }
 .actions .btn-outline { border-color: var(--control-border); color: var(--color-base-content); }
 .pagination .btn { font-size: var(--text-small); }
-#log-filters button:disabled, .empty-state button:disabled, .pagination[inert] .btn {
-  opacity: .55;
-  cursor: default;
-}
-
-#query-progress { min-height: 1.75rem; margin: .5rem 0; color: var(--color-primary); font-size: .85rem; text-align: end; }
-.htmx-indicator { display: none; }
-.htmx-request .htmx-indicator { display: inline; }
+.query-status { display: grid; align-items: center; min-block-size: 2.25rem; margin: .25rem 0; font-size: var(--text-small); }
+.query-status > * { grid-area: 1 / 1; }
+#query-progress { justify-self: end; margin: 0; color: var(--muted); }
+#query-failure-message { display: inline; margin: 0; color: var(--color-error); overflow-wrap: anywhere; }
+#retry-query { margin-inline-start: .375rem; }
+.retry-link { padding: 0; border: 0; background: transparent; color: var(--color-primary); font: inherit; text-decoration: underline; cursor: pointer; }
 .table-card { border: var(--border) solid var(--color-base-300); border-radius: var(--radius-box); overflow: auto; background: var(--color-base-100); container-type: inline-size; }
 .table { width: 100%; min-width: 35rem; table-layout: fixed; }
 .table :is(th, td) { text-align: left; vertical-align: top; overflow-wrap: anywhere; }
@@ -453,5 +470,9 @@ html:has(.log-details-panel:modal) { overflow: hidden; }
   .filters { grid-template-columns: minmax(0, 1fr); }
   .time-presets, .custom-dates, .actions { grid-column: auto; }
   .custom-dates:not([hidden]) { grid-template-columns: minmax(0, 1fr); }
+  .query-status { min-block-size: max(2.25rem, 3lh); }
+  .activity-heading { grid-template-columns: minmax(0, 1fr); }
+  #activity-snapshot { min-block-size: 1lh; }
+  #activity-snapshot[hidden] { display: block; visibility: hidden; }
   .log-fields { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
 }

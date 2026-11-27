@@ -1,23 +1,45 @@
 const calendarFields = { month: "short", day: "2-digit" };
 const clockFields = { hour: "2-digit", minute: "2-digit", hourCycle: "h23" };
+const utcOffsetFormatter = new Intl.DateTimeFormat("en", { timeZoneName: "longOffset" });
+const searchFeedbackDelay = 300;
 
 function logDate(value) {
   return new Date(value.replace(/\.(\d+)Z$/, (_, fraction) => `.${fraction.padEnd(3, "0").slice(0, 3)}Z`));
 }
 
+function utcOffset(date) {
+  const offset = utcOffsetFormatter.formatToParts(date).find(({ type }) => type === "timeZoneName").value;
+  return offset === "GMT" ? "UTC+00:00" : offset.replace("GMT", "UTC");
+}
+
+function browserTimeZone() {
+  const id = utcOffsetFormatter.resolvedOptions().timeZone;
+  const fixed = id === "UTC" || id === "GMT" || id.startsWith("Etc/");
+  const label = fixed
+    ? utcOffset(new Date()).replace("UTC+00:00", "UTC")
+    : id.split("/").at(-1).replaceAll("_", " ");
+  return { id, label, fixed };
+}
+
+function timeZoneAt(timeZone, date) {
+  return timeZone.fixed ? timeZone.label : `${timeZone.label} (${utcOffset(date)})`;
+}
+
 function detailTimeFormatter(language) {
   return new Intl.DateTimeFormat(language, {
     ...calendarFields, ...clockFields, year: "numeric", second: "2-digit",
-    fractionalSecondDigits: 3, timeZoneName: "shortOffset",
+    fractionalSecondDigits: 3,
   });
 }
 
-function exactLocalTime(formatter, timestamp) {
+function exactLocalTime(formatter, timeZone, timestamp) {
   // Intl formats milliseconds. Keep any additional digits from the original timestamp.
   const fraction = timestamp.match(/\.(\d+)Z$/)?.[1];
-  return formatter.formatToParts(logDate(timestamp))
+  const date = logDate(timestamp);
+  const time = formatter.formatToParts(date)
     .map(({ type, value }) => type === "fractionalSecond" && fraction ? fraction : value)
     .join("");
+  return `${time} ${timeZoneAt(timeZone, date)}`;
 }
 
 function localizeLogTimes(results) {
@@ -29,13 +51,14 @@ function localizeLogTimes(results) {
     ...calendarFields, ...clockFields, second: "2-digit",
   });
   const detailTime = detailTimeFormatter(results.lang);
+  const timeZone = browserTimeZone();
   for (const time of times) {
     const rounded = time.dataset.displayTime;
-    time.textContent = rounded ? detailTime.format(logDate(rounded)) : rowTime.format(logDate(time.dateTime));
-    time.title = exactLocalTime(detailTime, time.dateTime);
+    time.textContent = rounded ? exactLocalTime(detailTime, timeZone, rounded) : rowTime.format(logDate(time.dateTime));
+    time.title = exactLocalTime(detailTime, timeZone, time.dateTime);
   }
   for (const time of results.querySelectorAll(".log-timing time")) {
-    time.textContent = exactLocalTime(detailTime, time.dateTime);
+    time.textContent = exactLocalTime(detailTime, timeZone, time.dateTime);
   }
 }
 
@@ -50,7 +73,7 @@ function setupLogDetails(results) {
   const closeButton = panel.querySelector(".close-log-details");
   let selection;
 
-  const close = (restoreFocus = true) => {
+  const close = () => {
     if (!selection) {
       return;
     }
@@ -60,9 +83,7 @@ function setupLogDetails(results) {
     disclosure.open = false;
     inlineCell.append(inspector);
     panel.close();
-    if (restoreFocus) {
-      disclosure.querySelector("summary").focus({ preventScroll: true });
-    }
+    disclosure.querySelector("summary").focus({ preventScroll: true });
   };
 
   results.querySelector(".table-card").addEventListener("click", (event) => {
@@ -97,7 +118,7 @@ function setupLogDetails(results) {
   });
   results.dataset.drawer = "";
 
-  return { close, isOpen: () => panel.open };
+  return panel;
 }
 
 function setupActivitySelection(summary, selectRange) {
@@ -112,23 +133,40 @@ function setupActivitySelection(summary, selectRange) {
     clock.second = "2-digit";
   }
   const axis = new Intl.DateTimeFormat(summary.lang, { ...calendarFields, ...clock });
-  const axisWithZone = new Intl.DateTimeFormat(summary.lang, {
-    ...calendarFields, ...clock, timeZoneName: "shortOffset",
-  });
   const day = new Intl.DateTimeFormat(summary.lang, { dateStyle: "short" });
-  const round = (date) => Math.round(date.getTime() / precision) * precision;
+  const round = (date) => {
+    const rounded = new Date(Math.round(date.getTime() / precision) * precision);
+    // Keep the original side of a clock change when rounding would cross it.
+    return rounded.getTimezoneOffset() === date.getTimezoneOffset() ? rounded : date;
+  };
   const sameDay = day.format(round(logDate(ticks[0].dateTime))) === day.format(round(logDate(lastTick.dateTime)));
   const tooltipTime = new Intl.DateTimeFormat(summary.lang, {
-    ...(sameDay ? {} : calendarFields), ...clock, timeZoneName: "shortOffset",
+    ...(sameDay ? {} : calendarFields), ...clock,
   });
+  const timeZone = browserTimeZone();
+  function tooltipBoundary(timestamp) {
+    const date = round(logDate(timestamp));
+    return { time: tooltipTime.format(date), zone: timeZoneAt(timeZone, date) };
+  }
   const tooltipBounds = bars.map(({ dataset }) => ({
-    start: tooltipTime.format(round(logDate(dataset.start))),
-    end: tooltipTime.format(round(logDate(dataset.end))),
+    start: tooltipBoundary(dataset.start),
+    end: tooltipBoundary(dataset.end),
   }));
   const detailTime = detailTimeFormatter(summary.lang);
   for (const tick of ticks) {
-    tick.textContent = (tick === lastTick ? axisWithZone : axis).format(logDate(tick.dateTime));
-    tick.title = exactLocalTime(detailTime, tick.dateTime);
+    tick.textContent = axis.format(logDate(tick.dateTime));
+    tick.dataset.tooltip = exactLocalTime(detailTime, timeZone, tick.dateTime);
+    tick.setAttribute("aria-label", tick.dataset.tooltip);
+  }
+  lastTick.textContent += ` ${timeZone.label}`;
+
+  function tooltipRange(first, last) {
+    const { start } = tooltipBounds[first];
+    const { end } = tooltipBounds[last];
+    return {
+      start: start.zone === end.zone ? start.time : `${start.time} ${start.zone}`,
+      end: `${end.time} ${end.zone}`,
+    };
   }
 
   let first;
@@ -141,8 +179,8 @@ function setupActivitySelection(summary, selectRange) {
     const start = Math.min(first, last);
     const end = Math.max(first, last);
     bars.forEach((bar, index) => bar.toggleAttribute("data-selected", index >= start && index <= end));
-    const range = `${tooltipBounds[start].start} – ${tooltipBounds[end].end}`;
-    showTooltip(last, `${tooltip.dataset.search} ${range}`);
+    const range = tooltipRange(start, end);
+    showTooltip(last, `${tooltip.dataset.search} ${range.start} – ${range.end}`);
   };
 
   function showTooltip(index, text) {
@@ -170,7 +208,7 @@ function setupActivitySelection(summary, selectRange) {
     }
     const last = barAt(event.clientX);
     if (first === undefined) {
-      const { start, end } = tooltipBounds[last];
+      const { start, end } = tooltipRange(last, last);
       const label = summary.dataset.bucketFormat
         .replace("{start}", start).replace("{end}", end).replace("{count}", bars[last].dataset.count);
       showTooltip(last, label);
@@ -203,100 +241,124 @@ function setupActivitySelection(summary, selectRange) {
 }
 
 function setupLogActivity(panel, total, selectRange) {
+  const feedback = panel.querySelector("#activity-feedback");
   const status = panel.querySelector("#activity-status");
   const retry = panel.querySelector("#retry-activity");
   const interval = panel.querySelector("#activity-interval");
   const snapshot = panel.querySelector("#activity-snapshot");
   const content = panel.querySelector("#activity-content");
-  let activityURL;
   let resultsURL;
-  let matchesResults = true;
   let pending;
+  let interrupted = false;
 
-  function updateSnapshot() {
-    snapshot.hidden = matchesResults || !snapshot.textContent;
-    total.hidden = !matchesResults || !total.textContent;
-  }
-
-  function reset(url) {
-    pending?.abort();
-    pending = undefined;
-    activityURL = url;
-    matchesResults = true;
-    panel.hidden = !url;
-    status.hidden = true;
-    retry.hidden = true;
-    interval.textContent = "";
-    snapshot.textContent = "";
-    total.textContent = "";
-    updateSnapshot();
-    content.replaceChildren();
-  }
-
-  async function load(url) {
-    resultsURL = url;
-    reset(url);
-    if (!url) {
-      return;
+  function showCount(label) {
+    if (total.textContent !== label) {
+      total.textContent = label;
     }
-    const request = new AbortController();
-    pending = request;
-    status.textContent = panel.dataset.loading;
-    status.hidden = false;
+    total.hidden = false;
+  }
+
+  function showPreviousSearch() {
+    if (content.inert) {
+      snapshot.textContent = panel.dataset.previous;
+    }
+  }
+
+  function showFailure(reason, canRetry) {
+    showPreviousSearch();
+    showCount(total.dataset.unavailable);
+    feedback.hidden = false;
+    status.textContent = panel.dataset[reason];
+    retry.hidden = !canRetry;
+  }
+
+  async function fetchSummary(url, signal) {
     try {
-      const response = await fetch(url, { signal: request.signal });
-      if (request.signal.aborted) {
-        return;
-      }
+      const response = await fetch(url, { signal });
       if (!response.ok || response.headers.get("Einblick-View") !== "logs-activity") {
         const reason = response.status === 504 ? "timeout"
           : response.headers.get("Einblick-Activity") === "busy" ? "busy"
           : "unavailable";
-        status.textContent = panel.dataset[reason];
-        retry.hidden = !resultsURL || reason === "unavailable";
-        return;
+        return { reason, canRetry: reason !== "unavailable" };
       }
-      const fragment = await response.text();
-      if (request.signal.aborted) {
-        return;
-      }
-      content.innerHTML = fragment;
-      const summary = content.querySelector(".activity-summary");
-      snapshot.textContent = setupActivitySelection(summary, (startTime, endTime) => selectRange(url, startTime, endTime));
-      interval.textContent = summary.dataset.intervalLabel;
-      total.textContent = summary.dataset.totalLabel;
-      updateSnapshot();
-      status.hidden = true;
+      const template = document.createElement("template");
+      template.innerHTML = await response.text();
+      return { summary: template.content.querySelector(".activity-summary") };
     } catch {
-      if (!request.signal.aborted) {
-        status.textContent = panel.dataset.unavailable;
-        retry.hidden = !resultsURL;
+      return { reason: "unavailable", canRetry: true };
+    }
+  }
+
+  function prepare(url) {
+    const controller = new AbortController();
+    const request = { url, controller };
+    request.ready = fetchSummary(url, controller.signal).then((outcome) => { request.outcome = outcome; });
+    return request;
+  }
+
+  async function show(request) {
+    cancelLoading();
+    interrupted = false;
+    resultsURL = request.url;
+    feedback.hidden = true;
+    status.textContent = "";
+    panel.hidden = false;
+    pending = request;
+    content.inert = !snapshot.hidden;
+    content.setAttribute("aria-busy", "true");
+    try {
+      if (!request.outcome) {
+        showCount(total.dataset.updating);
+        showPreviousSearch();
+        await request.ready;
       }
+      if (request.controller.signal.aborted) {
+        return;
+      }
+      const { summary, reason, canRetry } = request.outcome;
+      if (reason) {
+        showFailure(reason, canRetry);
+        return;
+      }
+      snapshot.textContent = setupActivitySelection(summary, (startTime, endTime) => selectRange(request.url, startTime, endTime));
+      snapshot.hidden = false;
+      interval.textContent = summary.dataset.intervalLabel;
+      interval.title = summary.dataset.intervalLabel;
+      showCount(summary.dataset.totalLabel);
+      content.replaceChildren(summary);
+      content.inert = false;
+    } catch {
+      showFailure("unavailable", true);
     } finally {
       if (pending === request) {
         pending = undefined;
+        content.removeAttribute("aria-busy");
       }
     }
   }
 
-  function keepSnapshotFor(url) {
-    resultsURL = url;
-    matchesResults = url === activityURL;
-    retry.hidden ||= !url;
-    updateSnapshot();
+  function load(url) {
+    show(prepare(url));
   }
 
   function cancelLoading() {
     if (pending) {
-      pending.abort();
+      pending.controller.abort();
       pending = undefined;
-      status.textContent = panel.dataset.unavailable;
+      content.removeAttribute("aria-busy");
+      interrupted = true;
+    }
+  }
+
+  function resumeLoading() {
+    if (interrupted) {
+      load(resultsURL);
     }
   }
 
   retry.addEventListener("click", () => load(resultsURL));
 
-  return { load, keepSnapshotFor, cancelLoading, clear: () => load() };
+  return { load, prepare, show, cancelLoading, resumeLoading, isLoading: () => Boolean(pending) };
 }
 
 function localPickerValue(date) {
@@ -328,21 +390,19 @@ function setupTimeFilters(form) {
   const searchButtons = form.querySelectorAll("[data-search-submit]");
   const zoneLabel = form.querySelector("#picker-time-zone");
   const pickerBounds = [[startPicker, startTimeField], [endPicker, endTimeField]].map(([picker, applied]) => ({
-    picker, applied, label: picker.getAttribute("aria-label"),
+    picker, applied,
   }));
   const language = form.closest("[lang]").lang;
-  let formatter;
+  const formatter = new Intl.DateTimeFormat(language, {
+    ...calendarFields, ...clockFields, year: "numeric", second: "2-digit",
+  });
+  const timeZone = browserTimeZone();
+  zoneLabel.textContent = timeZone.label;
   let pickerVersion = 0;
 
   function renderPickers() {
-    formatter = new Intl.DateTimeFormat(language, {
-      ...calendarFields, ...clockFields, year: "numeric", second: "2-digit", timeZoneName: "shortOffset",
-    });
-    const timeZone = formatter.resolvedOptions().timeZone;
-    zoneLabel.textContent = timeZone;
     for (const bound of pickerBounds) {
-      const { picker, applied, label } = bound;
-      picker.setAttribute("aria-label", label.replace("UTC", timeZone));
+      const { picker, applied } = bound;
       bound.exact = applied.value;
       picker.value = localPickerValue(logDate(bound.exact));
       bound.renderedValue = picker.value;
@@ -352,6 +412,8 @@ function setupTimeFilters(form) {
 
   renderPickers();
   for (const bound of pickerBounds) {
+    const label = bound.picker.getAttribute("aria-label");
+    bound.picker.setAttribute("aria-label", label.replace("UTC", timeZone.id));
     bound.picker.addEventListener("input", () => {
       const { picker, renderedValue } = bound;
       const skippedTime = picker.value && picker.value !== renderedValue && !utcPickerValue(picker.value);
@@ -372,6 +434,7 @@ function setupTimeFilters(form) {
     customButton.setAttribute("aria-expanded", custom);
     customButton.setAttribute("aria-pressed", custom);
     customDates.hidden = !custom;
+    zoneLabel.hidden = !custom;
     for (const input of [customMode, startPicker, endPicker]) {
       input.disabled = !custom;
     }
@@ -401,9 +464,10 @@ function setupTimeFilters(form) {
   }
 
   function showStartError(cutoff) {
-    const date = formatter.format(logDate(cutoff));
+    const date = logDate(cutoff);
+    const cutoffTime = `${formatter.format(date)} ${timeZoneAt(timeZone, date)}`;
     startPicker.setAttribute("aria-invalid", "true");
-    startError.textContent = startError.dataset.message.replace("{date}", date);
+    startError.textContent = startError.dataset.message.replace("{date}", cutoffTime);
     startError.hidden = false;
     startPicker.focus();
   }
@@ -432,23 +496,16 @@ function setupMessageFilter(form) {
       updateClearButton();
     }
   });
-  form.addEventListener("htmx:config:request", (event) => {
-    // htmx disables the submit buttons before htmx:before:request.
-    if (event.detail.ctx.sourceEvent?.submitter === document.activeElement) {
-      input.focus();
-    }
-  });
-
-  return input;
 }
 
 function setupLogSearch(form) {
+  const progress = document.querySelector("#query-progress");
   const failure = document.querySelector("#query-failure");
   const failureMessage = failure.querySelector("#query-failure-message");
   const retryButton = failure.querySelector("#retry-query");
   const refreshInterval = document.querySelector("#refresh-interval");
   const timeFilters = setupTimeFilters(form);
-  const messageInput = setupMessageFilter(form);
+  setupMessageFilter(form);
   const activity = setupLogActivity(
     document.querySelector("#log-activity"),
     document.querySelector("#log-result-total"),
@@ -458,12 +515,16 @@ function setupLogSearch(form) {
   let results = document.querySelector("#results");
   let details = setupLogDetails(results);
   let queryURL = results.dataset.queryUrl;
+  let activeRequest;
+  let latestSearch;
+  let progressTimer;
   let failedQuery;
   let manualQueryFailed = false;
+  let refreshVersion = 0;
   const requests = new WeakMap();
 
   function refreshPaused() {
-    return details?.isOpen() || timeFilters.isCustomOpen();
+    return details?.open || results.contains(document.activeElement) || timeFilters.isCustomOpen();
   }
 
   function openActivityRange(activityURL, startTime, endTime) {
@@ -475,112 +536,195 @@ function setupLogSearch(form) {
     location.assign(url);
   }
 
-  function showFailure(reason, ctx) {
-    const refreshing = ctx?.sourceElement === refreshInterval;
-    if (ctx?.sourceElement && !refreshing) {
+  function clearFailure() {
+    if (document.activeElement === retryButton) {
+      form.querySelector("button[data-search-submit]").focus({ preventScroll: true });
+    }
+    failedQuery = undefined;
+    failure.hidden = true;
+    failureMessage.textContent = "";
+  }
+
+  function showFailure(message, ctx, request) {
+    if (!request.automatic) {
       manualQueryFailed = true;
     }
-    details?.close(false);
-    failureMessage.textContent = failure.dataset[reason];
-    failedQuery = undefined;
-    if (ctx?.request.body) {
-      const { method, action, body } = ctx.request;
-      failedQuery = { method, action, source: ctx.sourceElement, values: Object.fromEntries(body) };
-    }
-    retryButton.hidden = !failedQuery;
+    const { method, action, body } = ctx.request;
+    const { paging, refreshing, pickerVersion } = request;
+    failedQuery = { method, action, values: Object.fromEntries(body), paging, refreshing, pickerVersion };
+    progress.textContent = "";
     failure.hidden = false;
-    results.hidden = true;
-    if (refreshing) {
-      activity.keepSnapshotFor();
-    } else {
-      activity.clear();
+    const description = `${message} · ${failure.dataset.previous}`;
+    if (failureMessage.textContent !== description) {
+      failureMessage.textContent = description;
+    }
+  }
+
+  function configureRequest(event) {
+    const { ctx } = event.detail;
+    const { sourceElement, logRetry } = ctx;
+    const automatic = sourceElement === refreshInterval;
+    const paging = logRetry?.paging ?? sourceElement.matches(".next");
+    if (sourceElement !== form && !automatic && !paging && !logRetry) {
+      return;
+    }
+
+    requests.set(ctx, {
+      automatic, paging, refreshing: automatic || logRetry?.refreshing,
+      refreshVersion, pickerVersion: logRetry?.pickerVersion ?? timeFilters.version(),
+    });
+    if (!automatic) {
+      latestSearch = ctx;
+      requests.get(activeRequest)?.activity?.controller.abort();
+      clearFailure();
+      progressTimer ??= setTimeout(() => { progress.textContent = progress.dataset.message; }, searchFeedbackDelay);
     }
   }
 
   function beforeRequest(event) {
     const { ctx } = event.detail;
-    const paging = Boolean(ctx.sourceElement?.matches(".next"));
-    // htmx replaces the pagination link before firing htmx:after:swap.
-    requests.set(ctx, { paging, pickerVersion: timeFilters.version() });
-    if (ctx.sourceElement !== refreshInterval && !paging) {
+    const request = requests.get(ctx);
+    if (!request) {
+      return;
+    }
+    activeRequest = ctx;
+    // A queued submission can start after the original target was replaced.
+    ctx.target = results;
+    request.restorePageFocus = request.paging && document.activeElement === ctx.sourceElement;
+    if (!request.paging) {
       activity.cancelLoading();
+      const fetchResults = ctx.fetch;
+      ctx.fetch = async (target, options) => {
+        const response = await fetchResults(target, options);
+        await prepareActivity(ctx, request, response);
+        return response;
+      };
     }
-    failedQuery = undefined;
-    failure.hidden = true;
-    const pagination = results.querySelector(".pagination");
-    if (pagination) {
-      if (pagination.contains(document.activeElement)) {
-        messageInput.focus();
-      }
-      pagination.inert = true;
+  }
+
+  function isSuperseded(ctx, request) {
+    if (request.automatic) {
+      return Boolean(latestSearch) || request.refreshVersion !== refreshVersion || refreshPaused();
     }
+    return latestSearch !== ctx;
+  }
+
+  function isLogFragment(response) {
+    return response.headers.get("Einblick-View") === "logs-results" &&
+      response.headers.get("Content-Type")?.startsWith("text/html");
+  }
+
+  async function prepareActivity(ctx, request, response) {
+    if (!response.ok || !isLogFragment(response) || isSuperseded(ctx, request)) {
+      return;
+    }
+    const template = document.createElement("template");
+    template.innerHTML = await response.clone().text();
+    const url = template.content.querySelector("#results")?.dataset.activityUrl;
+    if (!url || isSuperseded(ctx, request)) {
+      return;
+    }
+
+    // Keep the displayed rows and count together during a quick activity request.
+    const prepared = activity.prepare(url);
+    request.activity = prepared;
+    await new Promise((resolve) => {
+      const timer = setTimeout(resolve, searchFeedbackDelay);
+      prepared.ready.then(() => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
   }
 
   function afterRequest(event) {
     const { ctx } = event.detail;
-    if (ctx.sourceElement === refreshInterval && refreshPaused()) {
+    const request = requests.get(ctx);
+    if (!request) {
+      return;
+    }
+    if (isSuperseded(ctx, request)) {
       event.preventDefault();
       return;
     }
 
     const { response, text } = ctx;
     // Gateways can return HTML error pages. Only swap Einblick's fragment.
-    const isLogFragment = response.headers.get("Einblick-View") === "logs-results" &&
-      response.headers.get("Content-Type")?.startsWith("text/html") && text.trim();
-    if (isLogFragment) {
-      if (ctx.sourceElement !== refreshInterval) {
-        manualQueryFailed = response.status >= 400;
-      }
-      const earliestStart = response.headers.get("Einblick-Earliest-Start");
-      if (earliestStart && timeFilters.isCustomOpen()) {
-        event.preventDefault();
-        if (requests.get(ctx)?.pickerVersion === timeFilters.version()) {
-          timeFilters.showStartError(earliestStart);
-        }
-      }
+    const hasFragment = isLogFragment(response) && text.trim();
+    if (hasFragment && response.status < 400) {
       return;
     }
 
     event.preventDefault();
-    const reason = { 499: "cancelled", 504: "timeout" }[response.status];
-    showFailure(reason ?? "request", ctx);
-  }
-
-  function requestError(event) {
-    const { ctx } = event.detail;
-    if (ctx?.sourceElement === refreshInterval && refreshPaused()) {
-      return;
-    }
-    showFailure(ctx?.request.signal?.reason === "timeout" ? "timeout" : "request", ctx);
-  }
-
-  function afterResultsSwap(event) {
-    results = document.querySelector("#results");
-    details = setupLogDetails(results);
-
-    const { ctx } = event.detail;
-    const refreshing = ctx?.sourceElement === refreshInterval;
-    const request = requests.get(ctx);
-    const keepsActivity = refreshing || request?.paging;
-    const { queryUrl, activityUrl } = results.dataset;
-    if (!queryUrl) {
-      if (refreshing) {
-        activity.keepSnapshotFor();
-      } else {
-        activity.clear();
+    const earliestStart = response.headers.get("Einblick-Earliest-Start");
+    if (earliestStart && timeFilters.isCustomOpen()) {
+      manualQueryFailed = true;
+      if (request.pickerVersion === timeFilters.version()) {
+        timeFilters.showStartError(earliestStart);
       }
       return;
     }
 
+    const fragment = hasFragment ? new DOMParser().parseFromString(text, "text/html") : undefined;
+    const message = fragment?.querySelector(".query-alert[role=alert] > p")?.textContent;
+    const reason = { 499: "cancelled", 504: "timeout" }[response.status];
+    showFailure(message || failure.dataset[reason ?? "request"], ctx, request);
+  }
+
+  function requestError(event) {
+    const { ctx } = event.detail;
+    const request = requests.get(ctx);
+    if (!request || isSuperseded(ctx, request)) {
+      return;
+    }
+    const reason = ctx.request.signal.reason === "timeout" ? "timeout" : "request";
+    showFailure(failure.dataset[reason], ctx, request);
+  }
+
+  function finishRequest(event) {
+    const { ctx } = event.detail;
+    if (activeRequest !== ctx) {
+      return;
+    }
+    requests.get(ctx)?.activity?.controller.abort();
+    activeRequest = undefined;
+    if (latestSearch === ctx) {
+      latestSearch = undefined;
+      clearTimeout(progressTimer);
+      progressTimer = undefined;
+      progress.textContent = "";
+    }
+    if (!latestSearch) {
+      activity.resumeLoading();
+    }
+  }
+
+  function afterResultsSwap(event) {
+    const request = requests.get(event.detail.ctx);
+    if (!request) {
+      return;
+    }
+    results = document.querySelector("#results");
+    details = setupLogDetails(results);
+    clearFailure();
+    if (!request.automatic) {
+      manualQueryFailed = false;
+    }
+
+    const { queryUrl, activityUrl } = results.dataset;
     queryURL = queryUrl;
-    const pickerChanged = request && request.pickerVersion !== timeFilters.version();
-    const preservePicker = timeFilters.isCustomOpen() && (keepsActivity || pickerChanged);
+    const preserveAppliedPicker = request.refreshing || request.paging;
+    const pickerChanged = request.pickerVersion !== timeFilters.version();
+    const preservePicker = timeFilters.isCustomOpen() && (preserveAppliedPicker || pickerChanged);
     timeFilters.apply(results.dataset, { preservePicker });
 
-    if (keepsActivity) {
-      activity.keepSnapshotFor(activityUrl);
-    } else {
-      activity.load(activityUrl);
+    if (!request.paging) {
+      const prepared = request.activity ?? activity.prepare(activityUrl);
+      request.activity = undefined;
+      activity.show(prepared);
+    }
+    if (request.restorePageFocus && document.activeElement === document.body) {
+      results.querySelector(".table-card")?.focus({ preventScroll: true });
     }
   }
 
@@ -594,27 +738,33 @@ function setupLogSearch(form) {
     let timer;
     refreshInterval.closest(".refresh-control").hidden = false;
     refreshInterval.addEventListener("change", () => {
+      refreshVersion += 1;
+      const request = requests.get(activeRequest);
+      if (request?.automatic) {
+        request.activity?.controller.abort();
+      }
       clearInterval(timer);
       const interval = htmx.parseInterval(refreshInterval.value);
       if (interval) {
         timer = setInterval(() => {
-          if (!manualQueryFailed && !refreshPaused()) {
+          if (!activeRequest && !latestSearch && !manualQueryFailed && !refreshPaused() && !activity.isLoading()) {
             htmx.ajax("PUT", queryURL, { source: refreshInterval });
           }
         }, interval);
       }
     });
     retryButton.addEventListener("click", () => {
-      const { method, action, source, values } = failedQuery;
-      htmx.ajax(method, action, { source, values });
+      const { method, action, values, ...logRetry } = failedQuery;
+      htmx.ajax(method, action, { source: retryButton, values, logRetry });
     });
   }
 
+  document.addEventListener("htmx:config:request", configureRequest);
   document.addEventListener("htmx:before:request", beforeRequest);
-  document.addEventListener("htmx:finally:request", () => results.querySelector(".pagination")?.removeAttribute("inert"));
+  document.addEventListener("htmx:finally:request", finishRequest);
   document.addEventListener("htmx:before:history:update", (event) => {
-    const { history: update, sourceElement } = event.detail;
-    if (sourceElement === refreshInterval || update.path === location.pathname + location.search) {
+    const { history: update } = event.detail;
+    if (requests.get(activeRequest)?.refreshing || update.path === location.pathname + location.search) {
       event.preventDefault();
     }
   });

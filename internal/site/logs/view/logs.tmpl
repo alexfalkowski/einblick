@@ -8,13 +8,12 @@
     <input id="service" class="input input-sm" name="service" form="log-filters" value="{{.Model.Filters.ServiceName}}"
            placeholder="{{.Localizer.Text "logs.all_services"}}">
   </aside>
-  <section class="workspace" aria-labelledby="logs-heading"
-           hx-disable:inherited="#log-filters [type=submit], button[form=log-filters]">
+  <section class="workspace" aria-labelledby="logs-heading" hx-swap:inherited="outerHTML settle:0">
     <header class="workspace-header">
       <h1 id="logs-heading">{{.Localizer.Text "logs.heading"}}</h1>
       <div class="refresh-control" hidden>
         <label for="refresh-interval">{{.Localizer.Text "logs.auto_refresh"}}</label>
-        <select id="refresh-interval" class="select select-sm" hx-target="#results" hx-swap="outerHTML" hx-sync="#main:drop">
+        <select id="refresh-interval" class="select select-sm" hx-target="#results" hx-sync="#main:drop">
           <option value="off">{{.Localizer.Text "logs.refresh_off"}}</option>
           <option value="5s">5s</option>
           <option value="10s">10s</option>
@@ -22,8 +21,8 @@
         </select>
       </div>
     </header>
-    <form id="log-filters" action="/logs" method="get" hx-put="/logs" hx-target="#results" hx-swap="outerHTML"
-          hx-indicator="#query-progress" hx-sync="#main:drop">
+    <form id="log-filters" action="/logs" method="get" hx-put="/logs" hx-target="#results"
+          hx-sync="#main:queue last">
       <input id="start-time" type="hidden" name="start_time" value="{{.Model.Filters.StartTime.Format $exactTime}}">
       <input id="end-time" type="hidden" name="end_time" value="{{.Model.Filters.EndTime.Format $exactTime}}">
       <input id="search-window" type="hidden" name="search_window" value="{{.Model.Filters.RecentWindow}}">
@@ -36,8 +35,12 @@
           {{range .Model.Filters.Windows}}
           <button name="window" value="{{.Value}}" type="submit" formnovalidate aria-pressed="{{eq .Value $.Model.Filters.SelectedWindow}}">{{$.Localizer.Text .Label}}</button>
           {{end}}
-          <button id="custom-range" type="button" aria-controls="custom-dates" aria-expanded="{{.Model.Filters.Custom}}"
-                  aria-pressed="{{.Model.Filters.Custom}}">{{.Localizer.Text "time_range.custom"}}</button>
+          <div class="custom-range-control">
+            <button id="custom-range" type="button" aria-controls="custom-dates" aria-expanded="{{.Model.Filters.Custom}}"
+                    aria-pressed="{{.Model.Filters.Custom}}">{{.Localizer.Text "time_range.custom"}}</button>
+            <span id="picker-time-zone" class="time-zone-pill"{{if not .Model.Filters.Custom}} hidden{{end}}
+                  data-invalid-time="{{.Localizer.Text "time_range.invalid_local_time"}}">UTC</span>
+          </div>
           <span id="current-range"{{if or .Model.Filters.SelectedWindow .Model.Filters.Custom}} hidden{{end}}>{{.Localizer.Text "logs.current_range"}}</span>
         </div>
         <div id="custom-dates" class="custom-dates"{{if not .Model.Filters.Custom}} hidden{{end}}>
@@ -51,9 +54,9 @@
           <input id="end-utc" class="input input-sm" type="datetime-local" name="end_utc" step="1" required
                  aria-label="{{.Localizer.Text "time_range.to"}}"
                  value="{{.Model.Filters.EndTime.Format $pickerTime}}"{{if not .Model.Filters.Custom}} disabled{{end}}>
-          <p class="lookback">
-            {{if eq .Model.Filters.LookbackDays 1}}{{.Localizer.Text "time_range.lookback_one_day"}} · {{else if .Model.Filters.LookbackDays}}{{.Localizer.Message "time_range.lookback_days" (dict "Days" .Model.Filters.LookbackDays)}} · {{else if .Model.Filters.Lookback}}{{.Localizer.Message "time_range.lookback_duration" (dict "Duration" .Model.Filters.Lookback)}} · {{end}}<span id="picker-time-zone" data-invalid-time="{{.Localizer.Text "time_range.invalid_local_time"}}">UTC</span>
-          </p>
+          {{if or .Model.Filters.LookbackDays .Model.Filters.Lookback}}
+          <p class="lookback">{{if eq .Model.Filters.LookbackDays 1}}{{.Localizer.Text "time_range.lookback_one_day"}}{{else if .Model.Filters.LookbackDays}}{{.Localizer.Message "time_range.lookback_days" (dict "Days" .Model.Filters.LookbackDays)}}{{else}}{{.Localizer.Message "time_range.lookback_duration" (dict "Duration" .Model.Filters.Lookback)}}{{end}}</p>
+          {{end}}
         </div>
         <label for="text">{{.Localizer.Text "logs.text"}}</label>
         <div class="message-field">
@@ -79,33 +82,42 @@
         </div>
       </div>
     </form>
-    <div id="query-progress" role="status">
-      <span class="htmx-indicator">{{.Localizer.Text "logs.loading"}}</span>
-    </div>
-    <div id="query-failure" class="query-alert" hidden
-       data-request="{{.Localizer.Text "logs.request_failed"}}"
-       data-timeout="{{.Localizer.Text "logs.timed_out"}}"
-       data-cancelled="{{.Localizer.Text "logs.cancelled"}}">
-      <p id="query-failure-message" role="alert"></p>
-      <button id="retry-query" type="button" class="btn btn-outline btn-sm">{{.Localizer.Text "logs.retry"}}</button>
+    <div class="query-status">
+      <p id="query-progress" role="status" data-message="{{.Localizer.Text "logs.loading"}}"></p>
+      <div id="query-failure" hidden
+           data-request="{{.Localizer.Text "logs.request_failed"}}"
+           data-timeout="{{.Localizer.Text "logs.timed_out"}}"
+           data-cancelled="{{.Localizer.Text "logs.cancelled"}}"
+           data-previous="{{.Localizer.Text "logs.previous_results"}}">
+        <p id="query-failure-message" role="alert"></p>
+        <button id="retry-query" type="button" class="retry-link"
+                hx-target="#results" hx-sync="#main:queue last">{{.Localizer.Text "logs.retry"}}</button>
+      </div>
     </div>
     <section id="log-activity" class="log-activity" aria-labelledby="activity-heading" hidden
-             data-loading="{{.Localizer.Text "logs.activity_loading"}}"
+             data-previous="{{.Localizer.Text "logs.activity_previous"}}"
              data-unavailable="{{.Localizer.Text "logs.activity_unavailable"}}"
              data-busy="{{.Localizer.Text "logs.activity_busy"}}"
              data-timeout="{{.Localizer.Text "logs.activity_timeout"}}">
       <div class="activity-heading">
-        <h2 id="activity-heading">{{.Localizer.Text "logs.activity"}} <span id="activity-interval" class="activity-interval"></span></h2>
+        <div class="activity-title">
+          <h2 id="activity-heading">{{.Localizer.Text "logs.activity"}}</h2>
+          <span id="activity-interval" class="activity-interval"></span>
+        </div>
         <p id="activity-snapshot" hidden></p>
       </div>
-      <div class="activity-feedback">
-        <p id="activity-status" role="status" hidden></p>
-        <button id="retry-activity" class="btn btn-ghost btn-sm" type="button" hidden>{{.Localizer.Text "logs.activity_retry"}}</button>
+      <div class="activity-frame">
+        <div id="activity-content"></div>
+        <div class="activity-feedback" id="activity-feedback" hidden>
+          <p id="activity-status" role="status"></p>
+          <button id="retry-activity" class="retry-link" type="button" hidden>{{.Localizer.Text "logs.activity_retry"}}</button>
+        </div>
       </div>
-      <div id="activity-content" aria-live="polite"></div>
     </section>
     <div aria-live="polite">
-      <p id="log-result-total" class="log-result-total" hidden></p>
+      <p id="log-result-total" class="log-result-total" hidden
+         data-updating="{{.Localizer.Text "logs.count_updating"}}"
+         data-unavailable="{{.Localizer.Text "logs.count_unavailable"}}"></p>
       {{template "results" .}}
     </div>
   </section>
@@ -169,8 +181,8 @@
   </dialog>
   {{if .Model.NextURL}}
   <div class="pagination">
-    <a class="next btn btn-outline btn-primary btn-sm" href="{{.Model.NextURL}}" hx-put="{{.Model.NextURL}}" hx-target="#results" hx-swap="outerHTML"
-       hx-indicator="#query-progress" hx-sync="#main:drop">{{.Localizer.Text "logs.next"}}</a>
+    <a class="next btn btn-outline btn-primary btn-sm" href="{{.Model.NextURL}}" hx-put="{{.Model.NextURL}}" hx-target="#results"
+       hx-sync="#main:queue last">{{.Localizer.Text "logs.next"}}</a>
   </div>
   {{end}}
   {{else}}

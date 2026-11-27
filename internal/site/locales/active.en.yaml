@@ -35,7 +35,8 @@ logs.related_logs: Find related logs
 logs.query: Search
 logs.clear_search: Clear search
 logs.reset: Reset
-logs.loading: Loading logs…
+logs.loading: Searching…
+logs.previous_results: Previous results
 logs.request_failed: Couldn’t load logs
 logs.retry: Try again
 logs.results: Log query results
@@ -92,8 +93,10 @@ logs.date_range_too_wide: This time range exceeds the search limit.
 logs.invalid_dates: Enter a valid start and end time.
 logs.date_outside_history: 'Choose a more recent start date.'
 logs.activity: Log activity
+logs.count_updating: Updating count…
+logs.count_unavailable: Match count unavailable
 logs.activity_through: 'Through {{.End}}'
-logs.activity_loading: 'Loading…'
+logs.activity_previous: Previous search
 logs.activity_unavailable: 'Chart unavailable'
 logs.activity_busy: 'Archive busy'
 logs.activity_timeout: 'Chart timed out'

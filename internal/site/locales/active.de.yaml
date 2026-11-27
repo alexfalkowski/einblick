@@ -35,7 +35,8 @@ logs.related_logs: Zugehörige Protokolle finden
 logs.query: Suchen
 logs.clear_search: Suchtext löschen
 logs.reset: Zurücksetzen
-logs.loading: Protokolle werden geladen …
+logs.loading: Suche läuft …
+logs.previous_results: Vorherige Ergebnisse
 logs.request_failed: Protokolle konnten nicht geladen werden
 logs.retry: Erneut versuchen
 logs.results: Ergebnisse der Protokollabfrage
@@ -92,8 +93,10 @@ logs.date_range_too_wide: Dieser Zeitraum überschreitet das Suchlimit.
 logs.invalid_dates: Gib einen gültigen Beginn und ein gültiges Ende ein.
 logs.date_outside_history: 'Wähle ein neueres Startdatum.'
 logs.activity: Protokollaktivität
+logs.count_updating: Treffer werden gezählt …
+logs.count_unavailable: Trefferzahl nicht verfügbar
 logs.activity_through: 'Bis {{.End}}'
-logs.activity_loading: 'Wird geladen …'
+logs.activity_previous: Vorherige Suche
 logs.activity_unavailable: 'Diagramm nicht verfügbar'
 logs.activity_busy: 'Archiv ausgelastet'
 logs.activity_timeout: 'Zeitlimit für Diagramm erreicht'

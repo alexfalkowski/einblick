@@ -29,7 +29,7 @@
       </div>
       {{end}}
     </div>
-    <div class="activity-tooltip" hidden data-search="{{.Localizer.Text "logs.activity_search"}}"></div>
+    <div class="log-tooltip activity-tooltip" hidden data-search="{{.Localizer.Text "logs.activity_search"}}"></div>
   </div>
   <div class="activity-axis">
     {{range $index, $tick := .Model.Ticks}}
