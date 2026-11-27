@@ -36,6 +36,7 @@ logs.query: Search
 logs.clear_search: Clear search
 logs.reset: Reset
 logs.loading: Searching…
+logs.search_timed_out: Search timed out
 logs.previous_results: Previous results
 logs.request_failed: Couldn’t load logs
 logs.retry: Try again

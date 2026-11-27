@@ -36,6 +36,7 @@ logs.query: Suchen
 logs.clear_search: Suchtext löschen
 logs.reset: Zurücksetzen
 logs.loading: Suche läuft …
+logs.search_timed_out: Zeitlimit erreicht
 logs.previous_results: Vorherige Ergebnisse
 logs.request_failed: Protokolle konnten nicht geladen werden
 logs.retry: Erneut versuchen

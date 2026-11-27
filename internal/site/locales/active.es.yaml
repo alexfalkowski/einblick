@@ -36,6 +36,7 @@ logs.query: Buscar
 logs.clear_search: Borrar búsqueda
 logs.reset: Restablecer
 logs.loading: Buscando…
+logs.search_timed_out: Tiempo agotado
 logs.previous_results: Resultados anteriores
 logs.request_failed: No se pudieron cargar los registros
 logs.retry: Volver a intentar

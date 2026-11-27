@@ -84,13 +84,15 @@
     </form>
     <div class="query-status">
       <p id="query-progress" role="status" data-message="{{.Localizer.Text "logs.loading"}}"></p>
-      <div id="query-failure" hidden
+      <div id="query-failure" class="query-alert" hidden
            data-request="{{.Localizer.Text "logs.request_failed"}}"
-           data-timeout="{{.Localizer.Text "logs.timed_out"}}"
-           data-cancelled="{{.Localizer.Text "logs.cancelled"}}"
-           data-previous="{{.Localizer.Text "logs.previous_results"}}">
-        <p id="query-failure-message" role="alert"></p>
-        <button id="retry-query" type="button" class="retry-link"
+           data-timeout="{{.Localizer.Text "logs.search_timed_out"}}"
+           data-cancelled="{{.Localizer.Text "logs.cancelled"}}">
+        <div class="query-alert-copy" role="alert">
+          <p id="query-failure-message"></p>
+          <p class="query-alert-context">{{.Localizer.Text "logs.previous_results"}}</p>
+        </div>
+        <button id="retry-query" type="button" class="btn btn-outline btn-sm"
                 hx-target="#results" hx-sync="#main:queue last">{{.Localizer.Text "logs.retry"}}</button>
       </div>
     </div>
