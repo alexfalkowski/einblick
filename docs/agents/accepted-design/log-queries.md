@@ -2,6 +2,13 @@
 
 These entries are part of the [accepted-design index](../accepted-design.md).
 
+## Browser appearance
+
+Use the existing light palette by default. Apply the dark palette through CSS
+`prefers-color-scheme` so the open page follows changes to the browser’s
+appearance preference. Set `color-scheme` so native controls match.
+[Frontend requirements](../../requirements.md#86-embedded-frontend)
+
 ## Browser time selection and refresh
 
 The Logs page opens on the last hour, capped by the configured query limit.
