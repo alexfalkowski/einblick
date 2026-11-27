@@ -53,12 +53,9 @@ timestamp selection, supported shapes and duplicate policy for E-11.
   requests before the final day of the bucket sample. The daily storage
   series was sparse while the archive grew. Measure the later billing window
   across the account when recalculating. [R2 pricing](https://developers.cloudflare.com/r2/pricing/)
-- In the log archive sizing probe, 64 identical records under the 640 KiB
-  batch target produced one 4,482-byte Parquet file. Adding 9,000-byte values
-  to the shared resource and scope produced three files totaling 87,877 bytes.
-  Upload and full-object verification bytes matched staged bytes. Idle
-  next-day lookups took 0.7–7.9 ms with up to 64 retained records. Use these
-  inputs when comparing trace and metric archive sizing.
+- The object and request counts above predate daily batching. Use the
+  seven-file daily-layout sample for the current batch shape and collect
+  fresh request counts when projecting costs for traces and metrics.
 - E-12 and E-17 extend the existing MVC site under `internal/site`. Follow the
   [Logs feature layout](../internal/site/logs) and reuse the
   [embedded catalogs](../internal/site/locales), [shared layouts](../internal/site/root/layout) and

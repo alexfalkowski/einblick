@@ -1,4 +1,46 @@
+const calendarFields = { month: "short", day: "2-digit" };
+const clockFields = { hour: "2-digit", minute: "2-digit", hourCycle: "h23" };
+
+function logDate(value) {
+  return new Date(value.replace(/\.(\d+)Z$/, (_, fraction) => `.${fraction.padEnd(3, "0").slice(0, 3)}Z`));
+}
+
+function detailTimeFormatter(language) {
+  return new Intl.DateTimeFormat(language, {
+    ...calendarFields, ...clockFields, year: "numeric", second: "2-digit",
+    fractionalSecondDigits: 3, timeZoneName: "shortOffset",
+  });
+}
+
+function exactLocalTime(formatter, timestamp) {
+  // Intl formats milliseconds. Keep any additional digits from the original timestamp.
+  const fraction = timestamp.match(/\.(\d+)Z$/)?.[1];
+  return formatter.formatToParts(logDate(timestamp))
+    .map(({ type, value }) => type === "fractionalSecond" && fraction ? fraction : value)
+    .join("");
+}
+
+function localizeLogTimes(results) {
+  const times = results.querySelectorAll("time[data-display-time]");
+  if (!times.length) {
+    return;
+  }
+  const rowTime = new Intl.DateTimeFormat(results.lang, {
+    ...calendarFields, ...clockFields, second: "2-digit",
+  });
+  const detailTime = detailTimeFormatter(results.lang);
+  for (const time of times) {
+    const rounded = time.dataset.displayTime;
+    time.textContent = rounded ? detailTime.format(logDate(rounded)) : rowTime.format(logDate(time.dateTime));
+    time.title = exactLocalTime(detailTime, time.dateTime);
+  }
+  for (const time of results.querySelectorAll(".log-timing time")) {
+    time.textContent = exactLocalTime(detailTime, time.dateTime);
+  }
+}
+
 function setupLogDetails(results) {
+  localizeLogTimes(results);
   const panel = results.querySelector(".log-details-panel");
   if (!panel?.showModal) {
     return;
@@ -58,9 +100,37 @@ function setupLogDetails(results) {
   return { close, isOpen: () => panel.open };
 }
 
-function setupActivitySelection(chart, selectRange) {
+function setupActivitySelection(summary, selectRange) {
+  const chart = summary.querySelector(".activity-bars");
   const bars = [...chart.querySelectorAll(".activity-bar")];
   const tooltip = chart.parentElement.querySelector(".activity-tooltip");
+  const ticks = [...summary.querySelectorAll(".activity-axis time")];
+  const lastTick = ticks.at(-1);
+  const precision = Number(summary.dataset.tooltipPrecision);
+  const clock = { ...clockFields };
+  if (precision === 1000) {
+    clock.second = "2-digit";
+  }
+  const axis = new Intl.DateTimeFormat(summary.lang, { ...calendarFields, ...clock });
+  const axisWithZone = new Intl.DateTimeFormat(summary.lang, {
+    ...calendarFields, ...clock, timeZoneName: "shortOffset",
+  });
+  const day = new Intl.DateTimeFormat(summary.lang, { dateStyle: "short" });
+  const round = (date) => Math.round(date.getTime() / precision) * precision;
+  const sameDay = day.format(round(logDate(ticks[0].dateTime))) === day.format(round(logDate(lastTick.dateTime)));
+  const tooltipTime = new Intl.DateTimeFormat(summary.lang, {
+    ...(sameDay ? {} : calendarFields), ...clock, timeZoneName: "shortOffset",
+  });
+  const tooltipBounds = bars.map(({ dataset }) => ({
+    start: tooltipTime.format(round(logDate(dataset.start))),
+    end: tooltipTime.format(round(logDate(dataset.end))),
+  }));
+  const detailTime = detailTimeFormatter(summary.lang);
+  for (const tick of ticks) {
+    tick.textContent = (tick === lastTick ? axisWithZone : axis).format(logDate(tick.dateTime));
+    tick.title = exactLocalTime(detailTime, tick.dateTime);
+  }
+
   let first;
   const barAt = (clientX) => {
     const { left, width } = chart.getBoundingClientRect();
@@ -71,7 +141,7 @@ function setupActivitySelection(chart, selectRange) {
     const start = Math.min(first, last);
     const end = Math.max(first, last);
     bars.forEach((bar, index) => bar.toggleAttribute("data-selected", index >= start && index <= end));
-    const range = `${bars[start].dataset.startLabel} – ${bars[end].dataset.endLabel} UTC`;
+    const range = `${tooltipBounds[start].start} – ${tooltipBounds[end].end}`;
     showTooltip(last, `${tooltip.dataset.search} ${range}`);
   };
 
@@ -100,7 +170,10 @@ function setupActivitySelection(chart, selectRange) {
     }
     const last = barAt(event.clientX);
     if (first === undefined) {
-      showTooltip(last, bars[last].dataset.summary);
+      const { start, end } = tooltipBounds[last];
+      const label = summary.dataset.bucketFormat
+        .replace("{start}", start).replace("{end}", end).replace("{count}", bars[last].dataset.count);
+      showTooltip(last, label);
     } else {
       selectThrough(last);
     }
@@ -125,6 +198,8 @@ function setupActivitySelection(chart, selectRange) {
     tooltip.hidden = true;
     bars.forEach((bar) => bar.removeAttribute("data-selected"));
   });
+
+  return summary.dataset.throughFormat.replace("{end}", lastTick.textContent);
 }
 
 function setupLogActivity(panel, total, selectRange) {
@@ -187,9 +262,8 @@ function setupLogActivity(panel, total, selectRange) {
       }
       content.innerHTML = fragment;
       const summary = content.querySelector(".activity-summary");
-      setupActivitySelection(summary.querySelector(".activity-bars"), (startTime, endTime) => selectRange(url, startTime, endTime));
+      snapshot.textContent = setupActivitySelection(summary, (startTime, endTime) => selectRange(url, startTime, endTime));
       interval.textContent = summary.dataset.intervalLabel;
-      snapshot.textContent = summary.dataset.throughLabel;
       total.textContent = summary.dataset.totalLabel;
       updateSnapshot();
       status.hidden = true;
@@ -225,6 +299,20 @@ function setupLogActivity(panel, total, selectRange) {
   return { load, keepSnapshotFor, cancelLoading, clear: () => load() };
 }
 
+function localPickerValue(date) {
+  const local = new Date(0);
+  local.setUTCFullYear(date.getFullYear(), date.getMonth(), date.getDate());
+  local.setUTCHours(date.getHours(), date.getMinutes(), date.getSeconds());
+  return local.toISOString().slice(0, 19);
+}
+
+function utcPickerValue(value) {
+  const seconds = value.length === 16 ? `${value}:00` : value;
+  // Date chooses the earlier instant at a repeated local time and moves a skipped time forward.
+  const date = new Date(seconds);
+  return Number.isFinite(date.getTime()) && localPickerValue(date) === seconds ? date.toISOString().slice(0, 19) : "";
+}
+
 function setupTimeFilters(form) {
   const timePresets = form.querySelectorAll(".time-presets button[name=window]");
   const currentRange = form.querySelector("#current-range");
@@ -238,7 +326,47 @@ function setupTimeFilters(form) {
   const endTimeField = form.querySelector("#end-time");
   const searchWindow = form.querySelector("#search-window");
   const searchButtons = form.querySelectorAll("[data-search-submit]");
+  const zoneLabel = form.querySelector("#picker-time-zone");
+  const pickerBounds = [[startPicker, startTimeField], [endPicker, endTimeField]].map(([picker, applied]) => ({
+    picker, applied, label: picker.getAttribute("aria-label"),
+  }));
+  const language = form.closest("[lang]").lang;
+  let formatter;
   let pickerVersion = 0;
+
+  function renderPickers() {
+    formatter = new Intl.DateTimeFormat(language, {
+      ...calendarFields, ...clockFields, year: "numeric", second: "2-digit", timeZoneName: "shortOffset",
+    });
+    const timeZone = formatter.resolvedOptions().timeZone;
+    zoneLabel.textContent = timeZone;
+    for (const bound of pickerBounds) {
+      const { picker, applied, label } = bound;
+      picker.setAttribute("aria-label", label.replace("UTC", timeZone));
+      bound.exact = applied.value;
+      picker.value = localPickerValue(logDate(bound.exact));
+      bound.renderedValue = picker.value;
+      picker.setCustomValidity("");
+    }
+  }
+
+  renderPickers();
+  for (const bound of pickerBounds) {
+    bound.picker.addEventListener("input", () => {
+      const { picker, renderedValue } = bound;
+      const skippedTime = picker.value && picker.value !== renderedValue && !utcPickerValue(picker.value);
+      picker.setCustomValidity(skippedTime ? zoneLabel.dataset.invalidTime : "");
+    });
+  }
+  form.addEventListener("formdata", ({ formData }) => {
+    for (const { picker, exact, renderedValue } of pickerBounds) {
+      if (formData.has(picker.name)) {
+        // Untouched fields keep the UTC bounds used to render them, including fractional seconds.
+        const utc = picker.value === renderedValue ? exact.slice(0, -1) : utcPickerValue(picker.value);
+        formData.set(picker.name, utc);
+      }
+    }
+  });
 
   function showCustom(custom, { window: selectedWindow, recentWindow } = {}) {
     customButton.setAttribute("aria-expanded", custom);
@@ -257,10 +385,8 @@ function setupTimeFilters(form) {
     startTimeField.value = startTime;
     endTimeField.value = endTime;
 
-    // The pickers show UTC to the second. The hidden fields retain the exact timestamps.
     if (!preservePicker) {
-      startPicker.value = startTime.slice(0, 19);
-      endPicker.value = endTime.slice(0, 19);
+      renderPickers();
       clearStartError();
     }
     searchWindow.value = recentWindow;
@@ -275,9 +401,7 @@ function setupTimeFilters(form) {
   }
 
   function showStartError(cutoff) {
-    const date = new Intl.DateTimeFormat(form.closest("[lang]")?.lang, {
-      dateStyle: "medium", timeStyle: "medium", timeZone: "UTC", hourCycle: "h23",
-    }).format(new Date(cutoff));
+    const date = formatter.format(logDate(cutoff));
     startPicker.setAttribute("aria-invalid", "true");
     startError.textContent = startError.dataset.message.replace("{date}", date);
     startError.hidden = false;

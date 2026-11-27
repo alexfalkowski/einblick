@@ -19,7 +19,8 @@ time_range.to: To (UTC)
 time_range.lookback_days: 'Last {{.Days}} days'
 time_range.lookback_one_day: 'Last 24 hours'
 time_range.lookback_duration: 'Last {{.Duration}}'
-time_range.start_too_early: 'Choose a date on or after {{.Date}} UTC.'
+time_range.start_too_early: 'Choose a date on or after {{.Date}}.'
+time_range.invalid_local_time: 'This time does not exist in your time zone.'
 logs.event_format: 02 Jan, 15:04:05
 logs.level.debug: Debug
 logs.level.info: Info
@@ -38,19 +39,18 @@ logs.loading: Loading logs…
 logs.request_failed: Couldn’t load logs
 logs.retry: Try again
 logs.results: Log query results
-logs.timestamp: Event time (UTC)
+logs.timestamp: Event time
 logs.message: Message
 logs.details: Log details
 logs.close_details: Close details
 logs.no_service: No service name
 logs.no_body: No message
 logs.structured_body: Structured message
-logs.received: Received (UTC)
-logs.received_short: Received
+logs.received: Received
 logs.received_later: '{{.ReceiptOffset}} later'
 logs.received_earlier: '{{.ReceiptOffset}} earlier'
 logs.received_same: At the same time
-logs.observed: Observed time (UTC)
+logs.observed: Observed time
 logs.detail_time_format: 02 Jan 2006, 15:04:05.000
 logs.attributes: Attributes
 logs.source: Source
@@ -89,10 +89,10 @@ logs.open: Open Logs
 logs.invalid_filters: Check the search filters and try again.
 logs.date_order: End time must be after start time.
 logs.date_range_too_wide: This time range exceeds the search limit.
-logs.invalid_dates: Enter a valid start and end time in UTC.
+logs.invalid_dates: Enter a valid start and end time.
 logs.date_outside_history: 'Choose a more recent start date.'
 logs.activity: Log activity
-logs.activity_through: 'Through {{.End}} UTC'
+logs.activity_through: 'Through {{.End}}'
 logs.activity_loading: 'Loading…'
 logs.activity_unavailable: 'Chart unavailable'
 logs.activity_busy: 'Archive busy'
@@ -103,7 +103,7 @@ logs.one_match: '1 match'
 logs.activity_search: Search
 logs.activity_tick_format: 02 Jan 15:04
 logs.activity_interval: '{{.Size}}{{.Unit}} buckets'
-logs.activity_bucket: '{{.Start}} – {{.End}} UTC · {{.Count}} logs'
+logs.activity_bucket: '{{.Start}} – {{.End}} · {{.Count}} logs'
 logs.activity_seconds: s
 logs.activity_minutes: min
 logs.activity_hours: h

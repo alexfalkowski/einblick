@@ -7,9 +7,9 @@
 and [historical log reads and local eviction](operations.md#-historical-log-availability)
 are implemented. Metrics and traces remain print-only.
 
-**Revision:** 0.27
+**Revision:** 0.28
 
-**Last updated:** 2026-11-26
+**Last updated:** 2026-11-27
 
 **Audience:** Implementing agents, reviewers, product owner, and operators.
 
@@ -79,7 +79,7 @@ The service should remain understandable to a small engineering team. Prefer an 
 | D-010 | Frontend libraries | Follow Web’s MVC/htmx full-page and partial-view pattern and render built-in charts with a small embedded plotting library. uPlot is the proposed chart library; Grafana is not a runtime dependency. | Built-in charts agreed; library proposed |
 | D-011 | Retention | Configurable; seven days is acceptable for normal operation. Use a shorter value while testing. | Agreed direction |
 | D-012 | UI authentication | Defer site authentication entirely for v1. A reusable go-service solution will be designed separately; no credential-file or session implementation is required here. | Agreed direction |
-| D-013 | Local persistence | A persistent volume holds DuckDB, its WAL, and pending exports. | Working design |
+| D-013 | Local persistence | A persistent volume holds DuckDB, its WAL and durable export state. A separate quota-limited workspace holds staged Parquet files. | Implemented for logs |
 | D-014 | Acknowledgement | Durable v1 acknowledges accepted telemetry after a successful local DuckDB commit; R2 upload is asynchronous. The early P0 printer acknowledges receipt only and discards records. | Working design; durability consequence documented below |
 | D-015 | Implementation order | Print all three signals first, then add persistence, queries, archival and the frontend through feature steps. | Agreed direction |
 | D-016 | Service dashboards | A small service catalog selects ready-made HTTP and/or gRPC panels plus Logs and Traces views, using our shared go-service instrumentation. | Agreed direction |
@@ -179,22 +179,27 @@ cardinality, retained sizes, or production capacity.
 
 ## 7. Working architecture
 
-This is the first-version target. The [README](../README.md#-telemetry-ingestion)
+This is the first-version target. Logs use the durable path today. Metrics and
+traces currently print to the service logger. The [README](../README.md#-telemetry-ingestion)
 shows the current data flow.
 
 ```mermaid
 flowchart TD
     accTitle: First-version target architecture
-    accDescr: All three signals commit to local DuckDB. Background export publishes Parquet to R2, and browser and API queries use local or archived data.
-    C[Application services] -->|OTLP/gRPC| I[Ingestion for all three signals]
+    accDescr: Logs already follow the durable DuckDB and R2 path. The target extends that path to metrics and traces and adds built-in browser views for them.
+    C[Application services] -->|OTLP/gRPC| I[Durable log ingestion]
+    C -. OTLP/gRPC .-> P[Planned durable trace and metric ingestion]
     I -->|Commit before acknowledgement| D[(DuckDB on persistent volume)]
-    D -->|Background export| E[Local Parquet staging]
-    E -->|Planned publication| R[(Private Cloudflare R2)]
-    B[Browser] --> M[Embedded MVC views and charts]
+    P -. Commit before acknowledgement .-> D
+    D -->|Background export| E[Parquet on separate staging workspace]
+    E -->|Publish when configured| R[(Private Cloudflare R2)]
+    B[Browser] --> M[Logs MVC page and activity chart]
+    B -.-> V[Planned Traces and Overview views]
     M --> Q[Bounded queries]
+    V -.-> Q
     A[API clients] --> Q
-    Q -->|Recent| D
-    Q -->|Planned historical reads| R
+    Q -->|Query local rows and required archive history| D
+    D -->|Read archived Parquet through httpfs| R
 ```
 
 All service components run in one executable. Templates and first-party CSS
@@ -215,7 +220,8 @@ An illustrative local layout is:
 
 The WAL is managed by DuckDB. It may not exist after a clean checkpoint or shutdown. The application must not treat its absence as an error or manipulate it as an independent replication stream.
 
-An illustrative archive layout is:
+The archive layout keeps separate signal/day prefixes. The log prefix is
+implemented. The metric and trace prefixes illustrate the target layout.
 
 ```text
 v1/signal=logs/day=2026-11-02/<batch-id>.parquet
@@ -223,7 +229,9 @@ v1/signal=metrics/day=2026-11-02/<batch-id>.parquet
 v1/signal=traces/day=2026-11-02/<batch-id>.parquet
 ```
 
-The bucket is scoped to this installation initially. Application identity is stored in columns. Day partitioning supports read selection and lifecycle reasoning; it does not require one large file per day.
+The bucket is scoped to this installation initially. Service identity stays in
+the stored OTLP resource. Daily partitioning helps queries select relevant files
+and lets late arrivals use supplemental files in the same partition.
 
 ## 8. Functional requirements
 
@@ -403,9 +411,11 @@ interval on entry. A supplied `window` takes precedence. Direct links that
 supply only the absolute bounds use the default duration on subsequent
 reloads. Pagination and investigation actions can use the exact applied bounds.
 
-On Logs, place **Custom** after the available presets and show the UTC start
-and end date-and-time fields below them. **Search** applies the fields and
-other filters.
+On Logs, place **Custom** after the available presets and show the start and end
+fields below them. Display log times, chart labels and Custom inputs in the
+browser's time zone. Show exact timestamps in that zone in **Timing and IDs**.
+**Search** applies the fields and other filters. The submitted range and
+shareable URL use absolute timestamps.
 Use positive configured R2 retention as the maximum browser lookback for new
 custom searches and the query range limit as the maximum interval length.
 Links from the picker and chart keep their absolute bounds on reload.
@@ -479,7 +489,8 @@ No production CPU, RAM, disk size, ingestion-throughput guarantee, or query-late
 
 ## 11. Configuration inventory and proposed defaults
 
-This is a logical configuration inventory, not a finalized YAML schema or command/flag contract. Choose exact field names using existing service conventions and update the owning schema/examples during implementation.
+See [configuration](configuration.md) for the implemented YAML keys and
+examples. This inventory tracks first-version policy and remaining choices.
 
 | Setting | Initial value or requirement | Status |
 | --- | --- | --- |
@@ -491,17 +502,17 @@ This is a logical configuration inventory, not a finalized YAML schema or comman
 | R2 bucket | Production uses the private `einblick` bucket declared in Infraops. Local development and CI use a disposable Floci bucket. | Production bucket declared |
 | R2 endpoint and credentials | Explicit configuration and mounted secret/source references. | Required |
 | Archive format | Versioned Parquet | Agreed |
-| Archive partition | Signal plus UTC event day; application remains a column. | Working design |
+| Archive partition | Signal plus UTC event day, with service identity in the stored resource. | Implemented for logs |
 | Export interval | Explicit local log export cadence. | Interface implemented; production tuning open |
-| Export batch size | Target projected source bytes; large accepted rows can form singleton batches. | Interface implemented; production tuning open |
-| Export staging workspace | Separate quota-limited filesystem; 1 GiB starting point for testing. | Working design; production sizing open |
-| Recent local window | Configure separately from export cadence, using receipt age. Approximately 15 minutes is a starting point. | Interface implemented; production tuning open |
+| Export batch | One batch for an eligible log event day, with supplemental batches for late arrivals. | Implemented for logs |
+| Export staging workspace | Separate quota-limited filesystem with a 1 GiB starting point for testing. | Interface implemented; production sizing open |
+| Recent local window | Keep the current and previous UTC event days locally and evict older batches after verified publication and cleanup. | Implemented for logs |
 | Archive retention | Seven days normally. | Agreed direction |
 | Testing retention | 24 hours initially, or another explicitly configured shorter value. | Proposed |
-| Retention clock | Object age versus event age must be explicit. | Open |
-| R2 lifecycle configuration | If object-age expiration is selected, reuse infraops `expiration`, for example `168h` normally or `24h` for testing; `7d` is not valid Go duration syntax. | Installation policy/activation open |
+| Retention clock | R2 expires objects by upload age. The Logs picker uses the configured duration as an event-time lookback. | Implemented for logs |
+| R2 lifecycle configuration | Set Infraops `expiration` and match Einblick's `archive.r2.retention`, for example `168h` for seven days. | Installation policy/activation open |
 | DuckDB memory / threads | Required explicit settings; development uses `64MiB` and one worker. Production values require measured Go/native headroom. | Interface implemented; production tuning open |
-| Historical-query concurrency | Two active archive queries for logs. | Log policy implemented; other signals open |
+| Log-query concurrency | One active local query and two active archive queries. Activity can use spare archive capacity. | Log policy implemented; other signals open |
 | Query timeout | Required and configurable; development uses 30 seconds, subject to the HTTP deadline. | Recent-log interface implemented; production tuning open |
 | Result and search-range limits | Required. See the [development query configuration](../test/.config/server.yaml). | Recent-log interface implemented; production tuning open |
 | Pending-ingestion disk budget | Sized for a chosen R2 outage window plus recovery/export workspace. | Open tuning |
@@ -617,10 +628,10 @@ file sizing.
 | --- | --- | --- | --- |
 | O-001 | Installation ingress identity | Service and module are einblick. Choose the ingress domain and deployment references. | Before configuring ingress |
 | O-002 | Internal ingestion authentication, TLS, certificate provisioning, and client trust | Reuse go-service mechanisms. Header-bearing remote OTLP/gRPC requires TLS under the current exporter contract. | Before a deployed client connects |
-| O-003 | Public meaning of archive retention | Selected R2 object-age expiration through Infraops. Document asynchronous deletion, complete-rule ownership, and explicit remote-rule removal when disabling it. | P6 implementation |
+| O-003 | Public meaning of archive retention | R2 object-age expiration through Infraops is implemented for logs. The operations guide covers asynchronous deletion, complete-rule ownership, and explicit remote-rule removal. | Apply the same archive policy when adding traces and metrics |
 | O-004 | Backend event-day selection, accepted lateness, missing timestamps, and future clock skew | Logs: preserve both original nanosecond timestamps and separate receipt time; select Timestamp, then ObservedTimestamp, then server receipt time. Use that selection's UTC day for archival. Accept late and future timestamps without cutoffs. See [recommended trace policies](#recommended-trace-policies). | Traces in E-11 and metrics in P8 |
 | O-005 | Duplicate policy per signal | Logs: retain repeated exports as additional records, including identical messages; no deduplication index or horizon. This log policy is agreed. The metric candidate uses complete stream identity and point timestamps. Validate counter/histogram semantics before adoption. See [recommended trace policies](#recommended-trace-policies). | Traces in E-11 and metrics in P8 |
-| O-006 | Supported OTLP subset and its database mapping | Logs: preserve complete content from the pinned OTLP protobuf, including typed bodies/attributes, resource/scope context, correlation and original nanosecond timestamps; this support policy is agreed. Derive physical schema from these contracts and verify representative go-service payloads. Document unsupported shapes and omissions explicitly. A handwritten copy of the OTel schema is unnecessary. See [recommended trace policies](#recommended-trace-policies). | Log verification in P1, trace storage in E-11 and metric storage in P8 |
+| O-006 | Supported OTLP subset and its database mapping | Logs preserve complete content from the pinned OTLP protobuf, including typed bodies/attributes, resource/scope context, correlation and original nanosecond timestamps. Derive the trace and metric schemas from their OTLP contracts and verify representative go-service payloads. Document unsupported shapes and omissions explicitly. See [recommended trace policies](#recommended-trace-policies). | Trace storage in E-11 and metric storage in P8 |
 | O-007 | R2 bucket and persistent-volume ownership/configuration | Reuse infraops' delivered protected-PVC and optional R2 expiration capabilities; choose capacity, path, provisioning profile, backing-volume reclaim policy and operational ownership. Verify actual release-tooling execution and storage preservation before activating storage. | Local storage path in P1; runtime settings before use |
 | O-008 | Concrete resource and query bounds | Log export uses one active batch and a separate quota-limited staging filesystem. DuckDB uses its default spill limit unless configured explicitly. Use 1 GiB as a starting point for testing the staging filesystem. Measure one-application ingestion and representative queries to size memory/native headroom, export batches, staging capacity and the persistent outage budget. | Bound each capability as introduced in P0–P8; refine with workload measurements |
 | O-009 | Reserved: site authentication | Outside v1 under D-012/WEB-012. | No v1 work |

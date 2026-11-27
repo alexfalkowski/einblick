@@ -57,17 +57,21 @@ time. A late record can create another batch for the same day.
 
 ```mermaid
 flowchart TD
-    accTitle: Local Parquet recovery after restart
-    accDescr: Clear partial files, check completed files, requeue missing or damaged files, then resume staging one batch per tick.
-    Start["Startup: clear partial output"] --> Verify[Check completed files]
+    accTitle: Archive worker startup and first recovery
+    accDescr: Startup prepares the workspace. The worker verifies or requeues staged files before new exports and uploads. It can reconcile recorded publication and attempt eligible eviction on a tick while recovery is blocked.
+    Start[Prepare workspace and clear partial output] --> Verify[Check completed files on worker tick]
     Verify -->|Missing or damaged| Requeue[Requeue with same batch ID]
     Requeue -->|Continue scan| Verify
-    Verify -->|Recovery error| Retry[Log error and retry next tick]
+    Verify -->|Recovery error| Reconcile[Try R2 publication reconciliation and cleanup]
+    Reconcile --> Eviction[Try eligible R2-backed eviction]
+    Eviction --> Retry[Retry recovery on next tick]
     Retry --> Verify
-    Verify -->|Recovery complete| Stage[Stage one batch per tick]
+    Verify -->|Recovery complete| Work[Resume normal worker ticks]
+    Work --> Stage[Try export, publication and eviction in order]
 ```
 
-DuckDB records the batch's exact members before computing the logical digest.
+Publication and eviction apply when R2 is configured. DuckDB records the
+batch's exact members before computing the logical digest.
 The exporter verifies the written rows, renames the file, and records its
 byte checksum.
 Recovery uses the retained rows to regenerate files while ingestion and recent

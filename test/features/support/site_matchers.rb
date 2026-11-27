@@ -17,7 +17,7 @@ module LogView
       auto_refresh: 'Auto-refresh', refresh_off: 'Off',
       custom: 'Custom', activity: 'Log activity', activity_interval: '1s buckets',
       'dates out of order': 'End time must be after start time.', 'wide date range': 'This time range exceeds the search limit.',
-      'invalid dates': 'Enter a valid start and end time in UTC.', 'invalid filter': 'Check the search filters and try again.',
+      'invalid dates': 'Enter a valid start and end time.', 'invalid filter': 'Check the search filters and try again.',
       'outside retention': 'Choose a more recent start date.'
     },
     'de' => {
@@ -223,17 +223,18 @@ RSpec::Matchers.define :show_log_time_fallback do |record, receipt_window|
       time = value.at_css('time')
       [label, LogView.timestamp(time)] if time
     end.to_h
-    receipt = timing.fetch('Received (UTC)')
+    receipt = timing.fetch('Received')
     summary = panel.at_css('.log-event-fields')
     if observed.positive?
-      expect(timing).to eq('Observed time (UTC)' => observed, 'Received (UTC)' => receipt)
-      expect(summary.css('dt').map(&:text)).to eq(['Observed time (UTC)', 'Received'])
+      expect(timing).to eq('Observed time' => observed, 'Received' => receipt)
+      expect(summary.css('dt').map(&:text)).to eq(['Observed time', 'Received'])
       expect(summary.css('dd').last.text).to show_receipt_offset((receipt - observed).fdiv(1_000_000_000), 'later')
     else
-      expect(timing).to eq('Received (UTC)' => receipt)
-      expect(summary.css('dt').map(&:text)).to eq(['Received (UTC)'])
+      expect(timing).to eq('Received' => receipt)
+      expect(summary.css('dt').map(&:text)).to eq(['Received'])
     end
     selected_time = timing.fetch(summary.at_css('dt').text)
+    expect(summary.at_css('time').text).to end_with(' UTC')
     expect(LogView.timestamp(summary.at_css('time'))).to eq(selected_time)
     expect(LogView.timestamp(row.at_css('time'))).to eq(selected_time)
   end
@@ -604,7 +605,7 @@ RSpec::Matchers.define :show_log_lookback do
     picker = doc.at_css('#custom-dates:not([hidden])')
     expect(picker.at_css('.lookback').text.strip).to eq('Last 7 days · UTC')
     expect(picker.css('time')).to be_empty
-    expect(picker.at_css('#start-date-error[hidden]')['data-message']).to eq('Choose a date on or after {date} UTC.')
+    expect(picker.at_css('#start-date-error[hidden]')['data-message']).to eq('Choose a date on or after {date}.')
     true
   end
 end
@@ -631,7 +632,7 @@ RSpec::Matchers.define :show_activity_times_for do |event_time|
     expect(ticks.map { |tick| tick['datetime'] }).to include(start.iso8601)
     expect(document.at_css('.activity-tooltip[hidden][data-search="Search"]').text).to be_empty
     expect(ticks.map(&:text).grep(/UTC/)).to eq([ticks.last.text])
-    expect(document.at_css('.activity-summary')['data-through-label']).to eq("Through #{ticks.last.text}")
+    expect(document.at_css('.activity-summary')['data-through-format']).to eq('Through {end}')
     true
   end
 end
