@@ -27,8 +27,8 @@ The page offers **15 min**, **1 hour**, **24 hours**, **3 days**, and **7 days**
 as allowed by the query range and configured R2 retention. Below 15 minutes,
 **Recent** uses the allowed duration. A positive R2 retention duration sets the
 maximum event-time lookback for new dates submitted from the picker. The picker
-shows the lookback and gives the current cutoff if a start date is rejected
-during an in-page search. Chart selections and saved links keep their exact dates as
+shows the current cutoff below the start field when an in-page search rejects
+an expired date. Chart selections and saved links keep their exact dates as
 the cutoff moves, subject to available history. Change filters and select
 **Search** to reuse the applied dates.
 R2 itself expires archive objects by upload age, so the cutoff can exclude

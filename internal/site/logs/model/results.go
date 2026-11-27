@@ -38,8 +38,6 @@ func NewLogs(ctx context.Context, search query.Search, results *storage.Page, li
 		ClearFiltersURL: search.ClearFiltersURL(),
 		Filters: Filters{
 			Custom:          search.Custom,
-			Lookback:        limits.Lookback,
-			LookbackDays:    limits.LookbackDays(),
 			StartTime:       filters.StartTime,
 			EndTime:         filters.EndTime,
 			ServiceName:     filters.Service,

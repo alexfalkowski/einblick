@@ -16,9 +16,6 @@ time_range.recent: Letzte Einträge
 time_range.custom: Benutzerdefiniert
 time_range.from: Von (UTC)
 time_range.to: Bis (UTC)
-time_range.lookback_days: 'Letzte {{.Days}} Tage'
-time_range.lookback_one_day: 'Letzte 24 Stunden'
-time_range.lookback_duration: 'Letzte {{.Duration}}'
 time_range.start_too_early: 'Wähle ein Datum ab {{.Date}}.'
 time_range.invalid_local_time: 'Diese Uhrzeit gibt es in deiner Zeitzone nicht.'
 logs.event_format: 02.01., 15:04:05
@@ -37,7 +34,6 @@ logs.clear_search: Suchtext löschen
 logs.reset: Zurücksetzen
 logs.loading: Suche läuft …
 logs.search_timed_out: Zeitlimit erreicht
-logs.previous_results: Vorherige Ergebnisse
 logs.request_failed: Protokolle konnten nicht geladen werden
 logs.retry: Erneut versuchen
 logs.results: Ergebnisse der Protokollabfrage

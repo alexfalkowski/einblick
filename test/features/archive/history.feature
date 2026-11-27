@@ -119,7 +119,7 @@ Feature: Read acknowledged logs across local storage and the archive
     Given acknowledged logs are ready to archive
     When the operator submits a valid new range and then a date that has aged past the cutoff
     Then the valid range should be applied with its edited bounds
-    And the picker should show a short lookback hint and return the cutoff for the expired start date
+    And the picker should show the cutoff only for the expired start date
 
   @archive_history_availability
   Scenario: Search the oldest bucket from the seven-day activity chart

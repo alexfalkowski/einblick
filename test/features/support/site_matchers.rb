@@ -134,8 +134,16 @@ RSpec::Matchers.define :show_full_log_layout do |language, labels, status|
       intervals = document.css('#refresh-interval option')
       expect(intervals.map(&:text)).to eq([labels.fetch(:refresh_off), '5s', '10s', '15s'])
       expect(intervals.map { |option| option['value'] }).to eq(%w[off 5s 10s 15s])
-      expect(document.at_css('#query-failure[hidden] #retry-query[type=button]').text).to eq(labels.fetch(:retry))
+      expect(document.at_css('#query-failure[hidden]')).to show_log_failure_status(labels.fetch(:retry))
     end
+    true
+  end
+end
+
+RSpec::Matchers.define :show_log_failure_status do |retry_label|
+  match(notify_expectation_failures: true) do |failure|
+    expect(failure.at_css('#retry-query[type=button]').text).to eq(retry_label)
+    expect(failure.text.strip).to eq(retry_label)
     true
   end
 end
@@ -610,12 +618,12 @@ RSpec::Matchers.define :show_clipped_activity_labels do
   end
 end
 
-RSpec::Matchers.define :show_log_lookback do
+RSpec::Matchers.define :show_custom_log_picker do
   match(notify_expectation_failures: true) do |response|
     expect(response.code).to eq(200)
     doc = Nokogiri::HTML5(response.body)
     picker = doc.at_css('#custom-dates:not([hidden])')
-    expect(picker.at_css('.lookback').text.strip).to eq('Last 7 days')
+    expect(picker.text.strip).to be_empty
     expect(doc.at_css('#custom-range + #picker-time-zone.time-zone-pill:not([hidden])').text).to eq('UTC')
     expect(picker.css('time')).to be_empty
     expect(picker.at_css('#start-date-error[hidden]')['data-message']).to eq('Choose a date on or after {date}.')
