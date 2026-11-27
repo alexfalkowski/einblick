@@ -422,15 +422,19 @@ Links from the picker and chart keep their absolute bounds on reload.
 
 Load **Log activity** automatically on Logs to show the event-time distribution
 for the applied interval and filters. Show the exact total above the results
-table while it describes the displayed interval. In-place paging and timed
-refreshes retain the previous chart. A chart selection starts a new search for
-the selected range. The table stays available during the activity request and
-after a failure. Automatic activity reports unavailable when an archive scan
-would take the last archive query slot.
+table. Search and timed refresh update the table, chart and total together when
+activity is fast. If activity is slow or fails, show the new table and the count's
+status while keeping the previous chart visible. In-place paging retains the
+chart and total for the same interval. A chart selection starts a new search
+for the selected range. Automatic activity reports unavailable when an archive
+scan would take the last archive query slot.
 
 Where a view offers Auto-refresh, default to Off and offer `5s`, `10s` and
 `15s`. Refresh the applied query in place without adding browser history or
-overlapping requests.
+overlapping result requests. Keep Search and Auto-refresh available while
+requests run. The latest submitted search takes precedence over a timed update.
+Keep the previous successful results visible while loading and label them as
+previous results if an update fails. Reserve space for chart and status updates.
 
 ### 8.8 R2 client selection
 

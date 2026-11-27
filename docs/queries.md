@@ -15,9 +15,9 @@ choice matches one exact level (Debug, Info, Warn, Error, or Fatal), while
 | Goal | Action |
 | --- | --- |
 | Search up to now | Choose a time preset. To apply filter edits, select **Search** or press Enter. A recent window advances to now each time you search or reload its URL. |
-| Search between dates | Select **Custom**, enter the dates and times in the browser time zone shown below the fields, then select **Search**. Share the address bar link to reopen the same interval on page one in any time zone. |
+| Search between dates | Select **Custom**, enter the dates and times in the browser time zone shown beside **Custom**, then select **Search**. Share the address bar link to reopen the same interval on page one in any time zone. |
 | Explore a narrower range | **Log activity** groups matches in UTC-aligned buckets and labels them in your browser time zone. Hover over a bar for its rounded range and count. Drag across the bars to search their exact interval. |
-| Automatically refresh | Select **5s**, **10s**, or **15s** under **Auto-refresh**. Each refresh uses the applied filters and the rolling window from the address bar. Updates pause while the custom dates or log details are open, or until a failed manual search is replaced by a successful one. Choose **Off** to stop automatic requests. The control starts at **Off** on a full page load. |
+| Automatically refresh | Select **5s**, **10s**, or **15s** under **Auto-refresh**. Each refresh updates the table, chart and match count using the applied filters and rolling window from the address bar. Updates wait while a search or chart request is running, focus is in the results, or custom dates or log details are open. A failed manual search also pauses updates until a search succeeds. Choose **Off** to stop timed updates. The control starts at **Off** on a full page load. |
 | Keep the exact interval | Choose **Next page**, clear the message search with **×** or **Clear search**, or search from an absolute-range bookmark. Clearing or paging retains the preset for the next **Search**. |
 | Share or revisit a query | Copy the address bar URL, such as `/logs?window=15m`. Reloading or sharing it opens the first page for that duration up to now, even when you're viewing a later page. Use Back for the previous query or **Reset** to clear the filters and return to the latest window. |
 | Inspect a log | Select a row or focus its message and press Enter. Use Escape or Close to return to it. On wide screens you can also click the backdrop. |
@@ -46,15 +46,16 @@ opens **Current range** on entry. Reload and Auto-refresh then use the
 default duration. A link generated from **Custom** also contains `custom=1`
 and retains its fixed interval on reload.
 
-The total above the table counts matching logs at the time the activity query
-runs. Logs can arrive between the table and activity requests. In-place paging
-and timed refreshes keep the chart from your last
-search. When a timed refresh moves the table to a new interval, the chart
-header shows where its range ends and the previous total is hidden. An
-automatic activity query uses spare archive capacity, leaving an archive slot
-for a log search or page. If the archive is busy or the chart times out,
-**Retry** reloads activity for the displayed search. The table remains usable
-while the chart loads.
+The total above the table counts all matching logs in the displayed range at
+the time the activity query runs. Logs can arrive between the table and activity
+requests. **Through** in the chart header shows where the displayed chart
+ends. Search and timed refresh show new rows and count together when activity
+is fast. If activity takes longer, the new rows appear with **Updating count…**
+and **Previous search** identifies the retained chart. If activity fails,
+**Match count unavailable** replaces the number. In-place paging keeps the
+chart and count for the same query. Activity uses spare archive capacity,
+leaving an archive slot for a log search or page. If the archive is busy or
+the chart times out, **Retry** reloads activity for the displayed search.
 
 The Logs page chooses where to search based on the selected time range.
 Recent ranges covered by the current database volume can load during an R2
@@ -62,9 +63,13 @@ outage. If a search needs unavailable archive history, the page shows a
 storage error. Choose a recent time preset or retry the same range after
 the archive recovers.
 
-The table shows browser-local time to the second. Hover over a timestamp to
-see its full precision in your time zone. When the producer omits event time, the **Log details**
-summary labels the observation or receipt time used in its place. The
+The **Custom** time-zone pill and the last chart tick use your browser’s
+time-zone city. Chart and table tooltips show the city and the UTC offset for
+the timestamp, for example **Berlin (UTC+01:00)** in winter. A chart range shows
+both offsets if they differ. The table shows browser-local time to the second.
+Hover over a timestamp to see its full precision. When the producer omits
+event time, the **Log details** summary labels the observation or receipt time
+used in its place. The
 inspector fills the screen on narrow displays. It shows the full
 message, available service, environment and time to receipt, and reported status
 and duration for HTTP and gRPC request logs.
@@ -73,13 +78,17 @@ resource and instrumentation details, exact local timestamps with their UTC
 offsets, and copyable IDs.
 Use the API for the original typed OTLP fields.
 
-While **Loading logs…** is visible, you can edit filters and submit after the
-query finishes. If htmx is unavailable, searches and pagination open full pages.
-For no matches, try a longer preset or choose **Clear filters** to keep the
-same dates and remove the log filters. If a saved link fails,
-choose **Open Logs**. When offered after a network or gateway error, **Try again**
-resends the same inputs. A transport timeout appears in in-place updates and can
-return an empty HTTP 504 on direct navigation.
+The current results stay visible while a search runs. If you submit again, the
+latest search takes priority over the pending result and over automatic refresh.
+A slow search shows **Searching…** above the chart. When an in-place update
+fails, the last successful search stays visible and **Try again** resends the
+failed request. You can also adjust the filters and search again.
+
+If htmx is unavailable, searches and pagination open full pages. For no matches,
+try a longer preset or choose **Clear filters** to keep the same dates and
+remove the log filters. If a saved link fails, choose **Open Logs**. A transport
+timeout appears in in-place updates and can return an empty HTTP 504 on direct
+navigation.
 
 The page supports English, German and Spanish with English fallback. Anyone who
 can reach the HTTP route can query the same data as the API without a site login.

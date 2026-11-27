@@ -7,7 +7,7 @@ module LogView
 
   LABELS = {
     'en' => {
-      title: 'Logs · Einblick', heading: 'Logs', service: 'Service', submit: 'Search', reset: 'Reset', loading: 'Loading logs…',
+      title: 'Logs · Einblick', heading: 'Logs', service: 'Service', submit: 'Search', reset: 'Reset', searching: 'Searching…',
       results: 'Log query results', message: 'Message', empty: 'No matches',
       unavailable: 'Log storage is unavailable',
       clear_filters: 'Clear filters', structured: 'Structured message', no_message: 'No message',
@@ -16,13 +16,14 @@ module LogView
       related_logs: 'Find related logs', details: 'Log details', close_details: 'Close details',
       auto_refresh: 'Auto-refresh', refresh_off: 'Off',
       custom: 'Custom', activity: 'Log activity', activity_interval: '1s buckets',
+      count_updating: 'Updating count…', count_unavailable: 'Match count unavailable',
       'dates out of order': 'End time must be after start time.', 'wide date range': 'This time range exceeds the search limit.',
       'invalid dates': 'Enter a valid start and end time.', 'invalid filter': 'Check the search filters and try again.',
       'outside retention': 'Choose a more recent start date.'
     },
     'de' => {
       title: 'Protokolle · Einblick', heading: 'Protokolle', service: 'Dienst', submit: 'Suchen', reset: 'Zurücksetzen',
-      loading: 'Protokolle werden geladen …', results: 'Ergebnisse der Protokollabfrage', message: 'Meldung',
+      searching: 'Suche läuft …', results: 'Ergebnisse der Protokollabfrage', message: 'Meldung',
       empty: 'Keine Treffer', clear_filters: 'Filter löschen',
       unavailable: 'Der Protokollspeicher ist nicht verfügbar', structured: 'Strukturierte Meldung',
       no_message: 'Keine Meldung', timing: 'Zeitangaben und IDs',
@@ -30,11 +31,12 @@ module LogView
       'dates out of order': 'Das Ende muss nach dem Beginn liegen.', related_logs: 'Zugehörige Protokolle finden',
       details: 'Protokolldetails', close_details: 'Details schließen',
       auto_refresh: 'Automatisch aktualisieren', refresh_off: 'Aus',
-      custom: 'Benutzerdefiniert', activity: 'Protokollaktivität', activity_interval: '1 s pro Balken'
+      custom: 'Benutzerdefiniert', activity: 'Protokollaktivität', activity_interval: '1 s pro Balken',
+      count_updating: 'Treffer werden gezählt …', count_unavailable: 'Trefferzahl nicht verfügbar'
     },
     'es' => {
       title: 'Registros · Einblick', heading: 'Registros', service: 'Servicio', submit: 'Buscar', reset: 'Restablecer',
-      loading: 'Cargando registros…', results: 'Resultados de la consulta de registros', message: 'Mensaje',
+      searching: 'Buscando…', results: 'Resultados de la consulta de registros', message: 'Mensaje',
       empty: 'Sin coincidencias', clear_filters: 'Quitar filtros',
       timeout: 'La consulta de registros agotó el tiempo de espera', structured: 'Mensaje estructurado',
       no_message: 'Sin mensaje', timing: 'Tiempos e identificadores',
@@ -42,7 +44,8 @@ module LogView
       'broken link': 'No se pudo abrir este enlace de búsqueda.', open_logs: 'Abrir registros',
       related_logs: 'Buscar registros relacionados', details: 'Detalles del registro', close_details: 'Cerrar detalles',
       auto_refresh: 'Actualización automática', refresh_off: 'Desactivada',
-      custom: 'Personalizado', activity: 'Actividad de registros', activity_interval: 'Intervalos de 1 s'
+      custom: 'Personalizado', activity: 'Actividad de registros', activity_interval: 'Intervalos de 1 s',
+      count_updating: 'Actualizando recuento…', count_unavailable: 'Recuento no disponible'
     }
   }.freeze
 
@@ -121,7 +124,8 @@ RSpec::Matchers.define :show_full_log_layout do |language, labels, status|
       actions = document.at_css('.filters > .actions')
       expect(actions.at_css('a.btn-outline[href="/logs"]').text).to eq(labels.fetch(:reset))
       expect(actions.at_css('a + button.btn-primary[type=submit]').text).to eq(labels.fetch(:submit))
-      expect(document.at_css('#query-progress[role=status]').text.strip).to eq(labels.fetch(:loading))
+      expect(document.at_css('#query-progress[role=status]')['data-message']).to eq(labels.fetch(:searching))
+      expect(document.at_css('#log-result-total[hidden]')).to show_log_count_status(labels)
       expect(document.at_css('label[for=text]').text).to eq(labels.fetch(:search))
       expect(document.at_css('.filters > #time-range-label').text).to eq(labels.fetch(:time_range))
       expect(document.at_css('#custom-range').text).to eq(labels.fetch(:custom))
@@ -132,6 +136,14 @@ RSpec::Matchers.define :show_full_log_layout do |language, labels, status|
       expect(intervals.map { |option| option['value'] }).to eq(%w[off 5s 10s 15s])
       expect(document.at_css('#query-failure[hidden] #retry-query[type=button]').text).to eq(labels.fetch(:retry))
     end
+    true
+  end
+end
+
+RSpec::Matchers.define :show_log_count_status do |labels|
+  match(notify_expectation_failures: true) do |total|
+    expect(total['data-updating']).to eq(labels.fetch(:count_updating))
+    expect(total['data-unavailable']).to eq(labels.fetch(:count_unavailable))
     true
   end
 end
@@ -441,8 +453,8 @@ RSpec::Matchers.define :show_time_and_severity_controls do
     expect(document.css('#log-filters .actions button[type=submit]').map(&:text)).to eq(['Search'])
     expect(document.at_css('#results')['data-activity-url']).to start_with('/logs/activity?')
     expect(document.at_css('#log-activity #retry-activity[hidden]').text).to eq('Retry')
-    expect(document.at_css('#activity-heading > #activity-interval').text).to be_empty
-    expect(document.at_css('#log-result-total[hidden] + #results')).not_to be_nil
+    expect(document.at_css('#activity-heading + #activity-interval').text).to be_empty
+    expect(document.at_css('[aria-live="polite"] > #log-result-total[hidden] + #results')).not_to be_nil
     expect(document.css('#severity option').map(&:text)).to eq(['All severities', 'Debug', 'Info', 'Warn', 'Error', 'Fatal'])
   end
 end
@@ -603,7 +615,8 @@ RSpec::Matchers.define :show_log_lookback do
     expect(response.code).to eq(200)
     doc = Nokogiri::HTML5(response.body)
     picker = doc.at_css('#custom-dates:not([hidden])')
-    expect(picker.at_css('.lookback').text.strip).to eq('Last 7 days · UTC')
+    expect(picker.at_css('.lookback').text.strip).to eq('Last 7 days')
+    expect(doc.at_css('#custom-range + #picker-time-zone.time-zone-pill:not([hidden])').text).to eq('UTC')
     expect(picker.css('time')).to be_empty
     expect(picker.at_css('#start-date-error[hidden]')['data-message']).to eq('Choose a date on or after {date}.')
     true
