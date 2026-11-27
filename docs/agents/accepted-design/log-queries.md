@@ -35,8 +35,8 @@ occurrence for newly entered repeated times. Shareable fixed ranges use RFC
 3339 bounds. Positive
 R2 retention bounds selectable log event dates in the browser. The repository
 determines archive coverage by object age and availability.
-Show the lookback beside the custom fields. On an in-page search with an expired
-start date, show the current cutoff under that field.
+On an in-page search with an expired start date, show the current cutoff under
+that field.
 [Browser log queries](../../queries.md#-investigate-logs-in-the-browser)
 
 Load the activity chart and total automatically on page entry, search and
@@ -62,8 +62,9 @@ different search. Mark it as **Previous search** if activity is slow or fails.
 Use the existing slow-search delay for the activity wait. Keep
 Search and Auto-refresh available, give the latest submitted search priority
 and skip timed refreshes while a result request is active. Turning Auto-refresh
-off discards any timed result waiting to be displayed. Show errors alongside the
-previous successful results and allow retrying the failed request.
+off discards any timed result waiting to be displayed. Keep the last successful
+results visible when a search fails. Keep the failure banner to the error reason
+and **Try again**, which retries the failed request.
 
 ## Search sources
 

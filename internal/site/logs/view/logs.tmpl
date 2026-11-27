@@ -54,9 +54,6 @@
           <input id="end-utc" class="input input-sm" type="datetime-local" name="end_utc" step="1" required
                  aria-label="{{.Localizer.Text "time_range.to"}}"
                  value="{{.Model.Filters.EndTime.Format $pickerTime}}"{{if not .Model.Filters.Custom}} disabled{{end}}>
-          {{if or .Model.Filters.LookbackDays .Model.Filters.Lookback}}
-          <p class="lookback">{{if eq .Model.Filters.LookbackDays 1}}{{.Localizer.Text "time_range.lookback_one_day"}}{{else if .Model.Filters.LookbackDays}}{{.Localizer.Message "time_range.lookback_days" (dict "Days" .Model.Filters.LookbackDays)}}{{else}}{{.Localizer.Message "time_range.lookback_duration" (dict "Duration" .Model.Filters.Lookback)}}{{end}}</p>
-          {{end}}
         </div>
         <label for="text">{{.Localizer.Text "logs.text"}}</label>
         <div class="message-field">
@@ -88,10 +85,7 @@
            data-request="{{.Localizer.Text "logs.request_failed"}}"
            data-timeout="{{.Localizer.Text "logs.search_timed_out"}}"
            data-cancelled="{{.Localizer.Text "logs.cancelled"}}">
-        <div class="query-alert-copy" role="alert">
-          <p id="query-failure-message"></p>
-          <p class="query-alert-context">{{.Localizer.Text "logs.previous_results"}}</p>
-        </div>
+        <p id="query-failure-message" role="alert"></p>
         <button id="retry-query" type="button" class="btn btn-outline btn-sm"
                 hx-target="#results" hx-sync="#main:queue last">{{.Localizer.Text "logs.retry"}}</button>
       </div>

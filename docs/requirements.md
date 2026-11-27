@@ -433,8 +433,9 @@ Where a view offers Auto-refresh, default to Off and offer `5s`, `10s` and
 `15s`. Refresh the applied query in place without adding browser history or
 overlapping result requests. Keep Search and Auto-refresh available while
 requests run. The latest submitted search takes precedence over a timed update.
-Keep the previous successful results visible while loading and label them as
-previous results if an update fails. Reserve space for chart and status updates.
+Keep the last successful results visible while loading and after a failed
+update. Show the failure reason and a retry action. Reserve space for chart and
+status updates.
 
 ### 8.8 R2 client selection
 

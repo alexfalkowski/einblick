@@ -144,8 +144,8 @@ Then('the valid range should be applied with its edited bounds') do
   expect(@valid_custom_search).to show_custom_log_range(bounds)
 end
 
-Then('the picker should show a short lookback hint and return the cutoff for the expired start date') do
-  expect(@retention_search).to show_log_lookback
+Then('the picker should show the cutoff only for the expired start date') do
+  expect(@retention_search).to show_custom_log_picker
   expect(@expired_custom_search).to reject_expired_log_start(@expired_custom_start, @expired_cutoff_window)
 end
 

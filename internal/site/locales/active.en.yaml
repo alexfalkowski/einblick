@@ -16,9 +16,6 @@ time_range.recent: Recent
 time_range.custom: Custom
 time_range.from: From (UTC)
 time_range.to: To (UTC)
-time_range.lookback_days: 'Last {{.Days}} days'
-time_range.lookback_one_day: 'Last 24 hours'
-time_range.lookback_duration: 'Last {{.Duration}}'
 time_range.start_too_early: 'Choose a date on or after {{.Date}}.'
 time_range.invalid_local_time: 'This time does not exist in your time zone.'
 logs.event_format: 02 Jan, 15:04:05
@@ -37,7 +34,6 @@ logs.clear_search: Clear search
 logs.reset: Reset
 logs.loading: Searching…
 logs.search_timed_out: Search timed out
-logs.previous_results: Previous results
 logs.request_failed: Couldn’t load logs
 logs.retry: Try again
 logs.results: Log query results
