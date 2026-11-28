@@ -1,18 +1,53 @@
+/* These viewport overrides follow the component styles in the bundle. */
 @media (max-width: 64rem) {
-  .log-details-panel { width: 100%; }
+  .log-details-panel {
+    width: 100%;
+  }
 }
+
 @media (max-width: 43rem) {
-  .console { grid-template-columns: minmax(0, 1fr); }
-  .sidebar { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: .35rem .85rem; }
-  .sidebar label, a.brand { margin: 0; }
-  .brand { grid-row: span 2; }
-  .filters { grid-template-columns: minmax(0, 1fr); }
-  .time-presets, .custom-dates, .actions { grid-column: auto; }
-  .custom-dates:not([hidden]) { grid-template-columns: minmax(0, 1fr); }
-  .query-status { min-block-size: max(2.875rem, 3lh); }
-  .query-status .query-alert { column-gap: .5rem; padding-inline: .5rem; }
-  .activity-heading { grid-template-columns: minmax(0, 1fr); }
-  #activity-snapshot { min-block-size: 1lh; }
-  #activity-snapshot[hidden] { display: block; visibility: hidden; }
-  .log-fields { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
+  .console {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sidebar {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    gap: .35rem .85rem;
+  }
+  .sidebar label, a.brand {
+    margin: 0;
+  }
+  .brand {
+    grid-row: span 2;
+  }
+  .filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .time-presets, .custom-dates, .actions {
+    grid-column: auto;
+  }
+  .custom-dates:not([hidden]) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .query-status {
+    min-block-size: max(2.875rem, 3lh);
+  }
+  .query-status .query-alert {
+    column-gap: .5rem;
+    padding-inline: .5rem;
+  }
+  .activity-heading {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  #activity-snapshot {
+    min-block-size: 1lh;
+  }
+  #activity-snapshot[hidden] {
+    display: block;
+    visibility: hidden;
+  }
+  .log-fields {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  }
 }

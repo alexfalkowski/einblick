@@ -1,18 +1,94 @@
-.log-activity { --activity-plot-height: 6rem; margin-bottom: .65rem; border: 1px solid var(--color-base-300); border-radius: var(--radius-box); padding: .75rem 1rem; background: var(--color-base-100); }
-.activity-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .25rem 1rem; min-block-size: 1.75rem; }
-.activity-title { display: flex; align-items: center; gap: .375rem; min-block-size: 1.625rem; min-inline-size: 0; }
-.log-activity h2 { margin: 0; font-size: var(--text-body); font-weight: 700; white-space: nowrap; }
-.activity-axis, .activity-interval, #activity-status, #activity-snapshot { color: var(--muted); font-size: var(--text-small); }
-#activity-status { margin: 0; }
-.activity-frame { display: grid; grid-template-columns: minmax(0, 1fr); margin-top: .5rem; }
-.activity-frame > * { grid-area: 1 / 1; }
-#activity-content { min-block-size: calc(var(--activity-plot-height) + .3rem + 3lh); font-size: var(--text-small); }
-#activity-content:empty::before { content: ""; display: block; block-size: var(--activity-plot-height); border-bottom: 1px solid var(--color-base-300); }
-.activity-feedback { display: flex; align-self: center; justify-content: center; align-items: center; gap: .5rem; }
-.activity-feedback[hidden], .activity-feedback button[hidden] { display: none; }
-#activity-snapshot { margin: 0; white-space: nowrap; }
-.activity-interval:empty { display: none; }
-.activity-interval { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; }
+.log-activity {
+  --activity-plot-height: 6rem;
+  margin-bottom: .65rem;
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-box);
+  padding: .75rem 1rem;
+  background: var(--color-base-100);
+}
+
+.activity-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .25rem 1rem;
+  min-block-size: 1.75rem;
+}
+
+.activity-title {
+  display: flex;
+  align-items: center;
+  gap: .375rem;
+  min-block-size: 1.625rem;
+  min-inline-size: 0;
+}
+
+.log-activity h2 {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.activity-axis, .activity-interval, #activity-status, #activity-snapshot {
+  color: var(--muted);
+  font-size: var(--text-small);
+}
+
+#activity-status {
+  margin: 0;
+}
+
+/* Put feedback over the plot so pending activity uses the same space. */
+.activity-frame {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin-top: .5rem;
+}
+
+.activity-frame > * {
+  grid-area: 1 / 1;
+}
+
+#activity-content {
+  min-block-size: calc(var(--activity-plot-height) + .3rem + 3lh);
+  font-size: var(--text-small);
+}
+
+#activity-content:empty::before {
+  content: "";
+  display: block;
+  block-size: var(--activity-plot-height);
+  border-bottom: 1px solid var(--color-base-300);
+}
+
+.activity-feedback {
+  display: flex;
+  align-self: center;
+  justify-content: center;
+  align-items: center;
+  gap: .5rem;
+}
+
+.activity-feedback[hidden], .activity-feedback button[hidden] {
+  display: none;
+}
+
+#activity-snapshot {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.activity-interval:empty {
+  display: none;
+}
+
+.activity-interval {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .time-zone-pill, .activity-interval:not(:empty), #query-progress:not(:empty) {
   padding: .1rem .5rem;
   border: var(--border) solid var(--color-base-300);
@@ -23,13 +99,49 @@
   line-height: 1.4;
   white-space: nowrap;
 }
-.activity-summary { container-type: inline-size; }
-.activity-plot { position: relative; }
-.activity-bars { display: flex; block-size: var(--activity-plot-height); border-bottom: 1px solid var(--color-base-300); cursor: crosshair; user-select: none; touch-action: pan-y; }
-.activity-bar { display: flex; align-items: end; flex: 1; min-width: 0; }
-.activity-bar span { display: block; width: 100%; height: var(--bar-height); margin-inline: 1px; background: var(--color-primary); pointer-events: none; }
-.activity-bar:hover { background: var(--primary-tint); }
-.activity-bar[data-selected] { background: color-mix(in srgb, var(--color-primary) 24%, var(--color-base-100)); }
+
+/* Size the axis to the chart container. */
+.activity-summary {
+  container-type: inline-size;
+}
+
+.activity-plot {
+  position: relative;
+}
+
+.activity-bars {
+  display: flex;
+  block-size: var(--activity-plot-height);
+  border-bottom: 1px solid var(--color-base-300);
+  cursor: crosshair;
+  user-select: none;
+  touch-action: pan-y;
+}
+
+.activity-bar {
+  display: flex;
+  align-items: end;
+  flex: 1;
+  min-width: 0;
+}
+
+.activity-bar span {
+  display: block;
+  width: 100%;
+  height: var(--bar-height);
+  margin-inline: 1px;
+  background: var(--color-primary);
+  pointer-events: none;
+}
+
+.activity-bar:hover {
+  background: var(--primary-tint);
+}
+
+.activity-bar[data-selected] {
+  background: color-mix(in srgb, var(--color-primary) 24%, var(--color-base-100));
+}
+
 .log-tooltip, .activity-axis time[data-tooltip]::after {
   position: absolute;
   z-index: 1;
@@ -47,13 +159,23 @@
   overflow-wrap: anywhere;
   pointer-events: none;
 }
+
 .activity-axis time[data-tooltip]::after {
   display: none;
   inset-inline-start: 50%;
   max-inline-size: min(20rem, calc(100vw - 2rem));
 }
-.activity-axis time[data-tooltip]:hover::after { display: block; }
-.activity-axis { display: grid; grid-template-columns: minmax(0, 1fr); margin-top: .3rem; }
+
+.activity-axis time[data-tooltip]:hover::after {
+  display: block;
+}
+
+.activity-axis {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin-top: .3rem;
+}
+
 .activity-axis time {
   position: relative;
   grid-area: 1 / 1;
@@ -65,11 +187,28 @@
   text-align: center;
   overflow-wrap: anywhere;
 }
-.activity-axis time[data-tooltip]::after { content: attr(data-tooltip); }
-.activity-axis time:first-child::after { inset-inline-start: 0; transform: none; }
-.activity-axis time:last-child::after { inset-inline: auto 0; transform: none; }
+
+.activity-axis time[data-tooltip]::after {
+  content: attr(data-tooltip);
+}
+
+.activity-axis time:first-child::after {
+  inset-inline-start: 0;
+  transform: none;
+}
+
+.activity-axis time:last-child::after {
+  inset-inline: auto 0;
+  transform: none;
+}
+
 /* Quarter ticks snap to bar boundaries, so the endpoints need different widths. */
-.activity-axis time:first-child { max-inline-size: 11%; transform: none; text-align: start; }
+.activity-axis time:first-child {
+  max-inline-size: 11%;
+  transform: none;
+  text-align: start;
+}
+
 .activity-axis time:last-child {
   justify-self: end;
   margin-inline-start: 0;
@@ -77,19 +216,44 @@
   transform: none;
   text-align: end;
 }
+
 @container (max-width: 36rem) {
-  .activity-tick-wide { display: none; }
-  .activity-axis time { max-inline-size: 24%; }
-  .activity-axis time:is(:first-child, :last-child) { max-inline-size: 25%; }
+  .activity-tick-wide {
+    display: none;
+  }
+  .activity-axis time {
+    max-inline-size: 24%;
+  }
+  .activity-axis time:is(:first-child, :last-child) {
+    max-inline-size: 25%;
+  }
 }
+
 @container (max-width: 22rem) {
-  .activity-axis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
-  .activity-axis time:not(:first-child):not(:last-child) { display: none; }
+  .activity-axis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .5rem;
+  }
+  .activity-axis time:not(:first-child):not(:last-child) {
+    display: none;
+  }
   .activity-axis time:is(:first-child, :last-child) {
     grid-area: auto;
     justify-self: stretch;
     max-inline-size: none;
   }
 }
-.log-result-total { min-block-size: 1lh; margin: .8rem 0 .5rem; font-size: 1rem; font-weight: 750; text-align: right; }
-.log-result-total[hidden] { display: block; visibility: hidden; }
+
+/* Reserve space for the count before the first activity response. */
+.log-result-total {
+  min-block-size: 1lh;
+  margin: .8rem 0 .5rem;
+  font-size: 1rem;
+  font-weight: 750;
+  text-align: right;
+}
+
+.log-result-total[hidden] {
+  display: block;
+  visibility: hidden;
+}

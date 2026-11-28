@@ -4,13 +4,17 @@ function localizeLogTimes(results) {
     return;
   }
   const rowTime = new Intl.DateTimeFormat(results.lang, {
-    ...calendarFields, ...clockFields, second: "2-digit",
+    ...calendarFields,
+    ...clockFields,
+    second: "2-digit",
   });
   const detailTime = detailTimeFormatter(results.lang);
   const timeZone = browserTimeZone();
   for (const time of times) {
     const rounded = time.dataset.displayTime;
-    time.textContent = rounded ? exactLocalTime(detailTime, timeZone, rounded) : rowTime.format(logDate(time.dateTime));
+    time.textContent = rounded
+      ? exactLocalTime(detailTime, timeZone, rounded)
+      : rowTime.format(logDate(time.dateTime));
     time.title = exactLocalTime(detailTime, timeZone, time.dateTime);
   }
   for (const time of results.querySelectorAll(".log-timing time")) {
@@ -37,6 +41,7 @@ function setupLogDetails(results) {
     const { disclosure, inlineCell, inspector } = selection;
     selection = undefined;
     disclosure.open = false;
+    // Restore the inspector to its row before returning focus to the disclosure.
     inlineCell.append(inspector);
     panel.close();
     disclosure.querySelector("summary").focus({ preventScroll: true });
@@ -62,7 +67,7 @@ function setupLogDetails(results) {
     content.scrollTop = 0;
   });
 
-  closeButton.addEventListener("click", () => close());
+  closeButton.addEventListener("click", close);
   panel.addEventListener("click", (event) => {
     if (event.target === panel && document.getSelection()?.isCollapsed !== false) {
       close();

@@ -1,4 +1,5 @@
 function localPickerValue(date) {
+  // Serialize local clock fields in the datetime-local input's format.
   const local = new Date(0);
   local.setUTCFullYear(date.getFullYear(), date.getMonth(), date.getDate());
   local.setUTCHours(date.getHours(), date.getMinutes(), date.getSeconds());
@@ -7,7 +8,7 @@ function localPickerValue(date) {
 
 function utcPickerValue(value) {
   const seconds = value.length === 16 ? `${value}:00` : value;
-  // Date chooses the earlier instant at a repeated local time and moves a skipped time forward.
+  // Date chooses the earlier instant at a repeated hour. The round trip detects skipped times.
   const date = new Date(seconds);
   return Number.isFinite(date.getTime()) && localPickerValue(date) === seconds ? date.toISOString().slice(0, 19) : "";
 }
@@ -26,12 +27,16 @@ function setupTimeFilters(form) {
   const searchWindow = form.querySelector("#search-window");
   const searchButtons = form.querySelectorAll("[data-search-submit]");
   const zoneLabel = form.querySelector("#picker-time-zone");
-  const pickerBounds = [[startPicker, startTimeField], [endPicker, endTimeField]].map(([picker, applied]) => ({
-    picker, applied,
-  }));
+  const pickerBounds = [
+    { picker: startPicker, applied: startTimeField },
+    { picker: endPicker, applied: endTimeField },
+  ];
   const language = form.closest("[lang]").lang;
   const formatter = new Intl.DateTimeFormat(language, {
-    ...calendarFields, ...clockFields, year: "numeric", second: "2-digit",
+    ...calendarFields,
+    ...clockFields,
+    year: "numeric",
+    second: "2-digit",
   });
   const timeZone = browserTimeZone();
   zoneLabel.textContent = timeZone.label;
@@ -76,8 +81,12 @@ function setupTimeFilters(form) {
       input.disabled = !custom;
     }
     currentRange.hidden = custom || Boolean(selectedWindow);
-    searchButtons.forEach((button) => { button.value = custom ? "" : recentWindow; });
-    timePresets.forEach((preset) => { preset.setAttribute("aria-pressed", !custom && preset.value === selectedWindow); });
+    for (const button of searchButtons) {
+      button.value = custom ? "" : recentWindow;
+    }
+    for (const preset of timePresets) {
+      preset.setAttribute("aria-pressed", !custom && preset.value === selectedWindow);
+    }
   }
 
   function apply(bounds, { preservePicker } = {}) {
@@ -110,20 +119,29 @@ function setupTimeFilters(form) {
   }
 
   startPicker.addEventListener("input", clearStartError);
-  customDates.addEventListener("input", () => { pickerVersion += 1; });
+  customDates.addEventListener("input", () => {
+    pickerVersion += 1;
+  });
   customButton.addEventListener("click", () => {
     pickerVersion += 1;
     showCustom(true);
     startPicker.focus();
   });
 
-  return { apply, showStartError, isCustomOpen: () => !customDates.hidden, version: () => pickerVersion };
+  return {
+    apply,
+    showStartError,
+    isCustomOpen: () => !customDates.hidden,
+    version: () => pickerVersion,
+  };
 }
 
 function setupMessageFilter(form) {
   const input = form.querySelector("#text");
   const clear = form.querySelector("#clear-message");
-  const updateClearButton = () => { clear.hidden = !input.value; };
+  const updateClearButton = () => {
+    clear.hidden = !input.value;
+  };
 
   input.addEventListener("input", updateClearButton);
   form.addEventListener("submit", (event) => {

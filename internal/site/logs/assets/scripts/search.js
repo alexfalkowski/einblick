@@ -23,6 +23,7 @@ function setupLogSearch(form) {
   let refreshVersion = 0;
   const requests = new WeakMap();
 
+  // Pause timed swaps while someone is interacting with the current results or picker.
   function refreshPaused() {
     return details?.open || results.contains(document.activeElement) || timeFilters.isCustomOpen();
   }
@@ -51,7 +52,14 @@ function setupLogSearch(form) {
     }
     const { method, action, body } = ctx.request;
     const { paging, refreshing, pickerVersion } = request;
-    failedQuery = { method, action, values: Object.fromEntries(body), paging, refreshing, pickerVersion };
+    failedQuery = {
+      method,
+      action,
+      values: Object.fromEntries(body),
+      paging,
+      refreshing,
+      pickerVersion,
+    };
     progress.textContent = "";
     failure.hidden = false;
     if (failureMessage.textContent !== message) {
@@ -69,14 +77,19 @@ function setupLogSearch(form) {
     }
 
     requests.set(ctx, {
-      automatic, paging, refreshing: automatic || logRetry?.refreshing,
-      refreshVersion, pickerVersion: logRetry?.pickerVersion ?? timeFilters.version(),
+      automatic,
+      paging,
+      refreshing: automatic || logRetry?.refreshing,
+      refreshVersion,
+      pickerVersion: logRetry?.pickerVersion ?? timeFilters.version(),
     });
     if (!automatic) {
       latestSearch = ctx;
       requests.get(activeRequest)?.activity?.controller.abort();
       clearFailure();
-      progressTimer ??= setTimeout(() => { progress.textContent = progress.dataset.message; }, searchFeedbackDelay);
+      progressTimer ??= setTimeout(() => {
+        progress.textContent = progress.dataset.message;
+      }, searchFeedbackDelay);
     }
   }
 
@@ -103,6 +116,7 @@ function setupLogSearch(form) {
 
   function isSuperseded(ctx, request) {
     if (request.automatic) {
+      // Changing the refresh interval invalidates any timed result still in flight.
       return Boolean(latestSearch) || request.refreshVersion !== refreshVersion || refreshPaused();
     }
     return latestSearch !== ctx;
@@ -222,6 +236,7 @@ function setupLogSearch(form) {
 
     const { queryUrl, activityUrl } = results.dataset;
     queryURL = queryUrl;
+    // Preserve picker edits made while the request was in flight.
     const preserveAppliedPicker = request.refreshing || request.paging;
     const pickerChanged = request.pickerVersion !== timeFilters.version();
     const preservePicker = timeFilters.isCustomOpen() && (preserveAppliedPicker || pickerChanged);
@@ -266,7 +281,13 @@ function setupLogSearch(form) {
       const interval = htmx.parseInterval(refreshInterval.value);
       if (interval) {
         timer = setInterval(() => {
-          if (!activeRequest && !latestSearch && !manualQueryFailed && !refreshPaused() && !activity.isLoading()) {
+          if (
+            !activeRequest &&
+            !latestSearch &&
+            !manualQueryFailed &&
+            !refreshPaused() &&
+            !activity.isLoading()
+          ) {
             htmx.ajax("PUT", queryURL, { source: refreshInterval });
           }
         }, interval);
