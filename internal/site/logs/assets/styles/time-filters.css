@@ -1,0 +1,37 @@
+#log-filters, .log-summary, .log-sections {
+  border: var(--border) solid var(--color-base-300);
+  border-radius: var(--radius-box);
+  background: var(--color-base-100);
+}
+#log-filters { padding: 1rem; }
+.filters { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: .65rem .85rem; }
+.time-presets { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
+.time-presets button {
+  appearance: none;
+  flex: 1 1 0;
+  min-width: max-content;
+  min-height: 2.25rem;
+  padding: .35rem .625rem;
+  border: var(--border) solid var(--color-base-300);
+  border-radius: var(--radius-field);
+  background: var(--color-base-100);
+  color: var(--color-base-content);
+  font: inherit;
+  font-size: var(--text-body);
+  font-weight: 700;
+  cursor: pointer;
+}
+.time-presets button[aria-pressed="false"]:enabled:hover, .actions .btn-outline:hover, #clear-message:enabled:hover {
+  background: var(--primary-tint);
+}
+.time-presets button[aria-pressed="true"] { border-color: var(--color-primary); background: var(--color-primary); color: var(--color-primary-content); }
+.custom-range-control { display: flex; flex: 1 1 0; align-items: center; gap: .5rem; min-inline-size: max-content; }
+.custom-range-control:has(#picker-time-zone:not([hidden])) { flex: 0 1 auto; min-inline-size: 0; }
+.time-zone-pill { min-inline-size: 0; overflow: hidden; color: var(--muted); text-overflow: ellipsis; }
+#current-range { flex-basis: 100%; color: var(--muted); font-size: var(--text-small); }
+.time-presets, .custom-dates, .actions { grid-column: 2 / -1; }
+.custom-dates:not([hidden]) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; }
+.custom-dates { align-items: start; }
+.custom-dates input { min-width: 0; }
+#start-date-error { margin: .3rem 0 0; font-size: var(--text-small); color: var(--color-error); }
+.custom-dates #start-utc[aria-invalid="true"] { --input-color: var(--color-error); }

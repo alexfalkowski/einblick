@@ -13,4 +13,5 @@ var Module = signal.Module(
 	signal.Constructor(NewFileSystem),
 	signal.Constructor(NewCatalog),
 	signal.Constructor(NewLayout),
+	signal.Constructor(NewAssets),
 )

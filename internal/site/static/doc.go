@@ -1,2 +1,2 @@
-// Package static serves the site's embedded assets through MVC.
+// Package static serves the site's favicon through MVC.
 package static

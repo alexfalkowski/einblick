@@ -81,8 +81,6 @@ In [CircleCI](../.circleci/config.yml) the groups run in separate jobs. Each job
 stores its test reports and passes its raw Go coverage profiles to the coverage
 job. The coverage job merges the profiles for a single Codecov upload.
 
-The Logs page includes a content fingerprint in each embedded CSS and
-JavaScript URL. Rebuilding with changed assets gives browsers a fresh URL.
 Shared actions live in `test/lib`; [fixtures](../test/fixtures/README.md) provide
 synthetic OTLP payloads. Storage scenarios stop the server before inspecting its
 database. Some scenarios reset that database, so use only the disposable test
@@ -190,9 +188,17 @@ for page-specific markup and `root/layout` for the shared layouts.
 Keep user-facing strings in each [locale catalog](../internal/site/locales).
 The [full-page layout](../internal/site/root/layout/full.tmpl) pins htmx and the
 daisyUI component stylesheets from jsDelivr with Subresource Integrity,
-following Web. Use the shared daisyUI controls with the Einblick theme in the
-[Logs stylesheet](../internal/site/static/logs.css). The theme, page layout and
-request-status script ship in the binary.
+following Web. Use the shared daisyUI controls with the Einblick theme.
+
+Edit the Logs CSS and JavaScript sources by component. Add new files to the
+corresponding manifest in CSS cascade or JavaScript execution order. A regular
+Go build embeds the sources. At startup, MVC assembles each bundle in manifest
+order and generates its URL from the served bytes. The site returns `404` with
+`Cache-Control: no-store` for outdated fingerprints.
+[CSS sources](../internal/site/logs/assets/styles) ·
+[CSS manifest](../internal/site/logs/assets/logs.css.tmpl) ·
+[JavaScript sources](../internal/site/logs/assets/scripts) ·
+[JavaScript manifest](../internal/site/logs/assets/logs.js.tmpl)
 
 Templates send exact RFC 3339 timestamps and UTC fallback text. The Logs script
 formats user-facing times after initial render and fragment updates. It converts

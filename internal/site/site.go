@@ -11,8 +11,9 @@ import (
 
 //go:embed root/layout/*.tmpl
 //go:embed logs/view/*.tmpl
+//go:embed logs/assets/*.tmpl logs/assets/styles/*.css logs/assets/scripts/*.js
 //go:embed locales/*.yaml
-//go:embed static/*.css static/*.js static/favicon.png
+//go:embed static/favicon.png
 var filesystem embed.FS
 
 // NewFileSystem provides the embedded layouts, views, catalogs, and first-party assets.

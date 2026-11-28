@@ -59,7 +59,7 @@ timestamp selection, supported shapes and duplicate policy for E-11.
 - E-12 and E-17 extend the existing MVC site under `internal/site`. Follow the
   [Logs feature layout](../internal/site/logs) and reuse the
   [embedded catalogs](../internal/site/locales), [shared layouts](../internal/site/root/layout) and
-  [Einblick daisyUI theme](../internal/site/static/logs.css). Use the
+  [Einblick daisyUI theme](../internal/site/logs/assets/styles/base.css). Use the
   [initial visual reference](requirements.md#87-service-catalog-and-standard-ux)
   and the [shared time controls and chart selection](requirements.md#time-controls).
   Each view owns its chart data. Verify each
