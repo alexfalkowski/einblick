@@ -34,11 +34,11 @@ type Repository interface {
 	Activity(ctx context.Context, query Query) (*Activity, error)
 }
 
-// NewRepository provides log persistence and queries over the service-owned database.
+// newRepository provides log persistence and queries over the service-owned database.
 // The migrate package initializes the schema before the listeners start.
-func NewRepository(cfg *Config, db *sql.DB, pool *sync.BufferPool, objects archive.ObjectStore) Repository {
+func newRepository(cfg *Config, db *sql.DB, pool *sync.BufferPool, objects archive.ObjectStore, queries statements) Repository {
 	return &repository{
-		config: cfg, db: db, pool: pool, store: objects,
+		config: cfg, db: db, pool: pool, store: objects, statements: queries,
 		localQueries:   sync.NewSemaphore(1),
 		archiveQueries: sync.NewSemaphore(archivePageSlots + archiveActivitySlots),
 	}

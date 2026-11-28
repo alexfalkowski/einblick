@@ -1,9 +1,6 @@
 package duckdb
 
-import _ "embed"
+import "embed"
 
-//go:embed queries/configure_httpfs.sql
-var configureHTTPFSQuery string
-
-//go:embed queries/create_r2_secret.sql
-var createR2SecretQuery string
+//go:embed queries
+var queries embed.FS

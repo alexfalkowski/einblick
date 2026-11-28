@@ -46,7 +46,7 @@ func (r *repository) Activity(ctx context.Context, query Query) (*Activity, erro
 		origin := query.StartTime.Truncate(width.Duration())
 		args := append(filterArgs(query), unixNanoseconds(origin).String(), int64(width))
 
-		return r.queryLogs(ctx, query, logActivityQuery, args, func(rows *sql.Rows) error {
+		return r.queryLogs(ctx, query, "queries/log_activity.sql", args, func(rows *sql.Rows) error {
 			buckets := activityBuckets(query, origin, width)
 			for rows.Next() {
 				var index int

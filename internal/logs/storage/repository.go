@@ -24,11 +24,12 @@ type repository struct {
 	localQueries   *sync.Semaphore
 	archiveQueries *sync.Semaphore
 	store          archive.ObjectStore
+	statements     statements
 }
 
 // Add commits all records and their resource/scope context before returning
-// their count. Empty requests are successful no-ops. Any encoding, statement or
-// commit failure returns zero and an error; accepted rows are never evicted here.
+// their count. Empty requests are successful no-ops. Encoding and database
+// failures return zero and an error; accepted rows are never evicted here.
 // Duplicate exports create additional records. The request context bounds SQL
 // work, and the shared transport owns admission size/rate/deadline limits.
 func (r *repository) Add(ctx context.Context, req *collector.ExportLogsServiceRequest) (int, error) {
@@ -42,6 +43,8 @@ func (r *repository) Add(ctx context.Context, req *collector.ExportLogsServiceRe
 		return 0, nil
 	}
 
+	insertResource := r.statements.MustLookup("queries/insert_resource.sql")
+
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
@@ -54,7 +57,7 @@ func (r *repository) Add(ctx context.Context, req *collector.ExportLogsServiceRe
 		}
 
 		header := &logs.ResourceLogs{Resource: resource.GetResource(), SchemaUrl: resource.GetSchemaUrl()}
-		resourceID, err := r.insertHeader(ctx, tx, insertResourceQuery, header)
+		resourceID, err := r.insertHeader(ctx, tx, insertResource, header)
 		if err != nil {
 			return 0, err
 		}
@@ -77,8 +80,11 @@ func (r *repository) writeScope(ctx context.Context, tx *sql.Tx, scope *logs.Sco
 		return nil
 	}
 
+	insertScope := r.statements.MustLookup("queries/insert_scope.sql")
+	insertLog := r.statements.MustLookup("queries/insert_log.sql")
+
 	header := &logs.ScopeLogs{Scope: scope.GetScope(), SchemaUrl: scope.GetSchemaUrl()}
-	scopeID, err := r.insertHeader(ctx, tx, insertScopeQuery, header, resourceID)
+	scopeID, err := r.insertHeader(ctx, tx, insertScope, header, resourceID)
 	if err != nil {
 		return err
 	}
@@ -94,7 +100,7 @@ func (r *repository) writeScope(ctx context.Context, tx *sql.Tx, scope *logs.Sco
 		timestamp := strconv.FormatUint(record.GetTimeUnixNano(), 10)
 		observed := strconv.FormatUint(record.GetObservedTimeUnixNano(), 10)
 
-		_, err = tx.ExecContext(ctx, insertLogQuery, scopeID, timestamp, observed, received, timestamp, observed, received, content)
+		_, err = tx.ExecContext(ctx, insertLog, scopeID, timestamp, observed, received, timestamp, observed, received, content)
 		if err != nil {
 			return err
 		}
