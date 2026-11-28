@@ -18,9 +18,11 @@ function setupActivitySelection(summary, selectRange) {
   };
   const sameDay = day.format(round(logDate(ticks[0].dateTime))) === day.format(round(logDate(lastTick.dateTime)));
   const tooltipTime = new Intl.DateTimeFormat(summary.lang, {
-    ...(sameDay ? {} : calendarFields), ...clock,
+    ...(sameDay ? {} : calendarFields),
+    ...clock,
   });
   const timeZone = browserTimeZone();
+
   function tooltipBoundary(timestamp) {
     const date = round(logDate(timestamp));
     return { time: tooltipTime.format(date), zone: timeZoneAt(timeZone, date) };
@@ -48,6 +50,7 @@ function setupActivitySelection(summary, selectRange) {
 
   let first;
   const barAt = (clientX) => {
+    // Pointer capture keeps delivering events outside the plot. Clamp to its end bars.
     const { left, width } = chart.getBoundingClientRect();
     const index = Math.floor((clientX - left) * bars.length / width);
     return Math.max(0, Math.min(index, bars.length - 1));
@@ -87,7 +90,9 @@ function setupActivitySelection(summary, selectRange) {
     if (first === undefined) {
       const { start, end } = tooltipRange(last, last);
       const label = summary.dataset.bucketFormat
-        .replace("{start}", start).replace("{end}", end).replace("{count}", bars[last].dataset.count);
+        .replace("{start}", start)
+        .replace("{end}", end)
+        .replace("{count}", bars[last].dataset.count);
       showTooltip(last, label);
     } else {
       selectThrough(last);
@@ -169,7 +174,9 @@ function setupLogActivity(panel, total, selectRange) {
   function prepare(url) {
     const controller = new AbortController();
     const request = { url, controller };
-    request.ready = fetchSummary(url, controller.signal).then((outcome) => { request.outcome = outcome; });
+    request.ready = fetchSummary(url, controller.signal).then((outcome) => {
+      request.outcome = outcome;
+    });
     return request;
   }
 
@@ -181,6 +188,7 @@ function setupLogActivity(panel, total, selectRange) {
     status.textContent = "";
     panel.hidden = false;
     pending = request;
+    // The previous chart can stay visible while a new search loads. Disable range selection until it matches.
     content.inert = !snapshot.hidden;
     content.setAttribute("aria-busy", "true");
     try {
@@ -197,7 +205,9 @@ function setupLogActivity(panel, total, selectRange) {
         showFailure(reason, canRetry);
         return;
       }
-      snapshot.textContent = setupActivitySelection(summary, (startTime, endTime) => selectRange(request.url, startTime, endTime));
+      snapshot.textContent = setupActivitySelection(summary, (startTime, endTime) => {
+        selectRange(request.url, startTime, endTime);
+      });
       snapshot.hidden = false;
       interval.textContent = summary.dataset.intervalLabel;
       interval.title = summary.dataset.intervalLabel;
@@ -235,5 +245,12 @@ function setupLogActivity(panel, total, selectRange) {
 
   retry.addEventListener("click", () => load(resultsURL));
 
-  return { load, prepare, show, cancelLoading, resumeLoading, isLoading: () => Boolean(pending) };
+  return {
+    load,
+    prepare,
+    show,
+    cancelLoading,
+    resumeLoading,
+    isLoading: () => Boolean(pending),
+  };
 }

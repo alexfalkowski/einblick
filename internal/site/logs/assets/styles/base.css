@@ -1,3 +1,4 @@
+/* Theme tokens shared by daisyUI components and the Logs page. */
 [data-theme="einblick"] {
   color-scheme: light;
   --color-base-100: #fff;
@@ -47,14 +48,45 @@
   }
 }
 
-html:has(.log-details-panel) { scrollbar-gutter: stable; }
-* { box-sizing: border-box; }
-body { margin: 0; }
-a:not(.btn) { color: var(--color-primary); text-underline-offset: .2em; }
-:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }
-h1 { margin: 0; font-size: clamp(1.65rem, 3vw, 2.2rem); font-weight: 800; letter-spacing: -.035em; }
-code, time, pre, .log-row .message, .log-body, #trace-id { font-family: ui-monospace, Menlo, Consolas, monospace; }
-.log-row .message, .log-body { font-size: .9375rem; font-weight: 550; line-height: 1.5; }
+/* Keep the document width stable when the dialog locks scrolling. */
+html:has(.log-details-panel) {
+  scrollbar-gutter: stable;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+a:not(.btn) {
+  color: var(--color-primary);
+  text-underline-offset: .2em;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(1.65rem, 3vw, 2.2rem);
+  font-weight: 800;
+  letter-spacing: -.035em;
+}
+
+code, time, pre, .log-row .message, .log-body, #trace-id {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+
+.log-row .message, .log-body {
+  font-size: .9375rem;
+  font-weight: 550;
+  line-height: 1.5;
+}
 
 .skip-link {
   position: absolute;
@@ -62,8 +94,18 @@ code, time, pre, .log-row .message, .log-body, #trace-id { font-family: ui-monos
   padding: .65rem 1rem;
   background: var(--color-base-100);
 }
-.skip-link:focus { transform: translateY(0); z-index: 1; }
-.console { display: grid; grid-template-columns: 13rem minmax(0, 1fr); min-height: 100vh; }
+
+.skip-link:focus {
+  transform: translateY(0);
+  z-index: 1;
+}
+
+.console {
+  display: grid;
+  grid-template-columns: 13rem minmax(0, 1fr);
+  min-height: 100vh;
+}
+
 .sidebar {
   color-scheme: dark;
   --color-base-100: #23383d;
@@ -72,14 +114,65 @@ code, time, pre, .log-row .message, .log-body, #trace-id { font-family: ui-monos
   background: #16272d;
   color: var(--color-base-content);
 }
-a.brand { display: block; width: fit-content; margin: 0 0 2rem; color: #fff; font-size: 1.3rem; font-weight: 800; letter-spacing: -.025em; text-decoration: none; }
-.brand::before { content: ''; display: inline-block; width: .7em; height: .7em; margin-right: .5em; border-radius: .18em; background: #79c9b5; }
-.sidebar :focus-visible { outline-color: #79c9b5; }
-.sidebar label { display: block; margin-bottom: .4rem; }
-.sidebar .input { --input-color: #6f9088; }
-.sidebar input::placeholder { color: var(--color-base-content); }
 
-.workspace { padding: clamp(1rem, 3vw, 2.25rem); min-width: 0; }
-.workspace-header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 0 1rem; }
-.refresh-control:not([hidden]) { display: flex; align-items: center; gap: .5rem; margin-bottom: 1rem; }
-.refresh-control label { white-space: nowrap; }
+a.brand {
+  display: block;
+  width: fit-content;
+  margin: 0 0 2rem;
+  color: #fff;
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: -.025em;
+  text-decoration: none;
+}
+
+.brand::before {
+  content: '';
+  display: inline-block;
+  width: .7em;
+  height: .7em;
+  margin-right: .5em;
+  border-radius: .18em;
+  background: #79c9b5;
+}
+
+.sidebar :focus-visible {
+  outline-color: #79c9b5;
+}
+
+.sidebar label {
+  display: block;
+  margin-bottom: .4rem;
+}
+
+.sidebar .input {
+  --input-color: #6f9088;
+}
+
+.sidebar input::placeholder {
+  color: var(--color-base-content);
+}
+
+.workspace {
+  padding: clamp(1rem, 3vw, 2.25rem);
+  min-width: 0;
+}
+
+.workspace-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0 1rem;
+}
+
+.refresh-control:not([hidden]) {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin-bottom: 1rem;
+}
+
+.refresh-control label {
+  white-space: nowrap;
+}

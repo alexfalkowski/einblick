@@ -1,5 +1,11 @@
-.pagination { margin-top: .85rem; }
-.next { text-decoration: none; }
+.pagination {
+  margin-top: .85rem;
+}
+
+.next {
+  text-decoration: none;
+}
+
 .empty-state {
   padding: 1.75rem 1rem;
   border: var(--border) solid var(--color-base-300);
@@ -7,6 +13,20 @@
   background: var(--color-base-100);
   text-align: center;
 }
-.empty-state h2 { margin: 0; font-size: 1rem; font-weight: 700; overflow-wrap: anywhere; }
-.empty-state p { margin: .25rem 0 0; color: var(--muted); font-size: .875rem; }
-.empty-state .btn { margin-top: .65rem; }
+
+.empty-state h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.empty-state p {
+  margin: .25rem 0 0;
+  color: var(--muted);
+  font-size: .875rem;
+}
+
+.empty-state .btn {
+  margin-top: .65rem;
+}

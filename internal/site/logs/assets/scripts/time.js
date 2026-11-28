@@ -4,6 +4,7 @@ const utcOffsetFormatter = new Intl.DateTimeFormat("en", { timeZoneName: "longOf
 const searchFeedbackDelay = 300;
 
 function logDate(value) {
+  // Normalize RFC 3339 fractions to the three digits used by Date.
   return new Date(value.replace(/\.(\d+)Z$/, (_, fraction) => `.${fraction.padEnd(3, "0").slice(0, 3)}Z`));
 }
 
@@ -27,7 +28,10 @@ function timeZoneAt(timeZone, date) {
 
 function detailTimeFormatter(language) {
   return new Intl.DateTimeFormat(language, {
-    ...calendarFields, ...clockFields, year: "numeric", second: "2-digit",
+    ...calendarFields,
+    ...clockFields,
+    year: "numeric",
+    second: "2-digit",
     fractionalSecondDigits: 3,
   });
 }

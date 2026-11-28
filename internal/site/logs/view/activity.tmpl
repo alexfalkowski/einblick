@@ -1,42 +1,47 @@
 {{define "results"}}
-{{if .Model}}
-{{$exactTime := "2006-01-02T15:04:05.999999999Z07:00"}}
-{{$axisTime := .Localizer.Text .Model.TickFormat}}
-{{$first := index .Model.Ticks 0}}
-{{$lastIndex := sub (len .Model.Ticks) 1}}
-{{$last := index .Model.Ticks $lastIndex}}
-{{$precision := .Model.TooltipPrecision.Duration}}
-{{$tooltipTime := $axisTime}}
-{{if eq (($first.Time.Round $precision).Format "2006-01-02") (($last.Time.Round $precision).Format "2006-01-02")}}
-  {{$tooltipTime = .Model.TooltipFormat}}
-{{end}}
-{{$totalLabel := .Localizer.Message "logs.matching_count" (dict "Count" .Model.Total)}}
-{{if eq .Model.Total 1}}{{$totalLabel = .Localizer.Text "logs.one_match"}}{{end}}
-<div class="activity-summary" lang="{{.Localizer.Tag}}" data-total-label="{{$totalLabel}}"
-     data-interval-label="{{.Localizer.Message "logs.activity_interval" (dict "Size" .Model.IntervalSize "Unit" (.Localizer.Text .Model.IntervalUnit))}}"
-     data-through-format="{{.Localizer.Message "logs.activity_through" (dict "End" "{end}")}}"
-     data-bucket-format="{{.Localizer.Message "logs.activity_bucket" (dict "Start" "{start}" "End" "{end}" "Count" "{count}")}}"
-     data-tooltip-precision="{{$precision.Milliseconds}}">
-  <div class="activity-plot" aria-hidden="true">
-    <div class="activity-bars">
-      {{range .Model.Bars}}
-      {{$start := (.StartTime.Round $precision).Format $tooltipTime}}
-      {{$end := (.EndTime.Round $precision).Format $tooltipTime}}
-      <div class="activity-bar" data-start="{{.StartTime.Format $exactTime}}" data-end="{{.EndTime.Format $exactTime}}"
-           data-start-label="{{$start}}" data-end-label="{{$end}}" data-count="{{.Count}}" style="--bar-height: {{.Height}}%"
-           data-summary="{{$.Localizer.Message "logs.activity_bucket" (dict "Start" $start "End" (printf "%s UTC" $end) "Count" .Count)}}">
-        <span></span>
-      </div>
-      {{end}}
-    </div>
-    <div class="log-tooltip activity-tooltip" hidden data-search="{{.Localizer.Text "logs.activity_search"}}"></div>
-  </div>
-  <div class="activity-axis">
-    {{range $index, $tick := .Model.Ticks}}
-    <time{{if $tick.WideOnly}} class="activity-tick-wide"{{end}} style="--tick-position: {{$tick.Position}}%"
-         datetime="{{$tick.Time.Format $exactTime}}">{{$tick.Time.Format $axisTime}}{{if eq $index $lastIndex}} UTC{{end}}</time>
+  {{if .Model}}
+    {{$exactTime := "2006-01-02T15:04:05.999999999Z07:00"}}
+    {{$axisTime := .Localizer.Text .Model.TickFormat}}
+    {{$first := index .Model.Ticks 0}}
+    {{$lastIndex := sub (len .Model.Ticks) 1}}
+    {{$last := index .Model.Ticks $lastIndex}}
+    {{$precision := .Model.TooltipPrecision.Duration}}
+    {{$tooltipTime := $axisTime}}
+    {{if eq (($first.Time.Round $precision).Format "2006-01-02") (($last.Time.Round $precision).Format "2006-01-02")}}
+      {{$tooltipTime = .Model.TooltipFormat}}
     {{end}}
-  </div>
-</div>
-{{end}}
+    {{$totalLabel := .Localizer.Message "logs.matching_count" (dict "Count" .Model.Total)}}
+    {{if eq .Model.Total 1}}
+      {{$totalLabel = .Localizer.Text "logs.one_match"}}
+    {{end}}
+
+    {{/* Keep UTC labels for the response and exact bounds for browser chart selections. */}}
+    <div class="activity-summary" lang="{{.Localizer.Tag}}" data-total-label="{{$totalLabel}}"
+         data-interval-label="{{.Localizer.Message "logs.activity_interval" (dict "Size" .Model.IntervalSize "Unit" (.Localizer.Text .Model.IntervalUnit))}}"
+         data-through-format="{{.Localizer.Message "logs.activity_through" (dict "End" "{end}")}}"
+         data-bucket-format="{{.Localizer.Message "logs.activity_bucket" (dict "Start" "{start}" "End" "{end}" "Count" "{count}")}}"
+         data-tooltip-precision="{{$precision.Milliseconds}}">
+      <div class="activity-plot" aria-hidden="true">
+        <div class="activity-bars">
+          {{range .Model.Bars}}
+            {{$start := (.StartTime.Round $precision).Format $tooltipTime}}
+            {{$end := (.EndTime.Round $precision).Format $tooltipTime}}
+            <div class="activity-bar" data-start="{{.StartTime.Format $exactTime}}"
+                 data-end="{{.EndTime.Format $exactTime}}"
+                 data-start-label="{{$start}}" data-end-label="{{$end}}" data-count="{{.Count}}" style="--bar-height: {{.Height}}%"
+                 data-summary="{{$.Localizer.Message "logs.activity_bucket" (dict "Start" $start "End" (printf "%s UTC" $end) "Count" .Count)}}">
+              <span></span>
+            </div>
+          {{end}}
+        </div>
+        <div class="log-tooltip activity-tooltip" hidden data-search="{{.Localizer.Text "logs.activity_search"}}"></div>
+      </div>
+      <div class="activity-axis">
+        {{range $index, $tick := .Model.Ticks}}
+          <time{{if $tick.WideOnly}} class="activity-tick-wide"{{end}} style="--tick-position: {{$tick.Position}}%"
+               datetime="{{$tick.Time.Format $exactTime}}">{{$tick.Time.Format $axisTime}}{{if eq $index $lastIndex}} UTC{{end}}</time>
+        {{end}}
+      </div>
+    </div>
+  {{end}}
 {{end}}
