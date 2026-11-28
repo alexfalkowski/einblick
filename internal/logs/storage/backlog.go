@@ -8,9 +8,11 @@ import (
 
 // Backlog reads the unpublished record totals and publication state in one snapshot.
 func (r *Archive) Backlog(ctx context.Context) (archive.Backlog, error) {
+	statement := r.statements.MustLookup("queries/archive/backlog.sql")
+
 	var backlog archive.Backlog
 	var oldest sql.Null[uint64]
-	row := r.db.QueryRowContext(ctx, archiveBacklogQuery)
+	row := r.db.QueryRowContext(ctx, statement)
 	if err := row.Scan(&backlog.PendingRecords, &backlog.PendingRecordBytes, &oldest, &backlog.LastPublishedAt); err != nil {
 		return archive.Backlog{}, err
 	}

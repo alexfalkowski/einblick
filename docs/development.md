@@ -98,10 +98,13 @@ python3 tools/check_handoff.py
 ## 🦆 Storage
 
 `internal/duckdb` opens, instruments and closes the shared database.
-`internal/logs/storage` keeps the `Repository` interface and composing
-`NewRepository` constructor in `storage.go`. The database implementation and
-transactional `Add` operation live in `repository.go`. SQL files live in
-`queries/` and are embedded as strings declared in `queries.go`.
+`internal/logs/storage` keeps the `Repository` interface and its
+`newRepository` constructor in `storage.go`. The database implementation and
+transactional `Add` operation live in `repository.go`. Add SQL files under
+`queries/` and refer to them by their package-relative paths. The directory
+embed includes subdirectories. The storage module uses
+[`internal/database/query`](../internal/database/query) to load the SQL text once
+during construction.
 The Logs module applies the repository logging decorator and registers archive
 metrics in [`internal/logs/telemetry`](../internal/logs/telemetry). Storage
 supplies the backlog snapshot used by the metrics callback.
@@ -201,7 +204,9 @@ shareable URLs continue to use absolute bounds.
 Application migrations live in `internal/migrate/migrations/`. Goose discovers
 the numbered SQL files through `embed.FS` and applies pending migrations before
 the listeners start. Its DuckDB history queries live in
-`internal/migrate/queries/`, with embedded strings declared in `queries.go`.
+[`internal/migrate/queries/`](../internal/migrate/queries).
+[`dialect.go`](../internal/migrate/dialect.go) embeds that directory and checks
+that all six required queries are present when it constructs the querier at startup.
 
 For a schema change, add a numbered SQL file with a `-- +goose Up` section and
 extend `test/features/migrate`. After release, leave applied migrations unchanged.

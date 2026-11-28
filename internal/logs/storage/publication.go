@@ -19,8 +19,10 @@ func (r *Archive) NextReconciliation(ctx context.Context) (archive.Publication, 
 }
 
 func (r *Archive) nextPublication(ctx context.Context, allowUpload bool) (archive.Publication, error) {
+	statement := r.statements.MustLookup("queries/archive/next_publication.sql")
+
 	var b archive.Publication
-	row := r.db.QueryRowContext(ctx, nextPublicationQuery, allowUpload)
+	row := r.db.QueryRowContext(ctx, statement, allowUpload)
 	err := row.Scan(&b.ID, &b.Day, &b.ContentDigest, &b.Checksum, &b.PublishedChecksum)
 	if errors.Is(err, sql.ErrNoRows) {
 		return archive.Publication{}, nil
@@ -30,30 +32,36 @@ func (r *Archive) nextPublication(ctx context.Context, allowUpload bool) (archiv
 
 // RecordUpload keeps the byte identity across retries and restaging.
 func (r *Archive) RecordUpload(ctx context.Context, id, checksum string) error {
-	_, err := r.db.ExecContext(ctx, recordUploadQuery, id, checksum)
+	statement := r.statements.MustLookup("queries/archive/record_upload.sql")
+	_, err := r.db.ExecContext(ctx, statement, id, checksum)
 	return err
 }
 
 // HasUpload checks whether this batch could have written the remote bytes.
 func (r *Archive) HasUpload(ctx context.Context, id, checksum string) (bool, error) {
+	statement := r.statements.MustLookup("queries/archive/has_upload.sql")
+
 	var exists bool
-	err := r.db.QueryRowContext(ctx, hasUploadQuery, id, checksum).Scan(&exists)
+	err := r.db.QueryRowContext(ctx, statement, id, checksum).Scan(&exists)
 	return exists, err
 }
 
 // ConfirmPublication commits the remote checksum and drops unneeded attempts.
 func (r *Archive) ConfirmPublication(ctx context.Context, id, checksum string) error {
+	confirmPublication := r.statements.MustLookup("queries/archive/confirm_publication.sql")
+	clearUploads := r.statements.MustLookup("queries/archive/clear_uploads.sql")
+
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.ExecContext(ctx, confirmPublicationQuery, checksum, id); err != nil {
+	if _, err := tx.ExecContext(ctx, confirmPublication, checksum, id); err != nil {
 		return err
 	}
 
-	if _, err := tx.ExecContext(ctx, clearUploadsQuery, id); err != nil {
+	if _, err := tx.ExecContext(ctx, clearUploads, id); err != nil {
 		return err
 	}
 
@@ -62,6 +70,7 @@ func (r *Archive) ConfirmPublication(ctx context.Context, id, checksum string) e
 
 // FinishCleanup clears durable cleanup work after the confirmed file is gone.
 func (r *Archive) FinishCleanup(ctx context.Context, id string) error {
-	_, err := r.db.ExecContext(ctx, finishCleanupQuery, id)
+	statement := r.statements.MustLookup("queries/archive/finish_cleanup.sql")
+	_, err := r.db.ExecContext(ctx, statement, id)
 	return err
 }

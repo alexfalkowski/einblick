@@ -73,7 +73,7 @@ func (r *repository) List(ctx context.Context, query Query) (*Page, error) {
 			position.BeforeNS, position.BeforeNS, position.BeforeID, position.BeforeID, position.BeforeSource, query.PageSize+1,
 		)
 
-		return r.queryLogs(ctx, query, listLogsQuery, args, func(rows *sql.Rows) error {
+		return r.queryLogs(ctx, query, "queries/list_logs.sql", args, func(rows *sql.Rows) error {
 			page, err = scanPage(ctx, rows, query.PageSize, position)
 			return err
 		})
@@ -136,17 +136,21 @@ func includesHistoricalRange(ctx context.Context, startTime time.Time) bool {
 	return startTime.Before(archive.LocalWindowStart(deadline))
 }
 
-func (r *repository) queryLogs(ctx context.Context, query Query, statement string, args []any, scan func(*sql.Rows) error) error {
+func (r *repository) queryLogs(ctx context.Context, query Query, path string, args []any, scan func(*sql.Rows) error) error {
+	statement := r.statements.MustLookup(path)
+	local := r.statements.MustLookup("queries/local_logs.sql")
+	filter := r.statements.MustLookup("queries/filter_logs.sql")
+
 	runQuery := func(queryRows sqlQuery, evictedLocations, archiveLocations []string) error {
 		archived := strings.Empty
 		queryArgs := args
 		if len(archiveLocations) > 0 {
-			archived = archivedLogsQuery
+			archived = r.statements.MustLookup("queries/archived_logs.sql")
 			queryArgs = append([]any{evictedLocations, archiveLocations}, args...)
 		}
 
 		querySQL := strings.Concat(
-			"WITH selected_logs AS (", localLogsQuery, archived, "), filtered_logs AS (", filterLogsQuery, ") ", statement,
+			"WITH selected_logs AS (", local, archived, "), filtered_logs AS (", filter, ") ", statement,
 		)
 		rows, err := queryRows(ctx, querySQL, queryArgs...)
 		if err != nil {
@@ -170,10 +174,12 @@ func (r *repository) queryLogs(ctx context.Context, query Query, statement strin
 }
 
 func (r *repository) checkLocalHistory(ctx context.Context, query Query) error {
+	statement := r.statements.MustLookup("queries/archive/evictions.sql")
+
 	startDay, endDay := archiveDays(query)
 
 	var evicted bool
-	if err := r.db.QueryRowContext(ctx, archiveEvictionsQuery, startDay, endDay).Scan(&evicted); err != nil {
+	if err := r.db.QueryRowContext(ctx, statement, startDay, endDay).Scan(&evicted); err != nil {
 		return err
 	}
 	if evicted {

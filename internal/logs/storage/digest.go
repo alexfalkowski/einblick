@@ -40,6 +40,7 @@ func newArchiveDigest() hash.Hash {
 
 func (r *Archive) sourceDigest(ctx context.Context, key string) (string, error) {
 	digest := newArchiveDigest()
+
 	err := r.visitArchiveRows(ctx, key, func(row [8]string) error {
 		hashArchiveRow(digest, row)
 		return nil
@@ -47,11 +48,15 @@ func (r *Archive) sourceDigest(ctx context.Context, key string) (string, error) 
 	if err != nil {
 		return strings.Empty, err
 	}
+
 	return hex.EncodeToString(digest.Sum(nil)), nil
 }
 
 func (r *Archive) visitArchiveRows(ctx context.Context, key string, visit func([8]string) error) error {
-	read, err := r.db.PrepareContext(ctx, sourceRowsQuery)
+	sourceRows := r.statements.MustLookup("queries/archive/source_rows.sql")
+	sourcePosition := r.statements.MustLookup("queries/archive/source_position.sql")
+
+	read, err := r.db.PrepareContext(ctx, sourceRows)
 	if err != nil {
 		return err
 	}
@@ -59,10 +64,11 @@ func (r *Archive) visitArchiveRows(ctx context.Context, key string, visit func([
 
 	var position int64
 	for {
-		rows, err := r.db.QueryContext(ctx, sourcePositionQuery, key, position, digestPageRows)
+		rows, err := r.db.QueryContext(ctx, sourcePosition, key, position, digestPageRows)
 		if err != nil {
 			return errors.Prefix("select archive row positions", err)
 		}
+
 		positions, err := readDigestPositions(rows)
 		if err != nil {
 			return err
@@ -97,19 +103,24 @@ func readDigestPositions(rows *sql.Rows) ([]int64, error) {
 		if err := rows.Scan(&position); err != nil {
 			return nil, err
 		}
+
 		positions = append(positions, position)
 	}
 	return positions, rows.Err()
 }
 
 func (r *Archive) parquetContentDigest(ctx context.Context, path string) (string, error) {
+	parquetCount := r.statements.MustLookup("queries/parquet/parquet_count.sql")
+
 	var count int64
-	if err := r.db.QueryRowContext(ctx, parquetCountQuery, path).Scan(&count); err != nil {
+	if err := r.db.QueryRowContext(ctx, parquetCount, path).Scan(&count); err != nil {
 		return strings.Empty, err
 	}
 
-	pageSizes := strings.Concat(parquetRowsQuery, digestPageSizesQuery)
-	page := strings.Concat(parquetRowsQuery, digestPageQuery)
+	parquetRows := r.statements.MustLookup("queries/parquet/parquet_rows.sql")
+	pageSizes := strings.Concat(parquetRows, r.statements.MustLookup("queries/archive/digest_page_sizes.sql"))
+	page := strings.Concat(parquetRows, r.statements.MustLookup("queries/archive/digest_page.sql"))
+
 	digest := newArchiveDigest()
 	for start := int64(0); start < count; {
 		end := start + min(digestPageRows, count-start) - 1
@@ -117,18 +128,22 @@ func (r *Archive) parquetContentDigest(ctx context.Context, path string) (string
 		if err != nil {
 			return strings.Empty, errors.Prefix("size archive digest page", err)
 		}
+
 		ends, err := digestSpanEnds(sizes)
 		if err != nil {
 			return strings.Empty, err
 		}
+
 		for _, end := range ends {
 			rows, err := r.db.QueryContext(ctx, page, path, start, end)
 			if err != nil {
 				return strings.Empty, errors.Prefix("read archive digest page", err)
 			}
+
 			if err := hashArchivePage(rows, digest); err != nil {
 				return strings.Empty, err
 			}
+
 			start = end + 1
 		}
 	}
@@ -144,6 +159,7 @@ func digestSpanEnds(rows *sql.Rows) ([]int64, error) {
 		if err := rows.Scan(&row.position, &row.bytes); err != nil {
 			return nil, err
 		}
+
 		page = append(page, row)
 	}
 	if err := rows.Err(); err != nil {

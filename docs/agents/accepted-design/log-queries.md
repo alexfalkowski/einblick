@@ -80,6 +80,14 @@ covered by the current database volume use local query capacity. Searches
 that need unavailable archive history return an error in both interfaces.
 [ListLogs protobuf contract](../../../api/einblick/v1/service.proto)
 
+## Embedded SQL lookup
+
+Embed the SQL directory in its owning package. Log storage loads its SQL once
+during construction and uses `MustLookup` for paths fixed in code. A missing
+path panics with its filename when the operation reaches it. The migration
+module checks the six required Goose history queries when it constructs the
+querier for the migrator.
+
 ## Search admission by source
 
 Allow one active current-volume search and two active archive-inclusive searches

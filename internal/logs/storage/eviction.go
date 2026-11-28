@@ -12,8 +12,10 @@ import (
 // batch whose UTC event day predates eventBefore.
 // A zero value indicates no eligible batch.
 func (r *Archive) NextEviction(ctx context.Context, eventBefore time.Time) (archive.Publication, error) {
+	statement := r.statements.MustLookup("queries/archive/next_eviction.sql")
+
 	var batch archive.Publication
-	row := r.db.QueryRowContext(ctx, nextEvictionQuery, eventBefore.Format(archive.DayLayout))
+	row := r.db.QueryRowContext(ctx, statement, eventBefore.Format(archive.DayLayout))
 	err := row.Scan(&batch.ID, &batch.Day, &batch.PublishedChecksum)
 	if errors.Is(err, sql.ErrNoRows) {
 		return archive.Publication{}, nil
@@ -30,14 +32,21 @@ func (r *Archive) Evict(ctx context.Context, id string, storedAt time.Time) erro
 	}
 	defer tx.Rollback()
 
-	for _, statement := range []string{evictResourcesQuery, evictScopesQuery, evictLogsQuery, evictMembersQuery} {
+	for _, path := range []string{
+		"queries/archive/evict_resources.sql",
+		"queries/archive/evict_scopes.sql",
+		"queries/archive/evict_logs.sql",
+		"queries/archive/evict_members.sql",
+	} {
+		statement := r.statements.MustLookup(path)
 		if _, err := tx.ExecContext(ctx, statement, id); err != nil {
 			return err
 		}
 	}
 
+	markEvicted := r.statements.MustLookup("queries/archive/mark_evicted.sql")
 	objectStoredAt := sql.NullTime{Time: storedAt.UTC(), Valid: !storedAt.IsZero()}
-	if _, err := tx.ExecContext(ctx, markEvictedQuery, objectStoredAt, id); err != nil {
+	if _, err := tx.ExecContext(ctx, markEvicted, objectStoredAt, id); err != nil {
 		return err
 	}
 	return tx.Commit()

@@ -108,7 +108,7 @@ func (r *repository) readArchiveLogs(ctx context.Context, query Query, list arch
 	}
 	defer tx.Rollback()
 
-	evicted, err := archiveSources(ctx, tx, query, list, cutoff)
+	evicted, err := r.archiveSources(ctx, tx, query, list, cutoff)
 	if err != nil {
 		return err
 	}
@@ -130,9 +130,11 @@ func archiveDays(query Query) (string, string) {
 	return query.StartTime.Format(archive.DayLayout), query.EndTime.Add(-time.Nanosecond.Duration()).Format(archive.DayLayout)
 }
 
-func archiveSources(ctx context.Context, tx *sql.Tx, query Query, listing archiveList, expirationCutoff time.Time) ([]string, error) {
+func (r *repository) archiveSources(ctx context.Context, tx *sql.Tx, query Query, list archiveList, cutoff time.Time) ([]string, error) {
+	statement := r.statements.MustLookup("queries/archive/sources.sql")
+
 	startDay, endDay := archiveDays(query)
-	rows, err := tx.QueryContext(ctx, archiveSourcesQuery, startDay, endDay)
+	rows, err := tx.QueryContext(ctx, statement, startDay, endDay)
 	if err != nil {
 		return nil, err
 	}
@@ -149,23 +151,23 @@ func archiveSources(ctx context.Context, tx *sql.Tx, query Query, listing archiv
 
 		key := batch.Key()
 		if !isEvicted {
-			delete(listing.objects, key)
+			delete(list.objects, key)
 			continue
 		}
-		if _, expired := listing.expired[key]; expired {
+		if _, expired := list.expired[key]; expired {
 			continue
 		}
 
 		// Asynchronous lifecycle deletion can leave eligible objects readable.
 		// Keep all listed objects, and require unlisted objects during retention.
-		listedAt, listed := listing.objects[key]
+		listedAt, listed := list.objects[key]
 
 		objectTime := archive.StoredAtForExpiration(listedAt, storedAt.Time)
 
-		if !listed && expiredObject(objectTime, expirationCutoff) {
+		if !listed && expiredObject(objectTime, cutoff) {
 			continue
 		}
-		listing.objects[key] = objectTime
+		list.objects[key] = objectTime
 		evicted = append(evicted, key)
 	}
 	return evicted, rows.Err()

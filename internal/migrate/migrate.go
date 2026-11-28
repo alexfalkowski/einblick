@@ -1,6 +1,7 @@
 package migrate
 
 import (
+	"embed"
 	"fmt"
 
 	"github.com/alexfalkowski/go-service/v3/context"
@@ -8,12 +9,16 @@ import (
 	"github.com/alexfalkowski/go-service/v3/io"
 	"github.com/pressly/goose/v3"
 	"github.com/pressly/goose/v3/database"
+	"github.com/pressly/goose/v3/database/dialect"
 )
 
-// NewMigrator constructs Goose over the service's existing connection and the
-// migrations embedded in this binary. It does not execute SQL or own cleanup.
-func NewMigrator(db *sql.DB) (*Migrator, error) {
-	store, err := database.NewStoreFromQuerier(goose.DefaultTablename, &Querier{})
+//go:embed migrations/*.sql
+var migrations embed.FS
+
+// NewMigrator configures Goose with the shared connection, the injected
+// migration-history querier, and the embedded migrations.
+func NewMigrator(db *sql.DB, querier dialect.Querier) (*Migrator, error) {
+	store, err := database.NewStoreFromQuerier(goose.DefaultTablename, querier)
 	if err != nil {
 		return nil, err
 	}
